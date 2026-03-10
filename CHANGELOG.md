@@ -1,0 +1,46 @@
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- **Plugin source folder naming** — Details: [plugin-source-folder-naming.md](_archive/plugin-source-folder-naming/plugin-source-folder-naming.md)
+  - Source directories and package names aligned with plugin directory names (dashes → underscores): `taps/restful-api-tap` uses `restful_api_tap` (formerly `tap_rest_api_msdk`); `loaders/gcs-loader` uses `gcs_loader` (formerly `target_gcs`).
+  - pyproject.toml, imports, scripts (install.sh, tox.ini, meltano.yml), and docs updated per plugin; provenance notes added in READMEs and AI_CONTEXT.
+- **Plugin standards and CI matrix** — Details: [plugin-standards-and-ci-matrix.md](_archive/plugin-standards-and-ci-matrix/plugin-standards-and-ci-matrix.md)
+  - Discovery script tests (TDD): `scripts/tests/` with black-box tests for `list_packages.py`; run via `pytest scripts/tests` from repo root.
+  - Discovery script implementation: `scripts/list_packages.py` (stdlib only, pathlib); optional ROOT, exclude .git/.venv/_archive/node_modules; sorted one path per line, exit 0.
+  - gcs-loader tests moved to package root: `loaders/gcs-loader/tests/` (from `target_gcs/tests/`); README updated; pytest discovers from package root.
+  - gcs-loader install.sh: add ruff (check + format --check) and mypy target_gcs; order ruff → mypy → pytest; exit code = pytest.
+  - restful-api-tap install.sh: run uv run pytest, ruff check/format --check, mypy tap_rest_api_msdk; exit code = pytest; tox removed from primary contract.
+  - GitHub workflow: `.github/workflows/plugin-matrix.yml` — discover job runs `scripts/list_packages.py`, converts stdout to JSON matrix, runs script tests; test job matrix over packages, runs `bash install.sh` per package. Triggers on push/PR to main or master with path filters (scripts/, taps/, loaders/, .github/).
+  - Documentation: `docs/monorepo/README.md` — added "CI and plugin standards" (matrix over pyproject.toml dirs, install.sh runs uv/pytest/ruff/mypy, tests in package root `tests/`). Plugin READMEs (gcs-loader, restful-api-tap) updated to state install.sh runs pytest, ruff, mypy; CI relies on install.sh.
+
+### Changed
+
+- **custom-meltano-plugins-documentation** — Details: [custom-meltano-plugins-documentation.md](_archive/custom-meltano-plugins-documentation/custom-meltano-plugins-documentation.md)
+  - Docs state plugins are custom (not on Meltano Hub or PyPI); install via `meltano.yml` and `pip_url` with `#subdirectory=`, variant **petcircle** in examples.
+  - Root README, docs/monorepo, docs/README, AI_CONTEXT (quick reference, repository), and tap README updated; tap README has "Install from this monorepo" subsection.
+- **glossary-terminology-repo** — Details: [glossary-terminology-repo.md](_archive/glossary-terminology-repo/glossary-terminology-repo.md)
+  - Align root README and CHANGELOG to glossary terminology (tap, target, extractor, loader, source, destination, stream, catalog, config file, state file).
+  - Align scripts: comments and docstrings in `scripts/list_packages.py` and `scripts/tests/*.py` to glossary (tap, target, extractor, loader); no logic or path changes.
+  - Align GitHub workflows: job names, comments, and step descriptions in `.github/workflows/*.yml` to glossary (tap, target, plugin); no run/paths/matrix or logic changes.
+  - Align Cursor commands: `.cursor/commands/update_context.md` updated so AI context docs describe extractors as taps and loaders as targets per glossary; prose only, no behaviour or path changes.
+  - Align Cursor agents: `.cursor/agents/*.md` use glossary terms (tap, target, config file, state file, catalog, stream); added Resources bullet to architect, archivist, debug-specialist, implementer, researcher, task-decomposer; ai-context-writer already referenced glossary.
+  - Align Cursor commands: `.cursor/commands/*.md` use glossary (extractor as tap, loader as target); update_context already compliant; audit only.
+  - Align Cursor workflows: `.cursor/workflows/*.md` use glossary terminology (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE) where describing Singer/Meltano pipelines or plugins; pipeline state preserved for scratchpad/workflow state.
+  - Align Cursor agents: `.cursor/agents/*.md` use glossary (tap, target, config file, state file, catalog, stream) in Resources; all seven agents already compliant.
+- **Target filenames and glossary alignment** — Details: [target-filenames-and-glossary-alignment.md](_archive/target-filenames-and-glossary-alignment/target-filenames-and-glossary-alignment.md)
+  - Rename Python package `gcs_loader` → `gcs_target` and CLI/plugin `gcs-loader` → `target-gcs` under `loaders/gcs-loader/` (pyproject.toml, meltano.yml, install.sh, source, tests; top-level dir unchanged until task 02).
+  - Top-level directory renamed `loaders/gcs-loader/` → `loaders/target-gcs/`; repo-wide path and plugin references updated.
+  - Package README and sample config updated to use `target-gcs` and `gcs_target`; root CHANGELOG documents migration.
+  - **User migration:** Plugin name is `target-gcs`, path is `loaders/target-gcs/`, package is `gcs_target`. Update `meltano.yml` to use `target-gcs` and re-run `meltano install`.
+- **Glossary terminology (target)** — Details: [glossary-terminology-target.md](_archive/glossary-terminology-target/glossary-terminology-target.md)
+  - Rename class and entry point: `GCSLoader` → `GCSTarget` in `loaders/gcs-loader`; CLI entry point set to `GCSTarget.cli`; module/class docstrings updated per glossary (target, destination, config file).
+  - Terminology in source: align docstrings and comments in `target.py` and `sinks.py` with glossary (target, sink, destination, config file, state file, SCHEMA, RECORD, STATE, RecordSink, sink drain, stream, record).
+  - Terminology in tests: align docstrings and comments in `test_core.py` and `test_sinks.py` with glossary (target, sink, config file); no assertion or behavioural changes.
+  - In-package docs: README aligned with glossary (target, loader, config file, destination); CLI name and config schema unchanged.
+- **Plugin class name alignment** — Details: [plugin-class-name-alignment.md](_archive/plugin-class-name-alignment/plugin-class-name-alignment.md)
+  - GCS loader (target): class renamed TargetGCS → GCSLoader, name set to "gcs-loader"; tests, pyproject.toml, meltano.yml, README updated.
+  - Restful API tap: class renamed TapRestApiMsdk → RestfulApiTap, name set to "restful-api-tap"; script restful-api-tap.sh, pyproject.toml, meltano.yml, tests, README and AI_CONTEXT docs updated.
+  - Repo docs: root README and docs/monorepo updated to use gcs-loader and restful-api-tap in plugins table, installation YAML, directory layout, and pipeline examples.

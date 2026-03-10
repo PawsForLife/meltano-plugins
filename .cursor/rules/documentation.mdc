@@ -1,0 +1,28 @@
+---
+description: Documentation rules
+alwaysApply: true
+---
+
+Obey @.cursor/rules/content_length.mdc
+
+# Code Documentation
+
+- ALWAYS keep documentation and comments concise and relevant
+- Use Google DocStrings when documenting functions
+
+# Project Documentation
+
+- All documentation not in files will be in Markdown format
+
+- Always provide a README.md for a project which contains the following:
+  - Executive summary of the project
+  - Installation Instructions
+  - Usage Instructions
+
+- **IF** additional documentation is required; it should be placed within a 'docs' folder within the project directory
+- All documentation generated should be concise
+- ALWAYS refresh your understanding of a system, project or feature before documenting
+
+- ALWAYS refresh your understanding of a document and the systems it covers; and then review that document for inconsistencies after writing it.
+- **NEVER** update code based on documentation; update documentation to reflect the code
+

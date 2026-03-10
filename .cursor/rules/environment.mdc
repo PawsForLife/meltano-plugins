@@ -1,0 +1,42 @@
+---
+description: Project environment and tooling
+alwaysApply: true
+---
+
+# Tooling
+
+Use the project's preferred languages, versions, and tooling as defined in project config (e.g. `pyproject.toml`, `package.json`, README). Common examples: Python (e.g. 3.12), Node.js, with linters and formatters (e.g. Ruff, MyPy for Python; ESLint/Prettier for Node).
+
+# Environment
+
+- **IF** `install.sh` does not exist, create one that:
+  - Creates a virtual environment (e.g. `.venv` with `uv` or project-preferred tool)
+  - Activates the virtual environment
+  - Installs project dependencies (e.g. Python via `uv`/`pyproject.toml`, Node via `pnpm install` or project script)
+  - Runs the project's test suite
+
+- **ALWAYS** ensure the project's runtime environment is active (e.g. `source .venv/bin/activate` for Python venv) when running project commands.
+
+- **IF** a new dependency is required, add it to the project's dependency file (`pyproject.toml`, `package.json`, etc.) and run the project's install script. **DO NOT** install ad hoc with `pip install ...` or `npm install ...` unless the project documents that approach.
+
+# Structure
+
+Document or discover project structure from README or `cursor/CONVENTIONS.md`. Typical elements include:
+
+- Source package(s) or application directories
+- `docs` — project documentation
+- Feature/bug tracking directories (e.g. `{features_dir}`, `{bugs_dir}` per conventions)
+- `.cursor` — Cursor commands, rules, and config
+- Any tools, data, or third-party directories the project defines
+
+## Git
+
+If the project's Git does not support certain flags (e.g. `--trailer`), use the project's wrapper script if provided (e.g. `scripts/git-commit.cmd` or `scripts/git-commit.sh`). The wrapper accepts standard `git commit` arguments (e.g. `-m`, `-a`, `--amend`). If no wrapper is documented, use `git commit` directly.
+
+## Linting / Styling
+
+Use the project's preferred test runner and linters (e.g. as defined in `pyproject.toml`, `package.json`, or README). Resolve style and type issues via the project's configured tools before considering work complete.
+
+## Testing / Validation
+
+Run the project's test suite and any code quality checks as defined in project rules or README. All tests must pass (excluding explicitly marked expected failures) before considering a task complete.

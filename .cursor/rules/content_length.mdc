@@ -1,0 +1,15 @@
+---
+description: Maximum Documentation & Code file length
+alwaysApply: false
+glob: [*.md, *.py]
+---
+
+# Documentation (Markdown)
+
+All documentation files should be capped at 500 lines in length.
+If a file would exceed this is should be divided into logical sub files and stored within a folder named for the original file and include an index.md that lists each file's name, a reference to the file and a brief single line description of the content of the file. All references to the original file should instead link to either the index (if usage is generic), or the specific subfile (if usage is specific).
+
+# Code (Python)
+
+All code files should be capped at 500 lines in length.
+If a code file would exceed this, it should be converted into a module. First create a folder named for the file, add an __init__.py that will supply the public interface of the module. This file should use relative imports to the files within itself. The code files should then be split into logical files within this module. If there are models (pydantic, dataclass, etc) defined they should be stored in a subfolder called `models` unless they are used globally within the program in which case they should be stored in a clear shared location. Any content only used internally within the submodule should be stored within a subfolder and not exposed to the rest of the program. Update any other code files which reference the original to instead make use of the module and use the exposed public values (they should not path into the submodule unless they are tests).

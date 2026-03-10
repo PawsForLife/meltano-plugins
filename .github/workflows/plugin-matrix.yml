@@ -1,0 +1,50 @@
+# Tap and target plugin matrix CI: discover plugin packages via scripts/list_packages.py and run each package's install.sh.
+name: Tap and target plugin matrix
+
+on:
+  pull_request:
+    branches: [main, release]
+    paths:
+      - "scripts/**"
+      - "taps/**"
+      - "loaders/**"
+      - ".github/**"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.discover.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run plugin package discovery and set matrix output
+        id: discover
+        run: |
+          PACKAGES=$(python scripts/list_packages.py .)
+          echo "packages<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$PACKAGES" | jq -R -s -c 'split("\n") | map(select(length > 0)) | {path: .}' >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Run script tests
+        run: |
+          pip install pytest
+          pytest scripts/tests -v
+
+  test:
+    needs: discover
+    strategy:
+      matrix: ${{ fromJson(needs.discover.outputs.packages) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and test tap or target plugin
+        working-directory: ${{ matrix.path }}
+        run: bash install.sh

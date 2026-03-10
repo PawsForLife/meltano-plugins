@@ -1,0 +1,119 @@
+# AI Context — Patterns & Conventions
+
+## Metadata
+
+| Field | Value |
+|-------|--------|
+| Version | 1.1 |
+| Last Updated | 2025-03-11 |
+| Tags | patterns, conventions, TDD, models, DI, validation, testing, meltano, singer |
+| Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) |
+
+---
+
+## Code Organization
+
+- **Monorepo layout**: Each plugin is a standalone package under `taps/` or `loaders/` with its own `pyproject.toml`, source package, and `tests/`. No shared library; tap and target communicate via Singer JSONL on stdout/stdin.
+- **Source package naming**: Snake_case directory matching the CLI name (e.g. `restful_api_tap/`, `gcs_target/`). Entry module is `tap.py` (tap) or `target.py` (target).
+- **Module responsibilities**:
+  - **Tap**: `tap.py` — Tap class, config schema (`common_properties`, `top_level_properties`), stream discovery (`discover_streams()`); `streams.py` — `DynamicStream`; `auth.py` — `get_authenticator`, `select_authenticator`; `client.py` — `RestApiStream`, `_request`, `request_records`; `pagination.py`; `utils.py` (e.g. `flatten_json`).
+  - **Target**: `target.py` — Target class, `config_jsonschema`, `default_sink_class`; `sinks.py` — `GCSSink` (`key_name`, `gcs_write_handle`, `process_record`).
+- **Config schema**: Declared on the Tap/Target class via `singer_sdk.typing` (`th.PropertiesList`, `th.Property`). Target example: `config_jsonschema = th.PropertiesList(th.Property("bucket_name", th.StringType, required=True), ...).to_dict()`. Stream-level and top-level properties are merged in tap config (e.g. `stream.get("key", self.config.get("key", default))` in `discover_streams()`).
+
+---
+
+## Type & Model Patterns
+
+- **Config and schema**: Use Singer SDK typing (`singer_sdk.typing` as `th`). Properties are defined with `th.Property(name, type, required=..., description=...)`. Complex or nested data is described via `th.ObjectType()`, `th.ArrayType()`, etc. No Pydantic/dataclass for config; validation is “load into SDK schema + fail fast.”
+- **Validation over re-checking**: Ingested data that must be parsed is loaded into a model (or SDK schema). If validation fails, do not use the data. Once valid, do not check validity again downstream.
+- **Typing in code**: Parameters and return types are annotated (e.g. `def parse_response(self, response: requests.Response) -> Iterable[dict]`). Optional and generic types from `typing` are used where appropriate.
+- **Stream/sink construction**: Tap builds stream instances with explicit kwargs from resolved config (e.g. `DynamicStream(tap=self, name=..., path=..., schema=..., authenticator=self._authenticator)`). No implicit global state for stream options.
+
+---
+
+## Error Handling & Logging
+
+- **Fatal vs non-fatal**: Initial request failures (e.g. 404 on first page) are fatal and surface via SDK (e.g. `FatalAPIError`). Next-page 404 can be treated as end-of-stream; the tap returns records already fetched and stops (see `restful_api_tap/client.py` `_request` and `request_records`).
+- **Validation errors**: Invalid config or response shape raises (e.g. `ValueError` for unknown auth method or non-dict record). Schema inference requires dict records; otherwise `ValueError("Input must be a dict object.")`.
+- **Logging**: Use the SDK/stream `self.logger` for info/debug/error. No tests assert on log output (black-box testing). Log messages are descriptive (e.g. “Pagination stopped after N pages because no records were found”).
+- **Backoff**: Rate-limited APIs use config-driven backoff (`backoff_type`: `message`, `header`, or default). Streams can override `backoff_wait_generator` to return a generator that yields wait times from response message or header (e.g. `RestfulApiTap` streams).
+
+---
+
+## Testing & TDD
+
+- **TDD**: Write a failing test first, then implement until it passes.
+- **Valid tests**: Every test must be able to fail (no tests that can only pass).
+- **Working tests**: If a test fails due to its own logic, fix the test; failing tests (except `@pytest.mark.xfail` / `@unittest.expectedFailure`) are regressions and must be resolved before the task is complete.
+- **Test layout**: Tests live under each plugin’s `tests/` (e.g. `taps/restful-api-tap/tests/`, `loaders/target-gcs/tests/`). Naming: `test_<module>.py` or `test_<feature>.py` (e.g. `test_tap.py`, `test_streams.py`, `test_404_end_of_stream.py`, `test_sinks.py`).
+- **Black-box**: Tests assert on observable behaviour (returned objects, emitted records, raised exceptions). They do not assert on “called_once”, log lines, or internal call counts. For external data changes, the mock (e.g. `requests_mock`) provides the changed response; for internal state, assert on returned or mutated objects.
+- **Exception tests**: Use `pytest.raises(ExpectedException)` to assert that a specific exception type is raised (e.g. `with pytest.raises(FatalAPIError): list(stream.get_records({}))`).
+- **Fixtures and helpers**: Shared config and API mocks are factored into helpers (e.g. `config()`, `setup_api()`, `json_resp()`, `build_sink()`) in test modules. Schema files under `tests/` (e.g. `tests/schema.json`) are used when discovery is bypassed.
+- **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_standard_target_tests(GCSTarget, config=...)`. Run these in a test that iterates and invokes each case.
+- **Regression gate**: Any failing test that is not explicitly marked as expected failure (`@pytest.mark.xfail`, `@unittest.expectedFailure`) is a regression and must be fixed before the task is complete.
+
+---
+
+## Dependency Injection & Validation
+
+- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; GCS sink uses `Client()` from constructor/config context, and tests patch `gcs_target.sinks.Client` to assert it is called with the expected args (e.g. no credentials path for ADC).
+- **Authenticator caching**: The tap caches the authenticator in `_authenticator` and reuses it across streams. OAuth refresh is handled inside the authenticator; `get_authenticator(self)` returns the cached instance or builds one via `select_authenticator(self)`.
+- **Config resolution**: Tap merges top-level and stream-level config (e.g. `params = {**self.config.get("params", {}), **stream.get("params", {})}`). Required settings (e.g. `api_url`, `bucket_name`) are enforced by the config schema and runtime checks. Config is supplied via config file or Meltano-injected env.
+
+---
+
+## Q&A Behavior Examples
+
+### How do I add a new stream?
+
+1. Add a stream entry to the tap config `streams` array with `name`, `path`, and any stream-level overrides (`records_path`, `primary_keys`, `replication_key`, etc.).
+2. Streams are created in `RestfulApiTap.discover_streams()` by iterating `self.config["streams"]`, resolving schema (file path, dict, or inferred via `get_schema()`), and instantiating `DynamicStream(...)` with the resolved kwargs.
+3. No code change is needed if the stream is fully described in config; for custom behaviour, subclass `DynamicStream` or add a new stream class and wire it in discovery.
+
+### How do I handle auth?
+
+1. Set `auth_method` in config (`no_auth`, `api_key`, `basic`, `oauth`, `bearer_token`, `aws`). Provide the required config keys for that method (see tap `top_level_properties` in `tap.py`).
+2. The tap calls `get_authenticator(self)` when it needs auth (e.g. in `get_schema()` and via the stream’s `authenticator` property). Authenticators live in `restful_api_tap/auth.py`; OAuth uses `ConfigurableOAuthAuthenticator`, AWS uses `AWSConnectClient` and sets `self.http_auth`.
+3. To add a new auth method: implement a new authenticator (or use an SDK one), add a branch in `select_authenticator()` in `auth.py`, and add any new config properties to `top_level_properties` in `tap.py`.
+
+### How do I add a new target option?
+
+1. Add a `th.Property(...)` to `GCSTarget.config_jsonschema` in `loaders/target-gcs/gcs_target/target.py` (e.g. `key_naming_convention`, `date_format`).
+2. Read the option in the sink from `self.config.get("option_name", default)` (e.g. in `GCSSink.key_name` and related logic in `sinks.py`).
+3. Add or adjust tests that build the sink with the new config and assert on behaviour (e.g. key name format), not on call counts.
+
+### How do I add a new tap (top-level or stream-level) config property?
+
+1. Add the property to `common_properties` (stream-level and top-level) or `top_level_properties` only in `restful_api_tap/tap.py`, using `th.Property(...)` with type, required, default, and description.
+2. If it is stream-level, ensure `discover_streams()` resolves it (e.g. `stream.get("key", self.config.get("key", default))`) and passes it into `DynamicStream(...)`.
+3. If the stream or auth logic uses it, add the parameter to `DynamicStream.__init__` and/or the relevant methods. Optionally add a test that asserts the property appears in `config_jsonschema` or that behaviour changes when the property is set.
+
+### How do I treat 404 as end-of-stream?
+
+- Only for **next-page** requests. In `RestApiStream._request()` (client.py), when `response.status_code == 404` and `_is_next_page_request` is True, return the response without calling `validate_response(response)`. In `request_records()`, when the response is 404 after a request, break the loop and do not yield further records. The initial request must still raise on 404 (e.g. `FatalAPIError`). See `tests/test_404_end_of_stream.py` for tests.
+
+### How do I add a new pagination style?
+
+1. Implement a paginator (or use an SDK base) and optionally a `_get_url_params_*` style in `restful_api_tap/streams.py`.
+2. Register the style in `get_new_paginator()` (e.g. by `pagination_request_style` string) and, if needed, in the `get_url_params_styles` dict for request body vs params.
+3. Add config properties for any new parameters (e.g. `pagination_*`) in `tap.py` and pass them into `DynamicStream`. Add tests that mock paged responses and assert record count or last page behaviour.
+
+### How do I validate that the target does not accept a credentials file?
+
+- Assert on the public config schema: in a test, load `GCSTarget.config_jsonschema` and assert `"credentials_file" not in (schema.get("properties") or {})`. Optionally assert that the GCS client is constructed without a credentials path by patching `Client` and checking constructor args (e.g. in `loaders/target-gcs/tests/test_sinks.py`). This documents that auth is ADC or env-only.
+
+### How do I run the test suite?
+
+- Per-plugin: from the plugin directory run `./install.sh` (creates venv, installs deps, runs tests) or activate the venv and run `pytest` (e.g. `cd taps/restful-api-tap && source .venv/bin/activate && pytest`). Use the project's test runner and linters as defined in each plugin's `pyproject.toml`; resolve style/type issues before considering the task complete.
+
+---
+
+## File Reference (short)
+
+| Purpose | Tap | Target |
+|--------|-----|--------|
+| Entry, config schema | `taps/restful-api-tap/restful_api_tap/tap.py` | `loaders/target-gcs/gcs_target/target.py` |
+| Stream/sink logic | `restful_api_tap/streams.py`, `client.py` | `gcs_target/sinks.py` |
+| Auth | `restful_api_tap/auth.py` | — |
+| Helpers | `restful_api_tap/utils.py`, `pagination.py` | — |
+| Tests | `taps/restful-api-tap/tests/*.py` | `loaders/target-gcs/tests/*.py` |

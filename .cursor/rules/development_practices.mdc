@@ -1,0 +1,17 @@
+---
+description: Software Development Practices
+alwaysApply: true
+---
+
+- Test Driven Development (TDD): Always write a test case first
+- Data Classes / Models : Always use models for transferring complex or nested data
+- Dependency Injection: Non-Deterministic systems **must** be passed in as parameters. This includes uncontrolled internal functionality such as `time`, and external API connections such as `google.cloud.firestore.Client`
+- Validation over testing: All ingested data that needs to be parsed will be done so via loading into a model; if the model fails validation, we do not use. If it does, we **never** check its validity again.
+- Black Box Testing: Tests validate functionality not internal behaviour.
+    - Never check for "called_once" or if a log line was printed
+    - If changing external data; ensure mock client can provide changed object
+    - If changing internal data; validate returned object or referenced object (if it is pass by reference updating )
+    - If validating exception; use expect exception tests
+- Working Tests: All tests **must** work; if a test is incorrect or fails due to its own logic, fix the test.
+- Valid Tests: All tests **must** be able to fail. You cannot have tests that can only pass
+- Regression Gate: Failing tests not explicitly marked as expected failures (`@pytest.mark.xfail`, `@unittest.expectedFailure`) are regressions. Regressions **must** be resolved before a task is considered complete.
