@@ -6,6 +6,7 @@
 
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)
   - Add optional `max_records_per_file` to target config schema; schema and validation tests in test_sinks.py.
+  - Add tests for chunking disabled: one key and one handle, key without chunk_index (backward compatibility).
 - **restful-api-tap is_sorted stream config** — Details: [restful-api-tap-is-sorted-stream-config.md](_archive/restful-api-tap-is-sorted-stream-config/restful-api-tap-is-sorted-stream-config.md)
   - Add black-box tests for stream-level `is_sorted` (true, omitted, false, multi-stream); tests marked xfail until tasks 02–05 wire config.
   - Add `is_sorted` stream setting (boolean) to plugin schema in meltano.yml.

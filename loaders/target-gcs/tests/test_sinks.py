@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
@@ -116,3 +116,42 @@ def test_gcs_client_uses_adc_when_google_application_credentials_set():
             sink = build_sink()
             _ = sink.gcs_write_handle
         mock_client.assert_called_once_with()
+
+
+def test_one_key_and_one_handle_when_chunking_disabled():
+    """When max_records_per_file is unset or 0, multiple records use a single key and a single handle (no rotation).
+    Backward compatibility: existing behaviour must be unchanged when the option is off."""
+    mock_handle = MagicMock()
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", return_value=mock_handle
+    ) as mock_open:
+        sink = build_sink()
+        context = {}
+        key_after_first = None
+        for i in range(5):
+            sink.process_record({"id": i, "name": f"record_{i}"}, context)
+            if i == 0:
+                key_after_first = sink.key_name
+        key_after_last = sink.key_name
+    assert key_after_first == key_after_last, (
+        "key_name must stay stable when chunking is disabled"
+    )
+    assert mock_open.call_count == 1, (
+        "exactly one file handle must be opened for the stream when chunking is off"
+    )
+
+
+def test_key_has_no_chunk_index_when_chunking_disabled():
+    """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp pattern.
+    Backward compatibility: key format is unchanged when chunking is off."""
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    ):
+        sink = build_sink()
+        sink.process_record({"id": 1}, {})
+    assert "{chunk_index}" not in sink.key_name, (
+        "key must not contain chunk_index token when chunking is disabled"
+    )
+    assert re.match(r"my_stream_\d+\.jsonl", sink.key_name), (
+        "key must match default pattern (stream, timestamp) when chunking is off"
+    )

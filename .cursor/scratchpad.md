@@ -23,3 +23,4 @@
 - **Task plan created:** 07-handle-flush-on-close at plans/tasks/07-handle-flush-on-close.md
 - Task plan created: 06-rotation-and-process-record at plans/tasks/06-rotation-and-process-record.md
 - **Task 01-add-config-schema completed, tests passing.**
+- Task 02-tests-chunking-disabled completed, tests passing.
