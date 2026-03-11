@@ -1,9 +1,0 @@
-{
-  "bucket_name": "datateer-managed-prt-prod-raw-data",
-  "key_prefix": "prt-test/triton",
-  "date_format": "%Y-%m-%d",
-  "key_naming_convention": "{stream}/{partition_date}/{timestamp}.jsonl",
-  "max_records_per_file": 1000,
-  "partition_date_field": "created_at",
-  "partition_date_format": "year=%Y/month=%m/day=%d"
-}
