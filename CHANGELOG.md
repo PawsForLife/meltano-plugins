@@ -10,6 +10,8 @@
 
 ### Added
 
+- **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
+  - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)
   - Add optional `max_records_per_file` to target config schema; schema and validation tests in test_sinks.py.
   - Add tests for chunking disabled: one key and one handle, key without chunk_index (backward compatibility).

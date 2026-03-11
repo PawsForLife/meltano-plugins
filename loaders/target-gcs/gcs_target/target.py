@@ -20,5 +20,17 @@ class GCSTarget(Target):
             required=False,
             description="Maximum records per GCS object; 0 or unset = no chunking.",
         ),
+        th.Property(
+            "partition_date_field",
+            th.StringType,
+            required=False,
+            description="Record property name for partition path (e.g. created_at, updated_at). When set, partition-by-field is enabled.",
+        ),
+        th.Property(
+            "partition_date_format",
+            th.StringType,
+            required=False,
+            description="strftime-style format for Hive path segment. Default in code: year=%Y/month=%m/day=%d.",
+        ),
     ).to_dict()
     default_sink_class = GCSSink

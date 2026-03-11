@@ -122,6 +122,45 @@ def test_config_validates_without_max_records_per_file():
     )
 
 
+def test_config_schema_includes_partition_date_field():
+    """Schema exposes partition_date_field so config can enable partition-by-record-date; config contract for record field name."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "partition_date_field" in properties
+    prop = properties["partition_date_field"]
+    type_val = prop.get("type")
+    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
+    required = schema.get("required") or []
+    assert "partition_date_field" not in required
+
+
+def test_config_schema_includes_partition_date_format():
+    """Schema exposes partition_date_format so config can set strftime format for Hive path segment; config contract for format."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "partition_date_format" in properties
+    prop = properties["partition_date_format"]
+    type_val = prop.get("type")
+    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
+    required = schema.get("required") or []
+    assert "partition_date_format" not in required
+
+
+def test_config_validates_with_partition_date_field():
+    """Config including partition_date_field (and optionally partition_date_format) is valid; target instantiates without validation error. Backward compatibility and new usage."""
+    config = {"bucket_name": "b", "partition_date_field": "created_at"}
+    target = GCSTarget(config=config)
+    assert target.config["partition_date_field"] == "created_at"
+    config_with_format = {
+        "bucket_name": "b",
+        "partition_date_field": "x",
+        "partition_date_format": "year=%Y/month=%m",
+    }
+    target_with_format = GCSTarget(config=config_with_format)
+    assert target_with_format.config["partition_date_field"] == "x"
+    assert target_with_format.config["partition_date_format"] == "year=%Y/month=%m"
+
+
 def test_gcs_client_created_without_credentials_path():
     """Sink must use Client() (ADC) only; no explicit credentials path passed from config file."""
     with patch("gcs_target.sinks.Client") as mock_client:
