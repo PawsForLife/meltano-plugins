@@ -5,7 +5,6 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import orjson
-import pytest
 
 from gcs_target.sinks import GCSSink, get_partition_path_from_record
 from gcs_target.target import GCSTarget
@@ -318,9 +317,6 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
 
 
 # Partition resolution tests for get_partition_path_from_record (implementation in task 03).
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_valid_iso_date_in_field():
     """Valid ISO date in partition_date_field yields Hive-style path. WHAT: Parsed date is formatted with default Hive format. WHY: Core behaviour for partition path from date string."""
     result = get_partition_path_from_record(
@@ -332,9 +328,6 @@ def test_partition_path_valid_iso_date_in_field():
     assert result == "year=2024/month=03/day=11"
 
 
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_valid_iso_datetime_in_field():
     """Valid ISO datetime in field yields date-only partition path. WHAT: Datetime is parsed and date part used for path. WHY: Common API format must be supported."""
     result = get_partition_path_from_record(
@@ -346,9 +339,6 @@ def test_partition_path_valid_iso_datetime_in_field():
     assert result == "year=2024/month=03/day=11"
 
 
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_fallback_format():
     """Date string parseable by supported format yields correct path. WHAT: Fallback parsing path works when format matches input. WHY: Support non-ISO date strings."""
     result = get_partition_path_from_record(
@@ -360,9 +350,6 @@ def test_partition_path_fallback_format():
     assert result == "year=2024/month=03/day=11"
 
 
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_missing_field_uses_fallback():
     """Missing partition_date_field in record yields fallback_date formatted path. WHAT: Fallback when field absent. WHY: No crash; predictable path."""
     result = get_partition_path_from_record(
@@ -374,9 +361,6 @@ def test_partition_path_missing_field_uses_fallback():
     assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_invalid_value_uses_fallback():
     """Non-date string in partition_date_field yields fallback path. WHAT: Unparseable value uses fallback. WHY: Robustness against bad data."""
     result = get_partition_path_from_record(
@@ -388,9 +372,6 @@ def test_partition_path_invalid_value_uses_fallback():
     assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
-@pytest.mark.xfail(
-    reason="get_partition_path_from_record not implemented until task 03"
-)
 def test_partition_path_custom_format():
     """Custom partition_date_format is applied to parsed date. WHAT: Configurable format produces matching path. WHY: Flexibility for different Hive layouts."""
     custom_format = "day=%d/month=%m"

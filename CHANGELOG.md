@@ -13,6 +13,7 @@
 - **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
   - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
   - Add unit tests for get_partition_path_from_record (valid ISO date/datetime, fallback format, missing field, invalid value, custom format); stub in sinks.py until task 03.
+  - Implement get_partition_path_from_record: parse record field (ISO date/datetime, fallback %Y-%m-%d); use fallback_date when missing or unparseable; add DEFAULT_PARTITION_DATE_FORMAT (Hive-style); remove xfail from partition resolution tests.
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)
   - Add optional `max_records_per_file` to target config schema; schema and validation tests in test_sinks.py.
   - Add tests for chunking disabled: one key and one handle, key without chunk_index (backward compatibility).
