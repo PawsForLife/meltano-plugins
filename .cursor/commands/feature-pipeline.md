@@ -119,11 +119,12 @@ For **each** task in the applicable list:
    - Execute the workflow in `@.cursor/workflows/6-archive-feature-summary.md`
    - Read all documents under `{features_dir}/{feature_name}` and the feature request at `{features_dir}/{feature_name}.md`
    - Write the summary to `{archive_dir}/{feature_name}/{feature_name}.md`
-3. **Delete feature artifacts**: Delete the feature request file and the feature folder:
+3. **Clean archive directory**: Remove any existing non-summary files and directories under `{archive_dir}/{feature_name}/` (e.g. `tasks/`, `plans/`, `planning/`, task-list files) so that only `{feature_name}.md` remains. Ensures the archive stays summary-only before every commit.
+4. **Delete feature artifacts**: Delete the feature request file and the feature folder:
    - Delete `{features_dir}/{feature_name}.md`
    - Delete the entire tree `{features_dir}/{feature_name}/`
-4. **Commit**: Run the **Commit Procedure**. Use type `docs`, scope `feature`, description: `archive summary for {feature_name}`.
-5. **Scratchpad**: Clear completed feature from the scratchpad file.
+5. **Commit**: Run the **Commit Procedure**. Use type `docs`, scope `feature`, description: `archive summary for {feature_name}`.
+6. **Scratchpad**: Clear completed feature from the scratchpad file.
 
 ## Notes
 

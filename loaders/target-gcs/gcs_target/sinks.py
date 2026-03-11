@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from io import FileIO
-from typing import Optional
+from typing import Callable, Optional
 
 import orjson
 import smart_open
@@ -13,11 +13,19 @@ from singer_sdk.sinks import RecordSink
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed."""
+    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key."""
 
     max_size = 1000  # Max records to write in one batch
 
-    def __init__(self, target, stream_name, schema, key_properties):
+    def __init__(
+        self,
+        target,
+        stream_name,
+        schema,
+        key_properties,
+        *,
+        time_fn: Optional[Callable[[], float]] = None,
+    ):
         super().__init__(
             target=target,
             stream_name=stream_name,
@@ -26,12 +34,18 @@ class GCSSink(RecordSink):
         )
         self._gcs_write_handle: Optional[FileIO] = None
         self._key_name: str = ""
+        self._records_written_in_current_file: int = (
+            0  # Records written to current file; reset on rotation.
+        )
+        self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
+        self._time_fn: Optional[Callable[[], float]] = time_fn
 
     @property
     def key_name(self) -> str:
-        """Return the key name."""
+        """Return the key name. When recomputing, uses stream, date, timestamp; when chunking is enabled (max_records_per_file > 0), includes chunk_index so key_naming_convention may use {chunk_index}."""
         if not self._key_name:
-            extraction_timestamp = round(time.time())
+            # Time is injectable via time_fn for deterministic key assertions in tests.
+            extraction_timestamp = round((self._time_fn or time.time)())
             base_key_name = self.config.get(
                 "key_naming_convention",
                 f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
@@ -42,14 +56,16 @@ class GCSSink(RecordSink):
                 )
             ).lstrip("/")
             date = datetime.today().strftime(self.config.get("date_format", "%Y-%m-%d"))
-            self._key_name = prefixed_key_name.format_map(
-                defaultdict(
-                    str,
-                    stream=self.stream_name,
-                    date=date,
-                    timestamp=extraction_timestamp,
-                )
+            max_records = self.config.get("max_records_per_file", 0)
+            format_map = defaultdict(
+                str,
+                stream=self.stream_name,
+                date=date,
+                timestamp=extraction_timestamp,
             )
+            if max_records and max_records > 0:
+                format_map["chunk_index"] = self._chunk_index
+            self._key_name = prefixed_key_name.format_map(format_map)
         return self._key_name
 
     @property
@@ -69,12 +85,35 @@ class GCSSink(RecordSink):
         """In the future maybe we will support more formats"""
         return "jsonl"
 
+    def _rotate_to_new_chunk(self) -> None:
+        """Close the current file handle, clear key cache, increment chunk index, and reset record count. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
+        if self._gcs_write_handle is not None:
+            if hasattr(self._gcs_write_handle, "flush"):
+                self._gcs_write_handle.flush()
+            self._gcs_write_handle.close()
+            self._gcs_write_handle = None
+        self._key_name = ""
+        self._chunk_index += 1
+        self._records_written_in_current_file = 0
+
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload).
 
+        When chunking is enabled (max_records_per_file > 0), rotates to a new
+        file before writing if the current file has reached the record limit.
         Developers may optionally read or write additional markers within the
         passed `context` dict from the current batch.
         """
+        max_records = self.config.get("max_records_per_file", 0)
+        # Rotate to new chunk: close handle, clear key cache, increment chunk index, reset record count.
+        if (
+            max_records
+            and max_records > 0
+            and self._records_written_in_current_file >= max_records
+        ):
+            self._rotate_to_new_chunk()
         self.gcs_write_handle.write(
             orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
         )
+        if max_records and max_records > 0:
+            self._records_written_in_current_file += 1

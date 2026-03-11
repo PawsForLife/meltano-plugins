@@ -12,9 +12,9 @@ Usage: python scripts/list_packages.py [ROOT] [--json]
   --json: Output a single JSON object {"path": [...]} for use as a GitHub Actions matrix.
           Without --json, outputs one relative path per line.
 
-Output: One relative path per line (no header, no trailing blank line), or JSON when --json.
-Paths are sorted lexicographically. Exits 0 on success; non-zero if ROOT is missing, not a
-directory, or invalid.
+Output: One relative path per line (no header, no trailing blank line), or JSON when --json
+(one line plus trailing newline for heredoc/GITHUB_OUTPUT compatibility). Paths sorted
+lexicographically. Exits 0 on success; non-zero if ROOT is missing, not a directory, or invalid.
 
 Excluded directory names (and their descendants are not walked): .git, .venv, _archive, node_modules.
 """
@@ -72,7 +72,7 @@ def main(root: Path | None = None, json_output: bool = False) -> int:
 
     packages = discover(root)
     if json_output:
-        print(json.dumps({"path": [p.as_posix() for p in packages]}), end="")
+        print(json.dumps({"path": [p.as_posix() for p in packages]}))
     else:
         for rel in packages:
             print(rel.as_posix())
@@ -80,7 +80,9 @@ def main(root: Path | None = None, json_output: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="List package directories (with pyproject.toml).")
+    parser = argparse.ArgumentParser(
+        description="List package directories (with pyproject.toml)."
+    )
     parser.add_argument(
         "root",
         nargs="?",
@@ -92,7 +94,7 @@ if __name__ == "__main__":
         "--json",
         dest="json_output",
         action="store_true",
-        help="Output JSON object {\"path\": [...]} for GitHub Actions matrix.",
+        help='Output JSON object {"path": [...]} for GitHub Actions matrix.',
     )
     args = parser.parse_args()
     sys.exit(main(root=args.root, json_output=args.json_output))

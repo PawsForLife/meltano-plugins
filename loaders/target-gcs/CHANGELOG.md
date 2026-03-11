@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **README:** Clarified "Naming with chunking": added comma before "so" in chunk-index sentence; rewrote timestamp explanation so collisions are defined by chunk start time within the same granularity window (e.g. 12:00:00.500 vs 12:00:00.999), not by processing duration.
+
 - **Glossary alignment:** Plugin, package, and directory were renamed for Singer/Meltano glossary alignment: CLI/plugin `target-gcs`, Python package `gcs_target`, path `loaders/target-gcs/`. See the [repo root CHANGELOG](../../CHANGELOG.md) for user migration (update `meltano.yml` to use `target-gcs`, re-run `meltano install`).
 
 ### Breaking

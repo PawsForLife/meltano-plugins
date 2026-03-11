@@ -46,7 +46,7 @@ if [[ -z "${VIRTUAL_ENV}" ]]; then
 fi
 
 printf "\n${GREEN}Installing project dependencies...${NC}\n"
-uv sync || { printf "\n${RED}Failed to install dependencies${NC}\n"; exit 1; }
+uv sync --extra dev || { printf "\n${RED}Failed to install dependencies${NC}\n"; exit 1; }
 
 # Lint and type-check
 printf "\n${GREEN}Running ruff check...${NC}\n"

@@ -22,12 +22,19 @@ The target reads its settings from a **config file** (see `sample.config.json` f
 
 ### Accepted Config Options
 
-| Property              | Env variable                     | Type   | Required | Default       | Description                                                                                                                                                                                                                                                                                      |
-| --------------------- | -------------------------------- | ------ | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| bucket_name           | TARGET_GCS_BUCKET_NAME           | string | yes      | n/a           | The name of the GCS bucket                                                                                                                                                                                                                                                                       |
-| date_format           | TARGET_GCS_DATE_FORMAT           | string | no       | %Y-%m-%d      | If `{date}` token is used in key_naming_convention, the date will be formatted with this format string                                                                                                                                                                                           |
-| key_prefix            | TARGET_GCS_KEY_PREFIX            | string | no       | None          | A static prefix before the generated key names. If this and `key_naming_convention` are both provided, they will be combined.                                                                                                                                                                    |
-| key_naming_convention | TARGET_GCS_KEY_NAMING_CONVENTION | string | no       | `{timestamp}` | A prefix to add to the beginning of uploaded files. The following tokens are supported: `date`, `stream`, and `timestamp`. The date format in `date_format` will be used based on [python date format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes) |
+| Property              | Env variable                         | Type    | Required | Default       | Description                                                                                                                                                                                                                                                                                      |
+| --------------------- | ------------------------------------ | ------- | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| bucket_name           | TARGET_GCS_BUCKET_NAME               | string  | yes      | n/a           | The name of the GCS bucket                                                                                                                                                                                                                                                                       |
+| date_format           | TARGET_GCS_DATE_FORMAT               | string  | no       | %Y-%m-%d      | If `{date}` token is used in key_naming_convention, the date will be formatted with this format string                                                                                                                                                                                           |
+| key_prefix            | TARGET_GCS_KEY_PREFIX                | string  | no       | None          | A static prefix before the generated key names. If this and `key_naming_convention` are both provided, they will be combined.                                                                                                                                                                    |
+| key_naming_convention | TARGET_GCS_KEY_NAMING_CONVENTION     | string  | no       | `{timestamp}` | Template for object keys. Tokens: `date`, `stream`, `timestamp`. When chunking is enabled (`max_records_per_file` > 0), `{chunk_index}` (0-based) is also available and `{timestamp}` is recomputed at the start of each new chunk. Date format uses [python date format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). |
+| max_records_per_file  | TARGET_GCS_MAX_RECORDS_PER_FILE      | integer | no       | 0             | When set and greater than 0, the target rotates to a new GCS object after that many records per stream; when 0 or omitted, one file per stream per run (unchanged).                                                                                                                              |
+
+**File chunking (optional):** When `max_records_per_file` is set and greater than 0, the target writes multiple files per stream; each file contains at most that many records, and the last file for a stream may have fewer. When 0 or omitted, one file per stream per run is written (no chunking).
+
+**Naming with chunking:** You can keep keys unique across chunks in two ways. (1) **Timestamp-based:** Use `{timestamp}` (and optionally `{date}`, `{stream}`). The timestamp is recomputed at the start of each new chunk, so keys differ unless consecutive chunks start within the same timestamp granularity window (e.g. two chunks starting at 12:00:00.500 and 12:00:00.999 get identical `{timestamp}` values). `{chunk_index}` is not required. (2) **Chunk-index-based:** Include `{chunk_index}` in the pattern, so each chunk has a distinct key regardless of timing—useful when many chunks can start within the same second, or when you want a fixed or run-level name with only the index varying.
+
+See `sample.config.json` for an example; the sample may include `max_records_per_file` to demonstrate chunking.
 
 A full list of supported settings and capabilities for this
 target is available by running:
@@ -77,7 +84,7 @@ The project uses **uv** for dependency management and **Ruff** and **mypy** for 
 **Option B:** Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then:
 
 ```bash
-uv sync
+uv sync --extra dev
 ```
 
 ### Lint, format, and type check
