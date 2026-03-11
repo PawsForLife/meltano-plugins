@@ -7,6 +7,8 @@
 - **restful-api-tap is_sorted stream config** — Details: [restful-api-tap-is-sorted-stream-config.md](_archive/restful-api-tap-is-sorted-stream-config/restful-api-tap-is-sorted-stream-config.md)
   - Add black-box tests for stream-level `is_sorted` (true, omitted, false, multi-stream); tests marked xfail until tasks 02–05 wire config.
   - Add `is_sorted` stream setting (boolean) to plugin schema in meltano.yml.
+  - Add `is_sorted` to common_properties in tap.py (BooleanType, default False) so config validation accepts the key.
+  - Add `is_sorted` param to DynamicStream (streams.py); set instance attribute and override property for SDK compatibility.
 - **Plugin source folder naming** — Details: [plugin-source-folder-naming.md](_archive/plugin-source-folder-naming/plugin-source-folder-naming.md)
   - Source directories and package names aligned with plugin directory names (dashes → underscores): `taps/restful-api-tap` uses `restful_api_tap` (formerly `tap_rest_api_msdk`); `loaders/gcs-loader` uses `gcs_loader` (formerly `target_gcs`).
   - pyproject.toml, imports, scripts (install.sh, tox.ini, meltano.yml), and docs updated per plugin; provenance notes added in READMEs and AI_CONTEXT.

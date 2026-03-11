@@ -45,7 +45,7 @@ No new imports required; `Optional` is already imported from `typing`.
 ## 3. Test Strategy
 
 - **No new test file** in this task (per task doc). Task 01 tests assert discovered stream `is_sorted` end-to-end once task 05 wires the value from config; those tests will still fail until task 05 is done.
-- **Optional unit test:** A test that instantiates `DynamicStream(..., is_sorted=True)` and asserts `stream.is_sorted is True`, and `DynamicStream(...)` (default) asserts `stream.is_sorted is False`. The task doc states this is optional and can be covered by task 01’s black-box discovery tests; if the implementer adds it, place it in an existing stream test module (e.g. `test_streams.py`) and keep it black-box (assert on the instance attribute only, no call-count or log assertions).
+- **Optional unit test:** A test that instantiates `DynamicStream(..., is_sorted=True)` and asserts `stream.is_sorted is True`, and `DynamicStream(...)` (default) asserts `stream.is_sorted is False`. The task doc states this is optional and can be covered by task 01's black-box discovery tests; if the implementer adds it, place it in an existing stream test module (e.g. `test_streams.py`) and keep it black-box (assert on the instance attribute only, no call-count or log assertions).
 - **Regression:** Run the full test suite from `taps/restful-api-tap/`. No existing tests should fail due to this change; the new parameter is optional and defaulted.
 
 ---

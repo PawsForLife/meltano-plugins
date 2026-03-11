@@ -82,6 +82,7 @@ class DynamicStream(RestApiStream):
         backoff_time_extension: Optional[int] = 0,
         store_raw_json_message: Optional[bool] = False,
         flatten_records: Optional[bool] = False,
+        is_sorted: Optional[bool] = False,
         authenticator: Optional[object] = None,
     ) -> None:
         """Class initialization.
@@ -119,6 +120,8 @@ class DynamicStream(RestApiStream):
             flatten_records: when True, post_process flattens records before
                 emission as RECORD messages; when False, returns row unchanged.
                 Default False.
+            is_sorted: when True, stream is declared sorted by replication_key
+                for resumable state. Default False.
             authenticator: see tap.py
 
         """
@@ -167,6 +170,7 @@ class DynamicStream(RestApiStream):
         self.backoff_time_extension = backoff_time_extension
         self.store_raw_json_message = store_raw_json_message
         self.flatten_records = flatten_records
+        self._is_sorted = bool(is_sorted) if is_sorted is not None else False
         if self.use_request_body_not_params:
             self.prepare_request_payload = get_url_params_styles.get(  # type: ignore
                 pagination_response_style, self._get_url_params_page_style
@@ -231,6 +235,11 @@ class DynamicStream(RestApiStream):
         # and try to exit early on its own.
         # This only has effect on streams whose `replication_key` is `updated_at`.
         self.use_fake_since_parameter = False
+
+    @property
+    def is_sorted(self) -> bool:
+        """Whether the stream is declared sorted by replication_key for resumable state."""
+        return self._is_sorted
 
     @property
     def http_headers(self) -> dict:

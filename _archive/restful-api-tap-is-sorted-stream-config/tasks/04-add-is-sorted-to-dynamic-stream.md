@@ -15,4 +15,4 @@
 
 ## Testing Needed
 
-- Task 01 tests will still fail until task 05 passes `is_sorted` from config. After task 05, task 01 tests assert that discovered streams have the correct `is_sorted` value. No new test file in this task; unit test that instantiates `DynamicStream` with `is_sorted=True`/`False` and asserts `stream.is_sorted` is optional and can be covered in task 01’s black-box discovery tests.
+- Task 01 tests will still fail until task 05 passes `is_sorted` from config. After task 05, task 01 tests assert that discovered streams have the correct `is_sorted` value. No new test file in this task; unit test that instantiates `DynamicStream` with `is_sorted=True`/`False` and asserts `stream.is_sorted` is optional and can be covered in task 01's black-box discovery tests.
