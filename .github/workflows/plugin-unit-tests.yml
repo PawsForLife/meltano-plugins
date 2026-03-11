@@ -12,7 +12,7 @@ on:
 
 jobs:
   discover:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.discover.outputs.packages }}
     steps:
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.packages) }}
       fail-fast: false
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ matrix.path }}
