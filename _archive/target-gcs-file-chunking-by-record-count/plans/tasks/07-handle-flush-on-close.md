@@ -35,7 +35,7 @@ This task ensures that when the GCS write handle is closed during rotation, any 
 
 ## 3. Test Strategy
 
-**No new test is required** for flush itself. Per master testing plan and development_practices (black-box testing): tests assert observable behaviour (record integrity, keys, number of opens/closes), not internal implementation details such as “flush was called.” Do **not** add a test that asserts `flush` was invoked.
+**No new test is required** for flush itself. Per master testing plan and development_practices (black-box testing): tests assert observable behaviour (record integrity, keys, number of opens/closes), not internal implementation details such as "flush was called." Do **not** add a test that asserts `flush` was invoked.
 
 **Regression and coverage:**
 
@@ -76,5 +76,5 @@ This task ensures that when the GCS write handle is closed during rotation, any 
 ## 6. Documentation Updates
 
 - **No new user-facing documentation** is required for this change (internal behaviour only).
-- **Master plan:** The master implementation plan already describes “flush (if the handle supports it)” in the rotation step; no change to `_features/.../plans/master/implementation.md` is required unless adding a one-line note that the guard is `hasattr(..., "flush")` for clarity. Prefer leaving implementation.md as-is and keeping the detail in this task plan.
+- **Master plan:** The master implementation plan already describes "flush (if the handle supports it)" in the rotation step; no change to `_features/.../plans/master/implementation.md` is required unless adding a one-line note that the guard is `hasattr(..., "flush")` for clarity. Prefer leaving implementation.md as-is and keeping the detail in this task plan.
 - **README / sample config:** No updates; no new config or API.

@@ -84,11 +84,10 @@ class GCSSink(RecordSink):
         return "jsonl"
 
     def _rotate_to_new_chunk(self) -> None:
-        """Close the current file handle, clear key cache, increment chunk index, and reset record count. Used when record count reaches max_records_per_file before writing the next record."""
+        """Close the current file handle, clear key cache, increment chunk index, and reset record count. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
         if self._gcs_write_handle is not None:
-            flush_fn = getattr(self._gcs_write_handle, "flush", None)
-            if flush_fn is not None:
-                flush_fn()
+            if hasattr(self._gcs_write_handle, "flush"):
+                self._gcs_write_handle.flush()
             self._gcs_write_handle.close()
             self._gcs_write_handle = None
         self._key_name = ""
