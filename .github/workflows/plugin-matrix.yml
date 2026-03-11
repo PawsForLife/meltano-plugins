@@ -1,5 +1,5 @@
-# Tap and target plugin matrix CI: discover plugin packages via scripts/list_packages.py and run each package's install.sh.
-name: Tap and target plugin matrix
+# Run unit tests for each discovered tap/target plugin. Uses inline env setup (no install.sh) for CI.
+name: Plugin unit tests (matrix)
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   discover:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       packages: ${{ steps.discover.outputs.packages }}
     steps:
@@ -41,10 +41,36 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.packages) }}
       fail-fast: false
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install and test tap or target plugin
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create venv and install dependencies
         working-directory: ${{ matrix.path }}
-        run: bash install.sh
+        run: |
+          uv venv --python 3.12
+          uv sync --extra dev
+
+      - name: Ruff check
+        working-directory: ${{ matrix.path }}
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        working-directory: ${{ matrix.path }}
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        working-directory: ${{ matrix.path }}
+        run: uv run mypy .
+
+      - name: Pytest
+        working-directory: ${{ matrix.path }}
+        run: uv run pytest
