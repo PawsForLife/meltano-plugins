@@ -330,9 +330,6 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     )
 
 
-@pytest.mark.xfail(
-    reason="Decimal serialization not yet implemented; orjson default callback in task 03-04"
-)
 def test_record_with_decimal_serializes_to_valid_json():
     """Record containing decimal.Decimal is written as valid JSONL with the numeric value as a JSON number.
     Regression guard: orjson does not natively serialize Decimal; the sink will use a default callback (later task).

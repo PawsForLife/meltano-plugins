@@ -230,7 +230,11 @@ class GCSSink(RecordSink):
         ):
             self._rotate_to_new_chunk()
         self.gcs_write_handle.write(
-            orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
         )
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
@@ -277,7 +281,11 @@ class GCSSink(RecordSink):
                 transport_params={"client": client},
             )
         self._gcs_write_handle.write(
-            orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
         )
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
