@@ -16,6 +16,7 @@
   - Implement get_partition_path_from_record: parse record field (ISO date/datetime, fallback %Y-%m-%d); use fallback_date when missing or unparseable; add DEFAULT_PARTITION_DATE_FORMAT (Hive-style); remove xfail from partition resolution tests.
   - Add optional date_fn to GCSSink.__init__ and _current_partition_path when partition_date_field is set; extend build_sink in tests to accept and pass date_fn (task 04).
   - Add _build_key_for_record(record, partition_path) and partition_date in key when partition_date_field set; key_name returns current key or empty when partition-by-field on; tests for key differs by partition, Hive path in key, fallback path, unset leaves behaviour unchanged (task 05).
+  - Integrate partition-by-field into process_record and handle lifecycle: resolve partition path per record; on partition change close handle and clear state, reset chunk index; chunk rotation within partition; build key via _build_key_for_record; when partition returns use new key (no reopen). Tests: chunking with same partition yields two keys; partition A→B→A yields three distinct keys (task 06).
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)
   - Add optional `max_records_per_file` to target config schema; schema and validation tests in test_sinks.py.
   - Add tests for chunking disabled: one key and one handle, key without chunk_index (backward compatibility).

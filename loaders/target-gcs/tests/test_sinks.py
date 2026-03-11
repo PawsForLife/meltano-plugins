@@ -470,3 +470,63 @@ def test_key_name_unchanged_when_partition_date_field_unset():
         or subject.config.get("partition_date_field") == ""
     )
     assert f"file/{datetime.today().strftime(date_format)}.txt" == subject.key_name
+
+
+def test_chunking_with_partition_rotation_within_partition():
+    """Chunk rotation within same partition produces two keys with same partition path. WHAT: With partition_date_field and max_records_per_file=2, three records in same partition yield two files (chunk 0 and 1), both under same partition path. WHY: Chunking interaction with partition-by-field."""
+    # Same timestamp for first two records (chunk 0), then next for chunk 1 so keys differ only by chunk_index.
+    timestamps = iter([3000.0, 3000.0, 3001.0])
+
+    def time_fn():
+        return next(timestamps)
+
+    mock_handles = [MagicMock(), MagicMock()]
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    ) as mock_open:
+        sink = build_sink(
+            config={
+                "partition_date_field": "dt",
+                "max_records_per_file": 2,
+                "key_naming_convention": "{partition_date}/{stream}_{timestamp}_{chunk_index}.jsonl",
+            },
+            time_fn=time_fn,
+            date_fn=lambda: FALLBACK_DATE,
+        )
+        partition_value = "2024-03-11"
+        for i in range(3):
+            sink.process_record({"dt": partition_value, "id": i}, {})
+    assert mock_open.call_count == 2
+    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert keys[0] != keys[1]
+    partition_segment = "year=2024/month=03/day=11"
+    assert partition_segment in keys[0], "first key must contain partition path"
+    assert partition_segment in keys[1], "second key must contain same partition path"
+
+
+def test_partition_change_then_return_creates_three_distinct_keys():
+    """Partition A then B then A produces three distinct keys; third key is new file (A'), not reopen of A. WHAT: Option (c) behaviour: on partition return we create a new key, not reopen the old file. WHY: Handle lifecycle and single-handle strategy."""
+    timestamps = iter([4000.0, 4001.0, 4002.0])
+
+    def time_fn():
+        return next(timestamps)
+
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open",
+        side_effect=[MagicMock(), MagicMock(), MagicMock()],
+    ) as mock_open:
+        sink = build_sink(
+            config={
+                "partition_date_field": "dt",
+                "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
+            },
+            time_fn=time_fn,
+            date_fn=lambda: FALLBACK_DATE,
+        )
+        sink.process_record({"dt": "2024-03-10", "id": 1}, {})
+        sink.process_record({"dt": "2024-03-11", "id": 2}, {})
+        sink.process_record({"dt": "2024-03-10", "id": 3}, {})
+    assert mock_open.call_count == 3
+    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert len(keys) == len(set(keys)), "all three keys must be distinct"
+    assert keys[2] != keys[0], "third key (A') must differ from first (A); no reopen"
