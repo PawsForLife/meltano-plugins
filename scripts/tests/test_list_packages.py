@@ -6,18 +6,18 @@ Run from repo root with a venv that has pytest: `pytest scripts/tests`
 In this repo, packages are directories with pyproject.toml and include tap (extractor) and target
 (loader) plugin directories. Path literals (e.g. taps/plugin) denote directory layout only.
 
-Contract: script is invoked as `python scripts/list_packages.py [ROOT]`.
-Stdout: one relative path per line (dirs containing pyproject.toml). Sorted. No header.
+Contract: script is invoked as `python scripts/list_packages.py [ROOT]` or with `--json`.
+Stdout: one relative path per line (default), or JSON {"path": [...]} with --json. Sorted. No header.
 Excluded trees: .git, .venv, _archive, node_modules. Exit 0 on success.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 # Repo root: parent of scripts/ (parent of tests/ is scripts/, parent of that is root).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -49,6 +49,17 @@ def run_list_packages_nonexistent(root: Path) -> tuple[str, int]:
     )
     out = result.stdout or result.stderr or ""
     return (out, result.returncode)
+
+
+def run_list_packages_json(root: Path) -> tuple[str, int]:
+    """Run list_packages.py with --json and the given root. Returns (stdout, returncode)."""
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPT), "--json", str(root.resolve())],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    return (result.stdout or "", result.returncode)
 
 
 # --- Test cases (black box: assert only stdout and exit code) ---
@@ -135,3 +146,32 @@ def test_invalid_root_nonzero_exit(tmp_path: Path) -> None:
     assert not nonexistent.exists()
     _out, returncode = run_list_packages_nonexistent(nonexistent)
     assert returncode != 0, "Expected non-zero exit for non-existent root path"
+
+
+def test_json_output_valid_matrix(tmp_path: Path) -> None:
+    """
+    --json: multiple packages. Expect valid JSON with "path" array, sorted, exit 0.
+
+    Ensures CI can use script output directly with fromJson (no jq); matrix shape is {"path": [...]}.
+    """
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "pyproject.toml").write_text("")
+    (tmp_path / "b" / "pyproject.toml").write_text("")
+    stdout, returncode = run_list_packages_json(tmp_path)
+    assert returncode == 0, f"Expected exit 0, got {returncode}. stdout: {stdout!r}"
+    data = json.loads(stdout)
+    assert "path" in data, f"Expected 'path' key in JSON, got {list(data)}"
+    assert data["path"] == ["a", "b"], f"Expected sorted ['a','b'], got {data['path']}"
+
+
+def test_json_output_empty_path_array(tmp_path: Path) -> None:
+    """
+    --json: no packages. Expect JSON {"path": []}, exit 0.
+
+    Ensures empty discovery produces valid matrix JSON for CI (fromJson does not fail).
+    """
+    stdout, returncode = run_list_packages_json(tmp_path)
+    assert returncode == 0
+    data = json.loads(stdout)
+    assert data == {"path": []}, f'Expected {{"path": []}}, got {data}'

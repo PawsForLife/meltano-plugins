@@ -1,0 +1,25 @@
+# Run tests for scripts (e.g. list_packages). Dedicated workflow for script test coverage.
+name: Script tests (list_packages)
+
+on:
+  pull_request:
+    branches: [main, release]
+    paths:
+      - "scripts/**"
+
+jobs:
+  script-tests:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run script tests
+        run: pytest scripts/tests -v
