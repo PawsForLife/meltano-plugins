@@ -14,6 +14,8 @@
 
 ### Added
 
+- **root-pre-commit-and-install** — Details: [root-pre-commit-and-install.md](_archive/root-pre-commit-and-install/root-pre-commit-and-install.md)
+  - Add `scripts/run_plugin_checks.sh`: discover plugins via `list_packages.py`, run ruff (check + format --check) and mypy per plugin using each plugin's `.venv`; optional pytest when `RUN_PYTEST=1`; exit on first failure; mypy package name from path with fallback map.
 - **target-gcs-handle-decimal-in-records** — Details: [target-gcs-handle-decimal-in-records.md](_archive/target-gcs-handle-decimal-in-records/target-gcs-handle-decimal-in-records.md)
   - Add regression test for record with Decimal: test_record_with_decimal_serializes_to_valid_json (captures GCS writes, asserts JSONL decodes and numeric value correct; xfail until orjson default in task 03–04).
   - Add test that non-Decimal non-serializable value in record raises TypeError (test_non_serializable_non_decimal_type_raises_type_error; black-box, documents contract).
