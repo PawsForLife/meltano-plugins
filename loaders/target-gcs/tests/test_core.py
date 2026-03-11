@@ -9,10 +9,8 @@ from singer_sdk.testing import get_target_test_class
 
 from gcs_target.target import GCSTarget
 
-# Sample config file contents for the target (minimal).
-SAMPLE_CONFIG: Dict[str, Any] = {
-    # TODO: Initialize minimal target config file contents
-}
+# Minimal config for SDK template tests; matches test_sinks and test_partition_key_generation.
+SAMPLE_CONFIG: Dict[str, Any] = {"bucket_name": "test-bucket"}
 
 # Run standard built-in target tests from the SDK (class-based; pytest discovers test methods).
 StandardTargetTests = get_target_test_class(

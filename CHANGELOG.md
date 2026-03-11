@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **fix-target-gcs-template-tests-config-validation** — Details: [fix-target-gcs-template-tests-config-validation.md](_archive/fix-target-gcs-template-tests-config-validation/fix-target-gcs-template-tests-config-validation.md)
+  - Set `SAMPLE_CONFIG` in `loaders/target-gcs/tests/test_core.py` to `{"bucket_name": "test-bucket"}` so SDK template tests pass config validation.
 - **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
   - Add regression test that JSON output from `list_packages.py --json` ends with newline (heredoc/GITHUB_OUTPUT compatibility).
   - Emit trailing newline from `list_packages.py` when outputting JSON so GitHub Actions discover step no longer fails with "Matching delimiter not found 'EOF'".
