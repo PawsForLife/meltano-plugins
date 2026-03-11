@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
+  - Add regression test that JSON output from `list_packages.py --json` ends with newline (heredoc/GITHUB_OUTPUT compatibility).
+  - Emit trailing newline from `list_packages.py` when outputting JSON so GitHub Actions discover step no longer fails with "Matching delimiter not found 'EOF'".
+
 ### Added
 
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)

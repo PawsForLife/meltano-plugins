@@ -175,3 +175,23 @@ def test_json_output_empty_path_array(tmp_path: Path) -> None:
     assert returncode == 0
     data = json.loads(stdout)
     assert data == {"path": []}, f'Expected {{"path": []}}, got {data}'
+
+
+def test_json_output_ends_with_newline_for_heredoc_compatibility(
+    tmp_path: Path,
+) -> None:
+    """
+    --json: stdout must end with a newline so heredoc consumers (e.g. GITHUB_OUTPUT) get a valid delimiter line.
+
+    GitHub Actions multiline output requires the delimiter on its own line; without a trailing newline the value and
+    delimiter merge into one line and the runner reports "Matching delimiter not found".
+    """
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "pyproject.toml").write_text("")
+    stdout, returncode = run_list_packages_json(tmp_path)
+    assert returncode == 0, f"Expected exit 0, got {returncode}. stdout: {stdout!r}"
+    assert stdout.endswith("\n"), (
+        f"JSON output must end with newline for GITHUB_OUTPUT heredoc; got {repr(stdout[-20:] if len(stdout) >= 20 else stdout)}"
+    )
+    data = json.loads(stdout.strip())
+    assert "path" in data, f"Expected 'path' key in JSON, got {list(data)}"
