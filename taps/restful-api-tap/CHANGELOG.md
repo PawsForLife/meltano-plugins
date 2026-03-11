@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Discovery: stream-level `is_sorted` now falls back to tap-level `is_sorted` when omitted on a stream, so tap-wide `is_sorted` is honored.
+
 ### Fixed
 
 - `post_process`: when `flatten_records` is false and `store_raw_json_message` is true, the non-flatten return path now adds `_sdc_raw_json` to the row (raw record copy) so the advertised field is emitted.

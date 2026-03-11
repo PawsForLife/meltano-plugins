@@ -1,0 +1,68 @@
+# Run unit tests for each discovered tap/target plugin. Uses inline env setup (no install.sh) for CI.
+name: Plugin unit tests (matrix)
+
+on:
+  pull_request:
+    branches: [main, release]
+    paths:
+      - "scripts/**"
+      - "taps/**"
+      - "loaders/**"
+      - ".github/**"
+
+jobs:
+  discover:
+    runs-on: self-hosted
+    outputs:
+      packages: ${{ steps.discover.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run plugin package discovery and set matrix output
+        id: discover
+        run: |
+          echo "packages<<EOF" >> "$GITHUB_OUTPUT"
+          python scripts/list_packages.py --json . >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: discover
+    strategy:
+      matrix: ${{ fromJson(needs.discover.outputs.packages) }}
+      fail-fast: false
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create venv and install dependencies
+        run: |
+          uv venv --python 3.12
+          uv sync --extra dev
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy .
+
+      - name: Pytest
+        run: uv run pytest

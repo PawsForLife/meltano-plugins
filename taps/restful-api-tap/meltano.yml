@@ -64,6 +64,8 @@ plugins:
           kind: string
         - name: source_search_query
           kind: string
+        - name: is_sorted
+          kind: boolean
         - name: auth_method
           kind: string
         - name: api_key
