@@ -141,11 +141,11 @@ Used in tests to construct a sink with optional overrides; `key_properties=confi
 ### Running as part of a pipeline
 
 ```bash
-# From loaders/target-gcs with venv active
-target-gcs --config sample.config.json < singer_output.jsonl
-
-# Or via Meltano (from project root)
+# Via Meltano (config from meltano.yml; from project root)
 meltano run restful-api-tap target-gcs
+
+# Or from loaders/target-gcs with venv active and a config file
+target-gcs --config /path/to/your-config.json < singer_output.jsonl
 ```
 
 ---

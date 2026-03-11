@@ -50,8 +50,7 @@ meltano-plugins/
 │       ├── tests/                # Loader tests
 │       ├── pyproject.toml        # Deps, script entry point
 │       ├── install.sh            # Venv, deps, lint, test
-│       ├── meltano.yml           # Plugin definition
-│       └── sample.config.json   # Sample config
+│       └── meltano.yml           # Plugin definition
 ├── docs/                         # Project documentation
 │   ├── AI_CONTEXT/               # AI context docs ({context_docs_dir})
 │   │   ├── GLOSSARY_MELTANO_SINGER.md
@@ -176,8 +175,8 @@ Each plugin is installable on its own via `pip` from its subdirectory (`pip inst
 | target-gcs | `target-gcs` | `gcs_target.target:GCSTarget.cli` |
 
 - **Running** — After install (Meltano or `uv sync` in plugin dir), run the CLI with `--config <path>` (tap/target read config from config file or Meltano-injected env). Target reads Singer messages from stdin.
-- **Extension points**  
-  - **Tap**: Subclass `RestfulApiTap`; add or override streams (e.g. subclass or replace `DynamicStream`); add auth via `get_authenticator` / custom `APIAuthenticatorBase`; custom pagination in `restful_api_tap.pagination` and stream classes.  
+- **Extension points**
+  - **Tap**: Subclass `RestfulApiTap`; add or override streams (e.g. subclass or replace `DynamicStream`); add auth via `get_authenticator` / custom `APIAuthenticatorBase`; custom pagination in `restful_api_tap.pagination` and stream classes.
   - **Target**: Subclass `GCSTarget` and/or `GCSSink`; override `default_sink_class` or sink behavior (e.g. key naming, batch size, format).
 
 Discovery of components: the repo layout is the source of truth; the two main components are the directories under `taps/` and `loaders/` that contain a `pyproject.toml` and a Singer tap or target implementation.

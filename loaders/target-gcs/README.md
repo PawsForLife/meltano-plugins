@@ -18,7 +18,7 @@ JSONL is the only supported output format
 
 ## Configuration
 
-The target reads its settings from a **config file** (see `sample.config.json` for an example).
+The target is configured via [Meltano](https://meltano.com/): settings and `config` are defined in `meltano.yml`, with optional overrides via environment variables (see table below). For an example structure, see `meltano.yml` in this directory.
 
 ### Accepted Config Options
 
@@ -36,7 +36,7 @@ The target reads its settings from a **config file** (see `sample.config.json` f
 
 **Naming with chunking:** You can keep keys unique across chunks in two ways. (1) **Timestamp-based:** Use `{timestamp}` (and optionally `{date}`, `{stream}`). The timestamp is recomputed at the start of each new chunk, so keys differ unless consecutive chunks start within the same timestamp granularity window (e.g. two chunks starting at 12:00:00.500 and 12:00:00.999 get identical `{timestamp}` values). `{chunk_index}` is not required. (2) **Chunk-index-based:** Include `{chunk_index}` in the pattern, so each chunk has a distinct key regardless of timing—useful when many chunks can start within the same second, or when you want a fixed or run-level name with only the index varying.
 
-See `sample.config.json` for an example; the sample may include `max_records_per_file` to demonstrate chunking.
+See `meltano.yml` in this directory for an example `config` block; it may include `max_records_per_file` to demonstrate chunking.
 
 ### Hive partitioning by record date field
 
@@ -86,8 +86,10 @@ You can easily run `target-gcs` by itself or in a pipeline using [Meltano](https
 ```bash
 target-gcs --version
 target-gcs --help
-# Test using the "Carbon Intensity" sample:
-tap-carbon-intensity | target-gcs --config /path/to/target-gcs-config.json
+# With Meltano (config from meltano.yml):
+meltano run tap-carbon-intensity target-gcs
+# Or run the target directly with a config file:
+tap-carbon-intensity | target-gcs --config /path/to/your-config.json
 ```
 
 ## Developer Resources
