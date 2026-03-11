@@ -40,7 +40,7 @@ class GCSSink(RecordSink):
 
     @property
     def key_name(self) -> str:
-        """Return the key name."""
+        """Return the key name. When recomputing, uses stream, date, timestamp; when chunking is enabled (max_records_per_file > 0), includes chunk_index so key_naming_convention may use {chunk_index}."""
         if not self._key_name:
             # Time is injectable via time_fn for deterministic key assertions in tests.
             extraction_timestamp = round((self._time_fn or time.time)())
@@ -54,14 +54,16 @@ class GCSSink(RecordSink):
                 )
             ).lstrip("/")
             date = datetime.today().strftime(self.config.get("date_format", "%Y-%m-%d"))
-            self._key_name = prefixed_key_name.format_map(
-                defaultdict(
-                    str,
-                    stream=self.stream_name,
-                    date=date,
-                    timestamp=extraction_timestamp,
-                )
+            max_records = self.config.get("max_records_per_file", 0)
+            format_map = defaultdict(
+                str,
+                stream=self.stream_name,
+                date=date,
+                timestamp=extraction_timestamp,
             )
+            if max_records and max_records > 0:
+                format_map["chunk_index"] = self._chunk_index
+            self._key_name = prefixed_key_name.format_map(format_map)
         return self._key_name
 
     @property
