@@ -40,4 +40,4 @@ Do not delete or move any other files; the pipeline deletes feature artifacts af
 ## Notes
 
 - This workflow does not perform any deletion. The feature pipeline orchestrator deletes `{features_dir}/{feature_name}.md` and the tree `{features_dir}/{feature_name}/` after the archivist completes.
-- The archive will contain only this single summary file for the feature.
+- The feature pipeline **cleans the archive directory** (Phase 6): it removes any non-summary files and directories under `{archive_dir}/{feature_name}/` so that only `{feature_name}.md` remains before commit. The archive therefore always contains only the single summary file per feature.
