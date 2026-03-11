@@ -186,6 +186,27 @@ class GCSSink(RecordSink):
         self._chunk_index += 1
         self._records_written_in_current_file = 0
 
+    def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
+        """Process one record when partition_date_field is unset (single-file or chunked by row limit).
+
+        Assumes partition_date_field is unset. Rotates to a new chunk when
+        max_records_per_file is set and record count has reached the limit;
+        writes the record via gcs_write_handle; increments _records_written_in_current_file
+        when chunking is enabled.
+        """
+        max_records = self.config.get("max_records_per_file", 0)
+        if (
+            max_records
+            and max_records > 0
+            and self._records_written_in_current_file >= max_records
+        ):
+            self._rotate_to_new_chunk()
+        self.gcs_write_handle.write(
+            orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
+        )
+        if max_records and max_records > 0:
+            self._records_written_in_current_file += 1
+
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload).
 
@@ -195,23 +216,12 @@ class GCSSink(RecordSink):
         partition; build key via _build_key_for_record; open handle when none or
         key changed; write record. When partition "returns" (same value again),
         a new key (new file) is used, not a reopen. When partition_date_field is
-        unset: chunking rotates to a new file at max_records_per_file; single
-        key and handle otherwise.
+        unset: delegates to _process_record_single_or_chunked (single key and
+        handle, or chunking by max_records_per_file).
         """
         partition_date_field = self.config.get("partition_date_field")
         if not partition_date_field:
-            max_records = self.config.get("max_records_per_file", 0)
-            if (
-                max_records
-                and max_records > 0
-                and self._records_written_in_current_file >= max_records
-            ):
-                self._rotate_to_new_chunk()
-            self.gcs_write_handle.write(
-                orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
-            )
-            if max_records and max_records > 0:
-                self._records_written_in_current_file += 1
+            self._process_record_single_or_chunked(record, context)
             return
 
         # Partition-by-field branch: resolve path, handle lifecycle, build key, write.
