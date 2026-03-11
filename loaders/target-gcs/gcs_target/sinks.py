@@ -58,7 +58,7 @@ def get_partition_path_from_record(
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key."""
+    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When partition_date_field is set, the key is derived per record from that field; one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
 
     max_size = 1000  # Max records to write in one batch
 

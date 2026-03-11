@@ -35,6 +35,8 @@ Package root: `loaders/target-gcs/`. Source package: `gcs_target/`. No shared co
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
   - `key_naming_convention` (string, optional): Template for the object key. When omitted, effective default is `{stream_name}_{timestamp}.jsonl`.
   - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. When chunking is enabled, the key token `{chunk_index}` (0-based) is available and `{timestamp}` is refreshed per chunk.
+  - `partition_date_field` (string, optional): Record property name used for the partition path; when set, partition-by-field is enabled. Example: `created_at`, `updated_at`.
+  - `partition_date_format` (string, optional): strftime format for partition path segments; default in code is Hive-style (e.g. `year=%Y/month=%m/day=%d`).
 - **Sink**: `default_sink_class = GCSSink`.
 
 The sink also reads `date_format` from config (used for the `{date}` token). It is not in `config_jsonschema`; Meltano or external config file can pass it (e.g. `meltano.yml` settings). Default in code: `%Y-%m-%d`.
@@ -42,16 +44,18 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 ### GCSSink (`gcs_target.sinks`)
 
 - **Base**: `singer_sdk.sinks.RecordSink`
-- **Constructor**: `GCSSink(target, stream_name, schema, key_properties, *, time_fn=None)` — same contract as SDK `RecordSink`; optional `time_fn` (callable returning float) injects time for key generation (e.g. tests use it for deterministic keys).
+- **Constructor**: `GCSSink(target, stream_name, schema, key_properties, *, time_fn=None, date_fn=None)` — same contract as SDK `RecordSink`; optional `time_fn` (callable returning float) for key generation; optional `date_fn` (callable returning datetime) for partition fallback and tests.
+- **Partition-by-field state**: When `partition_date_field` is set, the sink keeps one active handle and `_current_partition_path`; key is derived per record via `_build_key_for_record(record, partition_path)`. On partition change the sink closes the handle and clears key/partition state; when the partition "returns," the next write gets a new key (new file), not a reopen.
 - **Class attribute**: `max_size = 1000` (batch size hint for SDK; records are still written per `process_record` call).
-- **Key naming** (`key_name` property): Computed once per sink (recomputed after rotation when chunking is on). Uses `key_prefix` + `key_naming_convention` (or default). Tokens:
+- **Key naming** (`key_name` property, `_build_key_for_record`): When `partition_date_field` is unset, `key_name` is computed once per sink (recomputed after rotation when chunking is on). When partition-by-field is on, `key_name` returns the current key after a write (or empty); per-record keys are built by `_build_key_for_record` from stream, partition_date, timestamp, and optionally chunk_index. Uses `key_prefix` + `key_naming_convention` (or default). Tokens:
   - `{stream}` — stream name.
-  - `{date}` — `datetime.today().strftime(config.get("date_format", "%Y-%m-%d"))`.
+  - `{date}` — `datetime.today().strftime(config.get("date_format", "%Y-%m-%d"))`; used when partition-by-field is off.
+  - `{partition_date}` — partition path per record (e.g. `year=2024/month=03/day=11`); available only when `partition_date_field` is set; not available when partition-by-field is off.
   - `{timestamp}` — Unix time at key resolution (refreshed at start of each chunk when chunking is enabled).
   - `{chunk_index}` — 0-based chunk index; available only when `max_records_per_file` is set and > 0.
 - **GCS handle** (`gcs_write_handle` property): Opens once per sink via `smart_open.open("gs://{bucket}/{key_name}", "wb", transport_params={"client": client})`. Client is `google.cloud.storage.Client()` with no arguments (ADC only).
 - **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line with `orjson.dumps(..., option=orjson.OPT_APPEND_NEWLINE)`.
-- **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to `gcs_write_handle`.
+- **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to `gcs_write_handle`. With partition-by-field: partition path is resolved per record (helper `get_partition_path_from_record`); missing or invalid partition field uses run date as fallback (formatted with `partition_date_format`).
 
 ### Authentication
 
@@ -71,9 +75,16 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 
 ---
 
+## Partition-by-field behaviour
+
+When `partition_date_field` is set, the sink uses one active write handle. On each record it resolves the partition path from the record (or run date if the field is missing or unparseable). When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition. Fallback for missing or invalid partition field: run date formatted with `partition_date_format`.
+
+---
+
 ## Extension Points
 
 - **Custom sink class**: Subclass `GCSTarget` and set `default_sink_class` to a custom sink (e.g. different key naming or format).
+- **Partition resolution / key building**: Custom sinks can override partition resolution (e.g. call or replace `get_partition_path_from_record`) or key building (`_build_key_for_record`) if needed.
 - **Key naming**: Override `GCSSink.key_name` (or the logic that builds it) to change template, tokens, or prefix handling.
 - **Output format**: Override `GCSSink.output_format` and the write logic in `process_record` (e.g. Parquet, CSV). Current code path assumes JSONL.
 - **Config**: Add new options in `GCSTarget.config_jsonschema` and read them in the sink via `self.config.get(...)`. Example: add `date_format` to the schema for consistency with Meltano.
