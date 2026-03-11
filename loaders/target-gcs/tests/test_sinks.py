@@ -4,6 +4,9 @@ import re
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import orjson
+import pytest
+
 from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
 
@@ -173,4 +176,111 @@ def test_key_has_no_chunk_index_when_chunking_disabled():
     )
     assert re.match(r"my_stream_\d+\.jsonl", sink.key_name), (
         "key must match default pattern (stream, timestamp) when chunking is off"
+    )
+
+
+def _key_from_open_call(call_args: tuple) -> str:
+    """Extract GCS object key from smart_open.open first positional arg (gs://bucket/key)."""
+    url = call_args[0][0]
+    return url.split("/", 3)[-1]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Requires tasks 05 and 06 (key computation and rotation)",
+)
+def test_chunking_rotation_at_threshold():
+    """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
+    timestamps = iter([1000.0, 1001.0])
+
+    def time_fn():
+        return next(timestamps)
+
+    mock_handles = [MagicMock(), MagicMock()]
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    ) as mock_open:
+        sink = build_sink(
+            config={
+                "max_records_per_file": 2,
+                "key_naming_convention": "{stream}_{timestamp}.jsonl",
+            },
+            time_fn=time_fn,
+        )
+        context = {}
+        for i in range(3):
+            sink.process_record({"id": i, "name": f"record_{i}"}, context)
+    assert mock_open.call_count == 2, (
+        "exactly two file handles must be opened after writing 3 records with max_records_per_file=2"
+    )
+    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert keys[0] != keys[1], "first and second key must differ after rotation"
+    third_record_payload = b'{"id":2,"name":"record_2"}\n'
+    second_handle_writes = [c[0][0] for c in mock_handles[1].write.call_args_list]
+    assert third_record_payload in second_handle_writes, (
+        "the third record must be written to the second (new) file"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Requires tasks 05 and 06 (key computation and rotation)",
+)
+def test_chunking_key_format_includes_chunk_index():
+    """Key includes chunk_index when chunking is on: key_naming_convention may include {chunk_index} so multiple chunks in the same second have distinct keys. Uniqueness when multiple chunks in same second."""
+    timestamps = iter([2000.0, 2001.0])
+
+    def time_fn():
+        return next(timestamps)
+
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
+    ) as mock_open:
+        sink = build_sink(
+            config={
+                "max_records_per_file": 2,
+                "key_naming_convention": "{stream}_{timestamp}_{chunk_index}.jsonl",
+            },
+            time_fn=time_fn,
+        )
+        for i in range(3):
+            sink.process_record({"id": i}, {})
+    assert mock_open.call_count == 2
+    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert any("_0." in k or "_0.jsonl" in k for k in keys), (
+        "one key must contain chunk index 0 for the first chunk"
+    )
+    assert any("_1." in k or "_1.jsonl" in k for k in keys), (
+        "one key must contain chunk index 1 for the second chunk"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="Requires tasks 05 and 06 (key computation and rotation)",
+)
+def test_chunking_record_integrity_no_duplicate_or_dropped():
+    """Every record written exactly once: with chunking enabled, all records are written to GCS with no duplicates or drops. Correctness of the pipeline."""
+    write_payloads = []
+
+    def capture_write(data):
+        write_payloads.append(data)
+
+    mock_handles = [MagicMock() for _ in range(4)]
+    for h in mock_handles:
+        h.write.side_effect = capture_write
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    ) as mock_open:
+        sink = build_sink(config={"max_records_per_file": 10})
+        for i in range(25):
+            sink.process_record({"id": i, "name": f"row_{i}"}, {})
+    assert mock_open.call_count == 3, (
+        "25 records with max_records_per_file=10 must produce 3 files (10+10+5)"
+    )
+    assert len(write_payloads) == 25, "exactly 25 write calls must occur"
+    records = [orjson.loads(p.strip()) for p in write_payloads]
+    ids = [r["id"] for r in records]
+    assert len(ids) == 25 and set(ids) == set(range(25)), (
+        "all 25 records must be written exactly once with ids 0..24 (no duplicate or dropped)"
     )

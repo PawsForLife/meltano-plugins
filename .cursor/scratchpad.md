@@ -25,3 +25,4 @@
 - **Task 01-add-config-schema completed, tests passing.**
 - Task 02-tests-chunking-disabled completed, tests passing.
 - Task 03-sink-state-and-time-injection completed, tests passing.
+- Task 04-tests-rotation-and-key-format completed, tests passing.
