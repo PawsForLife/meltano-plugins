@@ -3410,7 +3410,7 @@ dependencies = [
     { name = "smart-open", version = "7.5.1", source = { registry = "https://pypi.org/simple" }, extra = ["gcs"], marker = "python_full_version >= '3.10'" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 dev = [
     { name = "coverage", version = "7.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "coverage", version = "7.10.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
@@ -3427,23 +3427,20 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "coverage", marker = "extra == 'dev'", specifier = ">=6.4" },
     { name = "google-api-python-client", specifier = ">=2.49.0" },
     { name = "google-cloud-storage", specifier = ">=2.3.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "orjson", specifier = ">=3.6.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.2.5" },
     { name = "pytest-watch", specifier = ">=4.2.0" },
     { name = "requests", specifier = ">=2.25.1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "singer-sdk", specifier = ">=0.40.0" },
     { name = "smart-open", extras = ["gcs"], specifier = ">=6.0.0" },
+    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.26.1" },
 ]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "coverage", specifier = ">=6.4" },
-    { name = "mypy", specifier = ">=1.0.0" },
-    { name = "pytest", specifier = ">=6.2.5" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "types-requests", specifier = ">=2.26.1" },
-]
+provides-extras = ["dev"]
 
 [[package]]
 name = "tomli"

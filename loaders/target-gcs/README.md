@@ -84,7 +84,7 @@ The project uses **uv** for dependency management and **Ruff** and **mypy** for 
 **Option B:** Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and then:
 
 ```bash
-uv sync
+uv sync --extra dev
 ```
 
 ### Lint, format, and type check

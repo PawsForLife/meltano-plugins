@@ -180,7 +180,7 @@ def test_key_has_no_chunk_index_when_chunking_disabled():
 
 def _key_from_open_call(call_args: tuple) -> str:
     """Extract GCS object key from smart_open.open first positional arg (gs://bucket/key)."""
-    url = call_args[0][0]
+    url: str = str(call_args[0][0])
     return url.split("/", 3)[-1]
 
 
