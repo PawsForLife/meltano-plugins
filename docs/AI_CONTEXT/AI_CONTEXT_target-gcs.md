@@ -34,6 +34,7 @@ Package root: `loaders/target-gcs/`. Source package: `gcs_target/`. No shared co
   - `bucket_name` (string, **required**): GCS bucket name.
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
   - `key_naming_convention` (string, optional): Template for the object key. When omitted, effective default is `{stream_name}_{timestamp}.jsonl`.
+  - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. When chunking is enabled, the key token `{chunk_index}` (0-based) is available and `{timestamp}` is refreshed per chunk.
 - **Sink**: `default_sink_class = GCSSink`.
 
 The sink also reads `date_format` from config (used for the `{date}` token). It is not in `config_jsonschema`; Meltano or external config file can pass it (e.g. `meltano.yml` settings). Default in code: `%Y-%m-%d`.
@@ -43,10 +44,11 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 - **Base**: `singer_sdk.sinks.RecordSink`
 - **Constructor**: `GCSSink(target, stream_name, schema, key_properties, *, time_fn=None)` — same contract as SDK `RecordSink`; optional `time_fn` (callable returning float) injects time for key generation (e.g. tests use it for deterministic keys).
 - **Class attribute**: `max_size = 1000` (batch size hint for SDK; records are still written per `process_record` call).
-- **Key naming** (`key_name` property): Computed once per sink. Uses `key_prefix` + `key_naming_convention` (or default). Tokens:
+- **Key naming** (`key_name` property): Computed once per sink (recomputed after rotation when chunking is on). Uses `key_prefix` + `key_naming_convention` (or default). Tokens:
   - `{stream}` — stream name.
   - `{date}` — `datetime.today().strftime(config.get("date_format", "%Y-%m-%d"))`.
-  - `{timestamp}` — Unix time at first key resolution (`time.time()`).
+  - `{timestamp}` — Unix time at key resolution (refreshed at start of each chunk when chunking is enabled).
+  - `{chunk_index}` — 0-based chunk index; available only when `max_records_per_file` is set and > 0.
 - **GCS handle** (`gcs_write_handle` property): Opens once per sink via `smart_open.open("gs://{bucket}/{key_name}", "wb", transport_params={"client": client})`. Client is `google.cloud.storage.Client()` with no arguments (ADC only).
 - **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line with `orjson.dumps(..., option=orjson.OPT_APPEND_NEWLINE)`.
 - **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to `gcs_write_handle`.

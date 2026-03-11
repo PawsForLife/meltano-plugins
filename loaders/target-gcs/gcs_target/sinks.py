@@ -13,7 +13,7 @@ from singer_sdk.sinks import RecordSink
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed."""
+    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key."""
 
     max_size = 1000  # Max records to write in one batch
 
@@ -34,8 +34,10 @@ class GCSSink(RecordSink):
         )
         self._gcs_write_handle: Optional[FileIO] = None
         self._key_name: str = ""
-        self._records_written_in_current_file: int = 0
-        self._chunk_index: int = 0
+        self._records_written_in_current_file: int = (
+            0  # Records written to current file; reset on rotation.
+        )
+        self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
         self._time_fn: Optional[Callable[[], float]] = time_fn
 
     @property
@@ -103,6 +105,7 @@ class GCSSink(RecordSink):
         passed `context` dict from the current batch.
         """
         max_records = self.config.get("max_records_per_file", 0)
+        # Rotate to new chunk: close handle, clear key cache, increment chunk index, reset record count.
         if (
             max_records
             and max_records > 0

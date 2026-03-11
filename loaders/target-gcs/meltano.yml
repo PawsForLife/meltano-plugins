@@ -19,8 +19,10 @@ plugins:
         - name: date_format
         - name: key_prefix
         - name: key_naming_convention
+        - name: max_records_per_file
       config:
         bucket_name: datateer-managed-prt-prod-raw-data
         date_format: "%Y-%m-%d"
         key_prefix: prt-test/triton
         key_naming_convention: "{stream}/export_date={date}/{timestamp}.jsonl"
+        max_records_per_file: 1000

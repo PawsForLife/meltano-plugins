@@ -29,3 +29,4 @@
 - Task 05-key-computation-with-chunk-index completed, tests passing.
 - Task 06-rotation-and-process-record completed, tests passing.
 - Task 07-handle-flush-on-close completed, tests passing.
+- Task 08-documentation-and-sample-config completed, tests passing.
