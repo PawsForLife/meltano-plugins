@@ -27,3 +27,4 @@
 - Task 03-sink-state-and-time-injection completed, tests passing.
 - Task 04-tests-rotation-and-key-format completed, tests passing.
 - Task 05-key-computation-with-chunk-index completed, tests passing.
+- Task 06-rotation-and-process-record completed, tests passing.

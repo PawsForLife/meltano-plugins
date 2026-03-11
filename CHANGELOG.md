@@ -10,6 +10,7 @@
   - Add per-stream state (_records_written_in_current_file, _chunk_index) and optional time_fn in GCSSink; key_name uses injectable time for deterministic tests.
   - Add tests for rotation at threshold, key format with chunk_index, and record integrity (marked xfail until tasks 05 and 06).
   - Key computation with chunk index: GCSSink.key_name reads max_records_per_file from config and adds chunk_index to format map when chunking enabled so key_naming_convention may use {chunk_index}; no rotation logic (task 06).
+  - Rotation and process_record: before write, rotate when _records_written_in_current_file >= max_records_per_file (close handle with flush if supported, clear key, increment chunk_index, reset counter); write record; increment counter when chunking enabled. Task 04 rotation/key/record-integrity tests enabled and passing.
 - **restful-api-tap is_sorted stream config** — Details: [restful-api-tap-is-sorted-stream-config.md](_archive/restful-api-tap-is-sorted-stream-config/restful-api-tap-is-sorted-stream-config.md)
   - Add black-box tests for stream-level `is_sorted` (true, omitted, false, multi-stream); tests marked xfail until tasks 02–05 wire config.
   - Add `is_sorted` stream setting (boolean) to plugin schema in meltano.yml.

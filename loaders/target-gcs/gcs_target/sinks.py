@@ -83,12 +83,35 @@ class GCSSink(RecordSink):
         """In the future maybe we will support more formats"""
         return "jsonl"
 
+    def _rotate_to_new_chunk(self) -> None:
+        """Close the current file handle, clear key cache, increment chunk index, and reset record count. Used when record count reaches max_records_per_file before writing the next record."""
+        if self._gcs_write_handle is not None:
+            flush_fn = getattr(self._gcs_write_handle, "flush", None)
+            if flush_fn is not None:
+                flush_fn()
+            self._gcs_write_handle.close()
+            self._gcs_write_handle = None
+        self._key_name = ""
+        self._chunk_index += 1
+        self._records_written_in_current_file = 0
+
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload).
 
+        When chunking is enabled (max_records_per_file > 0), rotates to a new
+        file before writing if the current file has reached the record limit.
         Developers may optionally read or write additional markers within the
         passed `context` dict from the current batch.
         """
+        max_records = self.config.get("max_records_per_file", 0)
+        if (
+            max_records
+            and max_records > 0
+            and self._records_written_in_current_file >= max_records
+        ):
+            self._rotate_to_new_chunk()
         self.gcs_write_handle.write(
             orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
         )
+        if max_records and max_records > 0:
+            self._records_written_in_current_file += 1

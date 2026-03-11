@@ -5,7 +5,6 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import orjson
-import pytest
 
 from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
@@ -185,10 +184,6 @@ def _key_from_open_call(call_args: tuple) -> str:
     return url.split("/", 3)[-1]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Requires tasks 05 and 06 (key computation and rotation)",
-)
 def test_chunking_rotation_at_threshold():
     """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
     timestamps = iter([1000.0, 1001.0])
@@ -222,10 +217,6 @@ def test_chunking_rotation_at_threshold():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Requires tasks 05 and 06 (key computation and rotation)",
-)
 def test_chunking_key_format_includes_chunk_index():
     """Key includes chunk_index when chunking is on: key_naming_convention may include {chunk_index} so multiple chunks in the same second have distinct keys. Uniqueness when multiple chunks in same second."""
     timestamps = iter([2000.0, 2001.0])
@@ -255,10 +246,6 @@ def test_chunking_key_format_includes_chunk_index():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Requires tasks 05 and 06 (key computation and rotation)",
-)
 def test_chunking_record_integrity_no_duplicate_or_dropped():
     """Every record written exactly once: with chunking enabled, all records are written to GCS with no duplicates or drops. Correctness of the pipeline."""
     write_payloads = []
