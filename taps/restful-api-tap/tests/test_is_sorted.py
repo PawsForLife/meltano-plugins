@@ -2,23 +2,15 @@
 
 Asserts that discovered streams expose stream.is_sorted according to config
 (is_sorted true, false, omitted, and per-stream in multi-stream). No assertions
-on logs, call counts, or internal functions. Tests fail until is_sorted is
-wired in plugin schema, common_properties, discover_streams, and DynamicStream
-(tasks 02–05).
+on logs, call counts, or internal functions.
 """
 
 from typing import Any
-
-import pytest
 
 from restful_api_tap.tap import RestfulApiTap
 from tests.test_streams import config, setup_api, url_path
 
 
-@pytest.mark.xfail(
-    reason="is_sorted not wired in schema/discover_streams/DynamicStream until tasks 02–05",
-    strict=True,
-)
 def test_is_sorted_true(requests_mock: Any) -> None:
     """Config with is_sorted true yields a stream with stream.is_sorted True.
 
@@ -97,10 +89,6 @@ def test_is_sorted_false(requests_mock: Any) -> None:
     assert streams[0].is_sorted is False
 
 
-@pytest.mark.xfail(
-    reason="is_sorted not wired in schema/discover_streams/DynamicStream until tasks 02–05",
-    strict=True,
-)
 def test_is_sorted_multiple_streams(requests_mock: Any) -> None:
     """Multiple streams: first is_sorted true, second false; each stream independent.
 

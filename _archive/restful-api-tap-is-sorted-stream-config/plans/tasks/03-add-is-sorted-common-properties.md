@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-This task adds the stream-level config property **`is_sorted`** to the tap’s schema in `tap.py` only. It extends `common_properties` with a single `th.Property` so that:
+This task adds the stream-level config property **`is_sorted`** to the tap's schema in `tap.py` only. It extends `common_properties` with a single `th.Property` so that:
 
 - Config validation (SDK schema load) accepts the `is_sorted` key.
 - Task 05 can safely read `stream.get("is_sorted", False)` in `discover_streams()` and pass it into `DynamicStream`.
@@ -23,7 +23,7 @@ No wiring in `discover_streams()` or `DynamicStream` in this task; no new Pydant
 |------|--------|--------|
 | `taps/restful-api-tap/restful_api_tap/tap.py` | Modify | Append one `th.Property("is_sorted", ...)` to `common_properties` |
 
-**Insertion point:** Inside the `th.PropertiesList(...)` of `common_properties`, **after** the `source_search_query` property (the last property before the closing `)` of the list, i.e. after the comma on the line that closes the `source_search_query` `th.Property` (around line 124).
+**Insertion point:** Inside the `th.PropertiesList(...)` of `common_properties`, **after** the `source_search_query` property (the last property before the closing `)` of the list), i.e. after the comma on the line that closes the `source_search_query` `th.Property` (around line 124).
 
 **Exact addition:**
 

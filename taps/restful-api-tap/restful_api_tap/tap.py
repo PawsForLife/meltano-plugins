@@ -121,6 +121,14 @@ class RestfulApiTap(Tap):
             '{"meta.lastUpdated": {"gt": "$last_run_date"}}}]}}. '
             "Escape any required double quotes in the template.",
         ),
+        th.Property(
+            "is_sorted",
+            th.BooleanType(),
+            default=False,
+            required=False,
+            description="When true, the stream is declared sorted by replication_key; "
+            "enables resumable state if the sync is interrupted.",
+        ),
     )
 
     top_level_properties = th.PropertiesList(
@@ -486,6 +494,7 @@ class RestfulApiTap(Tap):
             flatten_records = stream.get(
                 "flatten_records", self.config.get("flatten_records", False)
             )
+            is_sorted = stream.get("is_sorted", False)
 
             schema = {}
             schema_config = stream.get("schema")
@@ -553,6 +562,7 @@ class RestfulApiTap(Tap):
                     start_date=start_date,
                     source_search_field=source_search_field,
                     source_search_query=source_search_query,
+                    is_sorted=is_sorted,
                     use_request_body_not_params=self.config.get(
                         "use_request_body_not_params"
                     ),
