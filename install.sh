@@ -1,30 +1,61 @@
 #!/usr/bin/env bash
 # Bootstrap all plugins by running each plugin's install.sh; discovery via list_packages.py.
-# Then install pre-commit if missing and run pre-commit install at repo root.
-
-set -e
+# Runs every package install, then ensures pre-commit is available and runs pre-commit install.
+# Prints which package is being installed before each run and a final summary of succeeded/failed.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUCCEEDED=()
+FAILED=()
 
-# Discover plugin paths and run each plugin's install.sh; stop on first failure.
+# Run each plugin's install.sh; record success/failure (do not stop on first failure).
 while IFS= read -r path || [[ -n "$path" ]]; do
   path="$(echo "$path" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
   [[ -z "$path" ]] && continue
-  (cd "$ROOT/$path" && ./install.sh)
+  echo "==> Installing package: $path"
+  if (cd "$ROOT/$path" && ./install.sh); then
+    SUCCEEDED+=("$path")
+  else
+    FAILED+=("$path")
+  fi
 done < <(python "$ROOT/scripts/list_packages.py" "$ROOT")
 
 # Ensure pre-commit is available; install via pip if missing.
 if ! command -v pre-commit &>/dev/null; then
+  echo "==> Installing pre-commit..."
   if command -v pip3 &>/dev/null; then
     pip3 install pre-commit
   elif command -v pip &>/dev/null; then
     pip install pre-commit
   else
     echo "pre-commit not found and neither pip nor pip3 available." >&2
-    exit 1
+    FAILED+=("pre-commit (pip install)")
   fi
 fi
 
 # Install git hooks from repo root.
-cd "$ROOT"
-pre-commit install
+PRECOMMIT_FAILED=0
+if command -v pre-commit &>/dev/null; then
+  cd "$ROOT"
+  if ! pre-commit install; then
+    PRECOMMIT_FAILED=1
+  fi
+fi
+
+# Final summary: one line for succeeded, one for failed (including pre-commit when applicable).
+echo ""
+echo "--- Summary ---"
+if [[ ${#SUCCEEDED[@]} -gt 0 ]] || { [[ $PRECOMMIT_FAILED -eq 0 ]] && command -v pre-commit &>/dev/null; }; then
+  line="Succeeded: ${SUCCEEDED[*]}"
+  [[ $PRECOMMIT_FAILED -eq 0 ]] && command -v pre-commit &>/dev/null && line="$line pre-commit"
+  echo "$line"
+fi
+if [[ ${#FAILED[@]} -gt 0 ]] || [[ $PRECOMMIT_FAILED -ne 0 ]]; then
+  line="Failed: ${FAILED[*]}"
+  [[ $PRECOMMIT_FAILED -ne 0 ]] && line="$line pre-commit"
+  echo "$line"
+fi
+
+if [[ ${#FAILED[@]} -gt 0 ]] || [[ $PRECOMMIT_FAILED -ne 0 ]]; then
+  exit 1
+fi
+exit 0
