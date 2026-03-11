@@ -26,3 +26,4 @@
 - Task 05-wire-is-sorted-in-discover-streams completed, tests passing
 - Task 03-add-is-sorted-common-properties completed, tests passing
 - Task 04-add-is-sorted-to-dynamic-stream completed, tests passing
+- Task 06-update-is-sorted-documentation completed, tests passing

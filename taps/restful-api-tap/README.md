@@ -254,7 +254,9 @@ will overwrite their top-level counterparts except where noted below:
 
   At run-time, the tap will dynamically change the value **$last_run_date** with either the defined `start_date` parameter or the last bookmark (stream state) value.
   Example: source_search_field=**last-updated**, the
-  source_search_query = **gt$last_run_date**, and the current replication state = 2022-08-10:23:10:10+1200. At run time this creates a request parameter **last-updated=gt2022-06-10:23:10:10+1200**.
+  source_search_query = **gt$last_run_date**, and the current replication state = 2022-08-10:23:10:10+1200.   At run time this creates a request parameter **last-updated=gt2022-06-10:23:10:10+1200**.
+
+- `is_sorted`: optional: stream-level, boolean, default `False`. Set to `true` when the source API returns records ordered by the replication key (e.g. `sequence_id`, `created_at`). When `true`, the stream is declared sorted so interrupted syncs are resumable; the source API must actually return records ordered by the replication key. See [Meltano Singer SDK – Incremental replication](https://sdk.meltano.com/en/latest/incremental_replication.html).
 
 #### Top-Level Authentication config options.
 - `auth_method`: optional: The method of authentication used by the API. Supported options

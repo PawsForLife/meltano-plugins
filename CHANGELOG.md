@@ -10,6 +10,7 @@
   - Wire `is_sorted` in discover_streams: resolve from stream config (default False), pass to DynamicStream; enable all four is_sorted tests.
   - Add `is_sorted` to common_properties in tap.py (BooleanType, default False) so config validation accepts the key.
   - Add `is_sorted` param to DynamicStream (streams.py); set instance attribute and override property for SDK compatibility.
+  - Document stream-level `is_sorted` in README (when to use, effect); verify DynamicStream.__init__ Args; add discover_streams() docstring line.
 - **Plugin source folder naming** — Details: [plugin-source-folder-naming.md](_archive/plugin-source-folder-naming/plugin-source-folder-naming.md)
   - Source directories and package names aligned with plugin directory names (dashes → underscores): `taps/restful-api-tap` uses `restful_api_tap` (formerly `tap_rest_api_msdk`); `loaders/gcs-loader` uses `gcs_loader` (formerly `target_gcs`).
   - pyproject.toml, imports, scripts (install.sh, tox.ini, meltano.yml), and docs updated per plugin; provenance notes added in READMEs and AI_CONTEXT.

@@ -460,6 +460,8 @@ class RestfulApiTap(Tap):
     def discover_streams(self) -> List[DynamicStream]:  # type: ignore
         """Build the list of streams for Discovery. Returns stream instances used to build the catalog.
 
+        Resolves stream-level `is_sorted` (default False) and passes to DynamicStream.
+
         Returns:
             List of DynamicStream instances.
 
