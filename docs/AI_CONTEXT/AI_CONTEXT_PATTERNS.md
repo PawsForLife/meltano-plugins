@@ -49,7 +49,7 @@
 - **Black-box**: Tests assert on observable behaviour (returned objects, emitted records, raised exceptions). They do not assert on “called_once”, log lines, or internal call counts. For external data changes, the mock (e.g. `requests_mock`) provides the changed response; for internal state, assert on returned or mutated objects.
 - **Exception tests**: Use `pytest.raises(ExpectedException)` to assert that a specific exception type is raised (e.g. `with pytest.raises(FatalAPIError): list(stream.get_records({}))`).
 - **Fixtures and helpers**: Shared config and API mocks are factored into helpers (e.g. `config()`, `setup_api()`, `json_resp()`, `build_sink()`) in test modules. Schema files under `tests/` (e.g. `tests/schema.json`) are used when discovery is bypassed.
-- **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_standard_target_tests(GCSTarget, config=...)`. Run these in a test that iterates and invokes each case.
+- **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_target_test_class(GCSTarget, config=...)` and a test class that subclasses the result (e.g. `class TestGCSTarget(StandardTargetTests)`).
 - **Regression gate**: Any failing test that is not explicitly marked as expected failure (`@pytest.mark.xfail`, `@unittest.expectedFailure`) is a regression and must be fixed before the task is complete.
 
 ---

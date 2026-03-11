@@ -153,7 +153,7 @@ target-gcs --config /path/to/your-config.json < singer_output.jsonl
 ## Tests
 
 - **Location**: `loaders/target-gcs/tests/`
-- **test_core.py**: Runs SDK `get_standard_target_tests(GCSTarget, config=SAMPLE_CONFIG)`. `SAMPLE_CONFIG` is empty; for tests that open GCS, set at least `bucket_name`.
+- **test_core.py**: Runs SDK standard target tests via `get_target_test_class(GCSTarget, config=SAMPLE_CONFIG)` and `class TestGCSTarget(StandardTargetTests)`. `SAMPLE_CONFIG` is empty; for tests that open GCS, set at least `bucket_name`.
 - **test_sinks.py**: Key naming and GCS client behaviour:
   - Default key pattern, prefix, no leading slash, custom `key_naming_convention`, `{stream}`, `{date}`, `{timestamp}`, and `date_format`.
   - Config must not expose `credentials_file`.
