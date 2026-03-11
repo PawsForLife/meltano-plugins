@@ -19,13 +19,15 @@ Both are heavily modified from their upstreams; we use plugin names `restful-api
 
 ## Installation
 
-These plugins are **custom** (not published to the Meltano Hub or PyPI). Add them to your Meltano project by editing `meltano.yml` with `pip_url` pointing at this repo and, if you like, `variant: petcircle`. Do not add them via `meltano add` from the Hub.
+These plugins are **custom** (not published to the Meltano Hub or PyPI). Add them to your Meltano project by editing `meltano.yml` with `pip_url` and `namespace`. Do **not** set `variant` on custom plugins (see Troubleshooting). Do not add them via `meltano add` from the Hub.
 
 Install from this GitHub repo using Meltano’s `pip_url` and the **subdirectory** fragment so each plugin is installed from its own path.
 
 ### 1. Add the plugin in `meltano.yml`
 
-Use the `#subdirectory=` fragment in `pip_url` so Meltano installs the correct package from this monorepo.
+- Use the `#subdirectory=` fragment in `pip_url`.
+- Use a **plain** `git+https://...` URL (do not use the `package @ url` form—some installers fail with "Failed to parse: `@`").
+- Set `namespace` for each custom plugin; **omit** `variant` so Meltano uses your project definition instead of looking on the Hub.
 
 **Extractor (restful-api-tap):**
 
@@ -33,10 +35,10 @@ Use the `#subdirectory=` fragment in `pip_url` so Meltano installs the correct p
 plugins:
   extractors:
     - name: restful-api-tap
-      variant: petcircle
-      pip_url: "restful-api-tap @ git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap"
-      # Optional: pin to a ref (branch, tag, or commit)
-      # pip_url: "restful-api-tap @ git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirectory=taps/restful-api-tap"
+      namespace: restful_api_tap
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap
+      # Optional: pin to a ref (branch, tag, or commit)—put ref before #
+      # pip_url: git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirectory=taps/restful-api-tap
 ```
 
 **Loader (target-gcs):**
@@ -45,8 +47,8 @@ plugins:
 plugins:
   loaders:
     - name: target-gcs
-      variant: petcircle
-      pip_url: "target-gcs @ git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=loaders/target-gcs"
+      namespace: target_gcs
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=loaders/target-gcs
 ```
 
 ### 2. Install and run
@@ -59,11 +61,16 @@ Then run your pipelines as usual (e.g. `meltano run restful-api-tap target-gcs`)
 
 ### Version pinning
 
-To pin to a tag, branch, or commit, put the ref before `#`:
+To pin to a tag, branch, or commit, put the ref before `#` in the URL:
 
 ```yaml
-pip_url: "restful-api-tap @ git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirectory=taps/restful-api-tap"
+pip_url: git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirectory=taps/restful-api-tap
 ```
+
+### Troubleshooting
+
+- **"Extractor/Loader 'X' is not known to Meltano"** — Custom plugins must **not** set `variant`. Meltano treats `variant` as "look up on the Hub only"; since these plugins are not on the Hub, remove `variant` and ensure `namespace` is set so the project definition is used.
+- **"Failed to parse: `@`" / "Expected package name starting with an alphanumeric character, found `@`"** — Do not use the PEP 508 form `package @ git+https://...` in `pip_url`. Use a plain URL: `git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=...`.
 
 ---
 

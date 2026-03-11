@@ -34,17 +34,17 @@ Gratitude goes to [anelendata](https://github.com/anelendata/tap-rest-api) for i
 
 ### Install from this monorepo
 
-This tap is a **custom** plugin (not on the Meltano Hub or PyPI). To use it from this repo, add the following to your project's `meltano.yml`, then run `meltano install`:
+This tap is a **custom** plugin (not on the Meltano Hub or PyPI). To use it from this repo, add the following to your project's `meltano.yml`, then run `meltano install`. Use `namespace` and omit `variant`; use a plain `git+https://...` URL (not the `package @ url` form—see [repo root README](https://github.com/PawsForLife/meltano-plugins)#troubleshooting).
 
 ```yaml
 plugins:
   extractors:
     - name: restful-api-tap
-      variant: petcircle
-      pip_url: "restful-api-tap @ git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap"
+      namespace: restful_api_tap
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap
 ```
 
-For the full installation guide and the loader (target-gcs), see the [repo root README](https://github.com/PawsForLife/meltano-plugins) or [docs/monorepo](../../docs/monorepo/README.md).
+For the full installation guide, troubleshooting, and the loader (target-gcs), see the [repo root README](https://github.com/PawsForLife/meltano-plugins) or [docs/monorepo](../../docs/monorepo/README.md).
 
 ### Generic Meltano setup
 
