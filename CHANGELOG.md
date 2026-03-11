@@ -16,6 +16,7 @@
 
 - **target-gcs-handle-decimal-in-records** — Details: [target-gcs-handle-decimal-in-records.md](_archive/target-gcs-handle-decimal-in-records/target-gcs-handle-decimal-in-records.md)
   - Add regression test for record with Decimal: test_record_with_decimal_serializes_to_valid_json (captures GCS writes, asserts JSONL decodes and numeric value correct; xfail until orjson default in task 03–04).
+  - Add test that non-Decimal non-serializable value in record raises TypeError (test_non_serializable_non_decimal_type_raises_type_error; black-box, documents contract).
 - **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
   - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
   - Add unit tests for get_partition_path_from_record (valid ISO date/datetime, fallback format, missing field, invalid value, custom format); stub in sinks.py until task 03.

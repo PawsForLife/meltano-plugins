@@ -356,3 +356,17 @@ def test_record_with_decimal_serializes_to_valid_json():
     assert decoded["score"] == 12.34, (
         "Decimal must appear in written JSON as a numeric value equal to float(Decimal)"
     )
+
+
+def test_non_serializable_non_decimal_type_raises_type_error():
+    """Record containing a non-JSON-serializable value that is not Decimal raises TypeError when process_record runs.
+    Documents the contract that only Decimal is coerced to float; other non-serializable types must raise TypeError
+    so unknown types are not silently coerced. Black-box: asserts only that TypeError is raised."""
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    ):
+        sink = build_sink()
+        record = {"id": 1, "bad": object()}
+        context = {}
+        with pytest.raises(TypeError):
+            sink.process_record(record, context)

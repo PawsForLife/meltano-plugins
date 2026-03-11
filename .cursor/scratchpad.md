@@ -3,7 +3,7 @@
 ## Feature: target-gcs-handle-decimal-in-records
 
 - **Pipeline State:** Phase 1–4 Complete; Phase 5–6 Not started
-- **Task Completion Status:** Task 01-add-decimal-regression-test completed, tests passing
+- **Task Completion Status:** Task 01-add-decimal-regression-test completed, tests passing; Task 02-add-non-serializable-type-error-test completed, tests passing
 - **Execution Order:** `01-add-decimal-regression-test.md`, `02-add-non-serializable-type-error-test.md`, `03-add-json-default-helper-and-import.md`, `04-wire-default-at-orjson-call-sites.md`, `05-verify-suite-and-lint.md`
 
 ### Phase 1 (Research) summary
