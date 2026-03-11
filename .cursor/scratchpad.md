@@ -22,3 +22,4 @@
 - Task plan created: 06-update-is-sorted-documentation at plans/tasks/06-update-is-sorted-documentation.md
 - Task plan created: 04-add-is-sorted-to-dynamic-stream at plans/tasks/04-add-is-sorted-to-dynamic-stream.md
 - Task 01-add-is-sorted-tests completed, tests passing
+- Task 02-add-is-sorted-plugin-schema completed, tests passing
