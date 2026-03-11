@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Run ruff (check + format --check) and mypy per plugin using each plugin's .venv.
-# Discovery via scripts/list_packages.py; optional pytest when RUN_PYTEST=1.
+# Run ruff (check + format --check), mypy, and pytest per plugin using each plugin's .venv.
+# Discovery via scripts/list_packages.py.
 
 set -e
 
@@ -40,9 +40,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     .venv/bin/ruff format --check .
     pkg="$(get_mypy_package "$path")"
     .venv/bin/mypy "$pkg"
-    if [[ -n "${RUN_PYTEST:-}" && "${RUN_PYTEST}" != "0" ]]; then
-      .venv/bin/pytest
-    fi
+    .venv/bin/pytest
   }
   run_plugin
   rc=$?

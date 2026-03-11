@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap all plugins by running each plugin's install.sh; discovery via list_packages.py.
-# Runs every package install, then ensures pre-commit is available and runs pre-commit install.
+# Runs every package install, then ensures pre-commit is available and installs only the pre-push hook (checks run on push, not on commit).
 # Prints which package is being installed before each run and a final summary of succeeded/failed.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,26 +32,27 @@ if ! command -v pre-commit &>/dev/null; then
   fi
 fi
 
-# Install git hooks from repo root.
+# Install only the pre-push hook (checks run on push, not on commit). Uninstall pre-commit hook if present.
 PRECOMMIT_FAILED=0
 if command -v pre-commit &>/dev/null; then
   cd "$ROOT"
-  if ! pre-commit install; then
+  pre-commit uninstall 2>/dev/null || true
+  if ! pre-commit install --hook-type pre-push; then
     PRECOMMIT_FAILED=1
   fi
 fi
 
-# Final summary: one line for succeeded, one for failed (including pre-commit when applicable).
+# Final summary: one line for succeeded, one for failed (including pre-push hook when applicable).
 echo ""
 echo "--- Summary ---"
 if [[ ${#SUCCEEDED[@]} -gt 0 ]] || { [[ $PRECOMMIT_FAILED -eq 0 ]] && command -v pre-commit &>/dev/null; }; then
   line="Succeeded: ${SUCCEEDED[*]}"
-  [[ $PRECOMMIT_FAILED -eq 0 ]] && command -v pre-commit &>/dev/null && line="$line pre-commit"
+  [[ $PRECOMMIT_FAILED -eq 0 ]] && command -v pre-commit &>/dev/null && line="$line pre-push"
   echo "$line"
 fi
 if [[ ${#FAILED[@]} -gt 0 ]] || [[ $PRECOMMIT_FAILED -ne 0 ]]; then
   line="Failed: ${FAILED[*]}"
-  [[ $PRECOMMIT_FAILED -ne 0 ]] && line="$line pre-commit"
+  [[ $PRECOMMIT_FAILED -ne 0 ]] && line="$line pre-push"
   echo "$line"
 fi
 
