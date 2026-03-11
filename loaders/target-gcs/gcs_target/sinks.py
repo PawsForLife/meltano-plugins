@@ -11,7 +11,6 @@ import smart_open
 from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
-
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
 
@@ -92,9 +91,47 @@ class GCSSink(RecordSink):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
             self._current_partition_path: Optional[str] = None
 
+    def _build_key_for_record(self, record: dict, partition_path: str) -> str:
+        """Build the object key for a single record when partition_date_field is set.
+
+        Uses key_prefix and key_naming_convention with format_map: stream,
+        partition_date (= partition_path), timestamp (from _time_fn or time.time),
+        and chunk_index when chunking is enabled. Same normalization as key_name
+        (no double slashes, no leading slash). Callers pass a pre-resolved
+        partition_path (e.g. from get_partition_path_from_record).
+
+        Args:
+            record: Record dict (unused; partition_path is pre-resolved).
+            partition_path: Pre-resolved partition path segment (e.g. year=2024/month=03/day=11).
+
+        Returns:
+            Normalized key string for the GCS object.
+        """
+        extraction_timestamp = round((self._time_fn or time.time)())
+        base_key_name = self.config.get(
+            "key_naming_convention",
+            f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
+        )
+        max_records = self.config.get("max_records_per_file", 0)
+        format_map = defaultdict(
+            str,
+            stream=self.stream_name,
+            partition_date=partition_path,
+            timestamp=extraction_timestamp,
+        )
+        if max_records and max_records > 0:
+            format_map["chunk_index"] = self._chunk_index
+        base = base_key_name.format_map(format_map)
+        prefixed = (
+            f"{self.config.get('key_prefix', '')}/{base}".replace("//", "/")
+        ).lstrip("/")
+        return prefixed
+
     @property
     def key_name(self) -> str:
-        """Return the key name. When recomputing, uses stream, date, timestamp; when chunking is enabled (max_records_per_file > 0), includes chunk_index so key_naming_convention may use {chunk_index}."""
+        """Return the key name. When partition_date_field is set, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When unset, recomputes from stream, date, timestamp and optionally chunk_index."""
+        if self.config.get("partition_date_field"):
+            return self._key_name
         if not self._key_name:
             # Time is injectable via time_fn for deterministic key assertions in tests.
             extraction_timestamp = round((self._time_fn or time.time)())

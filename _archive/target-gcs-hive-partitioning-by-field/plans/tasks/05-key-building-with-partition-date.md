@@ -1,7 +1,7 @@
 # Task Plan: 05-key-building-with-partition-date
 
-**Feature:** target-gcs-hive-partitioning-by-field  
-**Task:** Add `_build_key_for_record` and adjust `key_name` when `partition_date_field` is set; keys are built per record with `{partition_date}` token.  
+**Feature:** target-gcs-hive-partitioning-by-field
+**Task:** Add `_build_key_for_record` and adjust `key_name` when `partition_date_field` is set; keys are built per record with `{partition_date}` token.
 **Master plan:** [../master/overview.md](../master/overview.md), [../master/implementation.md](../master/implementation.md), [../master/interfaces.md](../master/interfaces.md), [../master/testing.md](../master/testing.md)
 
 ---
