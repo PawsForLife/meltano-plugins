@@ -12,6 +12,16 @@ from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
 
+def get_partition_path_from_record(
+    record: dict,
+    partition_date_field: str,
+    partition_date_format: str,
+    fallback_date: datetime,
+) -> str:
+    """Resolve partition path string from record; fallback when field missing or unparseable. Stub until task 03."""
+    raise NotImplementedError("Partition resolution implemented in task 03")
+
+
 class GCSSink(RecordSink):
     """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key."""
 

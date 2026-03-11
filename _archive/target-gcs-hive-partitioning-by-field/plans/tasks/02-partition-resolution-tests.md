@@ -23,7 +23,7 @@ This task adds unit tests for the pure function `get_partition_path_from_record(
 
 **Alternative:** If test file length or separation is preferred, add tests in a new file `loaders/target-gcs/tests/test_sinks_partition.py` that imports `get_partition_path_from_record` from `gcs_target.sinks`. Current `test_sinks.py` is under 300 lines; adding these tests keeps it under 500 (content_length.mdc). Prefer extending `test_sinks.py` unless the team prefers a dedicated partition test module.
 
-**Default format constant:** Tests that assert “default Hive format” use the string `year=%Y/month=%m/day=%d` (per interfaces.md). No need to define a constant in this task; literal in tests is fine.
+**Default format constant:** Tests that assert "default Hive format" use the string `year=%Y/month=%m/day=%d` (per interfaces.md). No need to define a constant in this task; literal in tests is fine.
 
 ---
 
