@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from io import FileIO
-from typing import Optional
+from typing import Callable, Optional
 
 import orjson
 import smart_open
@@ -17,7 +17,15 @@ class GCSSink(RecordSink):
 
     max_size = 1000  # Max records to write in one batch
 
-    def __init__(self, target, stream_name, schema, key_properties):
+    def __init__(
+        self,
+        target,
+        stream_name,
+        schema,
+        key_properties,
+        *,
+        time_fn: Optional[Callable[[], float]] = None,
+    ):
         super().__init__(
             target=target,
             stream_name=stream_name,
@@ -26,12 +34,16 @@ class GCSSink(RecordSink):
         )
         self._gcs_write_handle: Optional[FileIO] = None
         self._key_name: str = ""
+        self._records_written_in_current_file: int = 0
+        self._chunk_index: int = 0
+        self._time_fn: Optional[Callable[[], float]] = time_fn
 
     @property
     def key_name(self) -> str:
         """Return the key name."""
         if not self._key_name:
-            extraction_timestamp = round(time.time())
+            # Time is injectable via time_fn for deterministic key assertions in tests.
+            extraction_timestamp = round((self._time_fn or time.time)())
             base_key_name = self.config.get(
                 "key_naming_convention",
                 f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",

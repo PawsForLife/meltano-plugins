@@ -24,3 +24,4 @@
 - Task plan created: 06-rotation-and-process-record at plans/tasks/06-rotation-and-process-record.md
 - **Task 01-add-config-schema completed, tests passing.**
 - Task 02-tests-chunking-disabled completed, tests passing.
+- Task 03-sink-state-and-time-injection completed, tests passing.

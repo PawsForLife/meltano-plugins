@@ -8,14 +8,22 @@ from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
 
 
-def build_sink(config=None):
-    """Build a sink for the target using the given config (config file contents)."""
+def build_sink(config=None, time_fn=None):
+    """Build a sink for the target using the given config (config file contents).
+    Optionally pass time_fn for deterministic key generation in tests."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
     config = {**default_config, **config}
+    kwargs = {}
+    if time_fn is not None:
+        kwargs["time_fn"] = time_fn
     return GCSSink(
-        GCSTarget(config=config), "my_stream", {"properties": {}}, key_properties=config
+        GCSTarget(config=config),
+        "my_stream",
+        {"properties": {}},
+        key_properties=config,
+        **kwargs,
     )
 
 
@@ -61,6 +69,17 @@ def test_key_name_includes_date_format_if_date_token_used_and_date_format_provid
 def test_key_name_includes_timestamp_if_timestamp_token_used():
     subject = build_sink({"key_naming_convention": "file/{timestamp}.txt"})
     assert re.match(r"file/\d+.txt", subject.key_name)
+
+
+def test_key_name_uses_injectable_time_fn_when_provided():
+    """Key name uses injectable time when time_fn is provided so tests can assert key content without flakiness.
+    WHAT: key_name uses time_fn for extraction_timestamp when passed to GCSSink. WHY: deterministic key assertions in tests (e.g. rotation and chunk_index in key)."""
+    fixed_ts = 12345.0
+    subject = build_sink(
+        config={"key_naming_convention": "file/{timestamp}.txt"},
+        time_fn=lambda: fixed_ts,
+    )
+    assert subject.key_name == "file/12345.txt"
 
 
 def test_config_schema_has_no_credentials_file():

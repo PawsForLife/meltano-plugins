@@ -41,7 +41,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 ### GCSSink (`gcs_target.sinks`)
 
 - **Base**: `singer_sdk.sinks.RecordSink`
-- **Constructor**: `GCSSink(target, stream_name, schema, key_properties)` — same contract as SDK `RecordSink`.
+- **Constructor**: `GCSSink(target, stream_name, schema, key_properties, *, time_fn=None)` — same contract as SDK `RecordSink`; optional `time_fn` (callable returning float) injects time for key generation (e.g. tests use it for deterministic keys).
 - **Class attribute**: `max_size = 1000` (batch size hint for SDK; records are still written per `process_record` call).
 - **Key naming** (`key_name` property): Computed once per sink. Uses `key_prefix` + `key_naming_convention` (or default). Tokens:
   - `{stream}` — stream name.
