@@ -77,13 +77,20 @@ def test_partition_path_valid_iso_datetime_in_field():
 
 
 def test_partition_path_fallback_format():
-    """Date string parseable by supported format yields correct path. WHAT: Fallback parsing path works when format matches input. WHY: Support non-ISO date strings."""
-    result = get_partition_path_from_record(
-        record={"dt": "2024-03-11"},
-        partition_date_field="dt",
-        partition_date_format=DEFAULT_HIVE_FORMAT,
-        fallback_date=FALLBACK_DATE,
-    )
+    """Fallback strptime path in get_partition_path_from_record is used when fromisoformat fails. WHAT: When ISO parse fails, %Y-%m-%d strptime is tried and produces correct Hive path. WHY: Ensures non-ISO or edge date strings still resolve via fallback."""
+    # Use a datetime subclass whose fromisoformat raises so the fallback branch (strptime) is exercised.
+    class FailingIsoDatetime(datetime):
+        @classmethod
+        def fromisoformat(cls, s: str) -> "datetime":
+            raise ValueError("not ISO")
+
+    with patch("gcs_target.sinks.datetime", FailingIsoDatetime):
+        result = get_partition_path_from_record(
+            record={"dt": "2024-03-11"},
+            partition_date_field="dt",
+            partition_date_format=DEFAULT_HIVE_FORMAT,
+            fallback_date=FALLBACK_DATE,
+        )
     assert result == "year=2024/month=03/day=11"
 
 
