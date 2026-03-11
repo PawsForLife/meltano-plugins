@@ -1,19 +1,14 @@
 version: 1
 send_anonymous_usage_stats: true
-project_id: e1acb3ba-b6d0-4b7c-aa29-30ea9fc18d29
 plugins:
   extractors:
-    - name: tap-carbon-intensity
-      variant: meltano
-      pip_url: git+https://gitlab.com/meltano/tap-carbon-intensity.git
+    - name: tap-csv
+      variant: meltanolabs
+      pip_url: meltanolabs-tap-csv
   loaders:
     - name: target-gcs
       namespace: gcs_target
       pip_url: -e .
-      capabilities:
-        - state
-        - catalog
-        - discover
       settings:
         - name: bucket_name
         - name: date_format
@@ -23,9 +18,9 @@ plugins:
         - name: partition_date_field
         - name: partition_date_format
       config:
-        bucket_name: datateer-managed-prt-prod-raw-data
+        bucket_name: your-gcs-bucket
         date_format: "%Y-%m-%d"
-        key_prefix: prt-test/triton
+        key_prefix: output
         key_naming_convention: "{stream}/{partition_date}/{timestamp}.jsonl"
         max_records_per_file: 1000
         partition_date_field: created_at

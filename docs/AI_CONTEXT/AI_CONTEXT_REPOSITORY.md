@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Last Updated | 2026-03-11 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
 | Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
@@ -13,7 +13,7 @@
 
 ## High-Level Overview
 
-This repository is a **Meltano/Singer SDK monorepo** containing two standalone plugins: one Singer **tap** (extractor) and one Singer **target** (loader). Both are maintained by PawsForLife as forks of upstream projects. They are **custom** (not on the Meltano Hub or PyPI); add them in a Meltano project by editing `meltano.yml` with `pip_url` (Git URL + `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`) and optionally `variant: petcircle`.
+This repository is a **Meltano/Singer SDK monorepo** containing two standalone plugins: one Singer **tap** (extractor) and one Singer **target** (loader). Both are maintained by PawsForLife as forks of upstream projects. They are **custom** (not on the Meltano Hub or PyPI); add them in a Meltano project by editing `meltano.yml` with `pip_url` (Git URL + `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`) and `namespace`; omit `variant` so Meltano uses the project definition.
 
 - **restful-api-tap** — Extracts data from REST APIs. Streams and schemas are configured or auto-discovered; supports multiple auth types (Basic, API Key, Bearer, OAuth, AWS). Emits Singer-formatted JSONL to stdout.
 - **target-gcs** — Loads Singer JSONL from stdin into Google Cloud Storage. Writes to a configurable bucket with configurable key naming.
@@ -164,7 +164,7 @@ No shared process state; communication is Singer JSONL on stdout → stdin. Stat
 - **restful-api-tap**: `singer-sdk`, `requests`, `genson`, `atomicwrites`, `requests-aws4auth`, `boto3`. Python ≥3.12.
 - **target-gcs**: `singer-sdk`, `google-cloud-storage`, `google-api-python-client`, `smart-open[gcs]`, `orjson`, `requests`. Python ≥3.8,<4.0.
 
-Each plugin is installable on its own via `pip` from its subdirectory (`pip install -e .` or Meltano `pip_url` with `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`; use `variant: petcircle` in `meltano.yml` when following this repo's install examples).
+Each plugin is installable on its own via `pip` from its subdirectory (`pip install -e .` or Meltano `pip_url` with `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`; see README for `meltano.yml` examples).
 
 ---
 

@@ -4,12 +4,12 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Last Updated | 2026-03-11 |
-| Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink |
+| Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink, RecordSink |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, env), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (typing, testing), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (target, destination, streams, Sink, config file, SCHEMA/RECORD/STATE), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md) (tap component) |
 
-**Summary:** Singer **target** (loader) that reads SCHEMA, RECORD, and STATE messages from stdin and loads record data into **Google Cloud Storage** as the destination. One **sink** per stream; writes JSONL objects using config file settings (bucket, key prefix, key naming).
+**Summary:** Singer **target** (loader) that reads SCHEMA, RECORD, and STATE messages from stdin and loads record data into **Google Cloud Storage** as the destination. One **sink** per stream; writes JSONL using config file settings (bucket, key prefix, key naming, optional partition-by-field and chunking).
 
 ---
 
@@ -25,6 +25,12 @@ Package root: `loaders/target-gcs/`. Source package: `gcs_target/`. No shared co
 ---
 
 ## Public Interfaces
+
+### `get_partition_path_from_record` (`gcs_target.sinks`)
+
+- **Signature**: `get_partition_path_from_record(record: dict, partition_date_field: str, partition_date_format: str, fallback_date: datetime) -> str`
+- **Role**: Resolve partition path string from a record’s date field for partition-by-field behaviour. Reads the record property named by `partition_date_field`; parses as date/datetime (ISO via `fromisoformat`, then `%Y-%m-%d`). If missing or unparseable, returns `fallback_date` formatted with `partition_date_format`. Used by `GCSSink`; callable from custom sinks or tests.
+- **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style).
 
 ### GCSTarget (`gcs_target.target`)
 
@@ -84,7 +90,7 @@ When `partition_date_field` is set, the sink uses one active write handle. On ea
 ## Extension Points
 
 - **Custom sink class**: Subclass `GCSTarget` and set `default_sink_class` to a custom sink (e.g. different key naming or format).
-- **Partition resolution / key building**: Custom sinks can override partition resolution (e.g. call or replace `get_partition_path_from_record`) or key building (`_build_key_for_record`) if needed.
+- **Partition resolution / key building**: Custom sinks can reuse `get_partition_path_from_record` or override partition resolution and key building (`_build_key_for_record`) for different partition or key semantics.
 - **Key naming**: Override `GCSSink.key_name` (or the logic that builds it) to change template, tokens, or prefix handling.
 - **Output format**: Override `GCSSink.output_format` and the write logic in `process_record` (e.g. Parquet, CSV). Current code path assumes JSONL.
 - **Config**: Add new options in `GCSTarget.config_jsonschema` and read them in the sink via `self.config.get(...)`. Example: add `date_format` to the schema for consistency with Meltano.
@@ -147,7 +153,7 @@ meltano run restful-api-tap target-gcs
 ## Tests
 
 - **Location**: `loaders/target-gcs/tests/`
-- **test_core.py**: Runs SDK `get_standard_target_tests(GCSTarget, config=SAMPLE_CONFIG)`. `SAMPLE_CONFIG` is currently minimal (TODO in repo).
+- **test_core.py**: Runs SDK `get_standard_target_tests(GCSTarget, config=SAMPLE_CONFIG)`. `SAMPLE_CONFIG` is empty; for tests that open GCS, set at least `bucket_name`.
 - **test_sinks.py**: Key naming and GCS client behaviour:
   - Default key pattern, prefix, no leading slash, custom `key_naming_convention`, `{stream}`, `{date}`, `{timestamp}`, and `date_format`.
   - Config must not expose `credentials_file`.

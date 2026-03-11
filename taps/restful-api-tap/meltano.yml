@@ -113,6 +113,8 @@ plugins:
       select:
         - '*.*'
   loaders:
-    - name: target-jsonl
-      variant: andyh1203
-      pip_url: target-jsonl
+    - name: target-csv
+      variant: meltanolabs
+      pip_url: meltanolabs-target-csv
+      config:
+        output_path: output
