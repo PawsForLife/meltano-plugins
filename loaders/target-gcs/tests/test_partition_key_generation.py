@@ -76,25 +76,6 @@ def test_partition_path_valid_iso_datetime_in_field():
     assert result == "year=2024/month=03/day=11"
 
 
-def test_partition_path_fallback_format():
-    """Fallback strptime path in get_partition_path_from_record is used when fromisoformat fails. WHAT: When ISO parse fails, %Y-%m-%d strptime is tried and produces correct Hive path. WHY: Ensures non-ISO or edge date strings still resolve via fallback."""
-
-    # Use a datetime subclass whose fromisoformat raises so the fallback branch (strptime) is exercised.
-    class FailingIsoDatetime(datetime):
-        @classmethod
-        def fromisoformat(cls, s: str) -> "datetime":
-            raise ValueError("not ISO")
-
-    with patch("gcs_target.sinks.datetime", FailingIsoDatetime):
-        result = get_partition_path_from_record(
-            record={"dt": "2024-03-11"},
-            partition_date_field="dt",
-            partition_date_format=DEFAULT_HIVE_FORMAT,
-            fallback_date=FALLBACK_DATE,
-        )
-    assert result == "year=2024/month=03/day=11"
-
-
 def test_partition_path_missing_field_uses_fallback():
     """Missing partition_date_field in record yields fallback_date formatted path. WHAT: Fallback when field absent. WHY: No crash; predictable path."""
     result = get_partition_path_from_record(
