@@ -266,12 +266,13 @@ class GCSSink(RecordSink):
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload).
 
-        When partition_date_field is set: delegates to _process_record_partition_by_field.
-        When unset: delegates to _process_record_single_or_chunked (single key and
-        handle, or chunking by max_records_per_file).
+        Dispatches by partition_date_field: when set, partition-by-field path
+        (per-record partition, handle lifecycle on partition/key change); when
+        unset, single-file or chunked path (one key/handle per stream per run,
+        optional rotation by max_records_per_file).
         """
         partition_date_field = self.config.get("partition_date_field")
-        if not partition_date_field:
+        if partition_date_field:
+            self._process_record_partition_by_field(record, context)
+        else:
             self._process_record_single_or_chunked(record, context)
-            return
-        self._process_record_partition_by_field(record, context)

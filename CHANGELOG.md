@@ -57,6 +57,7 @@
 - **target-gcs-split-process-record** — Details: [target-gcs-split-process-record.md](_archive/target-gcs-split-process-record/target-gcs-split-process-record.md)
   - Extract single-file/chunked path to _process_record_single_or_chunked; process_record delegates when partition_date_field unset (task 01).
   - Extract partition-by-field path to _process_record_partition_by_field; process_record delegates when partition_date_field set (task 02).
+  - Make process_record thin dispatch only: config read, branch on partition_date_field, delegate; docstring updated (task 04).
 - **custom-meltano-plugins-documentation** — Details: [custom-meltano-plugins-documentation.md](_archive/custom-meltano-plugins-documentation/custom-meltano-plugins-documentation.md)
   - Docs state plugins are custom (not on Meltano Hub or PyPI); install via `meltano.yml` and `pip_url` with `#subdirectory=`, variant **petcircle** in examples.
   - Root README, docs/monorepo, docs/README, AI_CONTEXT (quick reference, repository), and tap README updated; tap README has "Install from this monorepo" subsection.
