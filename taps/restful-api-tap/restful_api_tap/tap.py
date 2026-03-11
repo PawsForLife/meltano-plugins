@@ -460,7 +460,7 @@ class RestfulApiTap(Tap):
     def discover_streams(self) -> List[DynamicStream]:  # type: ignore
         """Build the list of streams for Discovery. Returns stream instances used to build the catalog.
 
-        Resolves stream-level `is_sorted` (default False) and passes to DynamicStream.
+        Resolves stream-level `is_sorted` with tap-level fallback and passes to DynamicStream.
 
         Returns:
             List of DynamicStream instances.
@@ -496,7 +496,7 @@ class RestfulApiTap(Tap):
             flatten_records = stream.get(
                 "flatten_records", self.config.get("flatten_records", False)
             )
-            is_sorted = stream.get("is_sorted", False)
+            is_sorted = stream.get("is_sorted", self.config.get("is_sorted", False))
 
             schema = {}
             schema_config = stream.get("schema")
