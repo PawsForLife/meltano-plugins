@@ -84,6 +84,7 @@ class GCSSink(RecordSink):
             0  # Records written to current file; reset on rotation.
         )
         self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
+        self._current_timestamp: Optional[int] = None  # Cached at handle open; used for key building.
         self._time_fn: Optional[Callable[[], float]] = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Optional[Callable[[], datetime]] = date_fn
@@ -107,7 +108,9 @@ class GCSSink(RecordSink):
         Returns:
             Normalized key string for the GCS object.
         """
-        extraction_timestamp = round((self._time_fn or time.time)())
+        if self._current_timestamp is None:
+            self._current_timestamp = round((self._time_fn or time.time)())
+        extraction_timestamp = self._current_timestamp
         base_key_name = self.config.get(
             "key_naming_convention",
             f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
@@ -187,13 +190,14 @@ class GCSSink(RecordSink):
         self._records_written_in_current_file = 0
 
     def _close_handle_and_clear_state(self) -> None:
-        """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
+        """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string and _current_timestamp to None so the next open gets a fresh timestamp. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
         if self._gcs_write_handle is not None:
             if hasattr(self._gcs_write_handle, "flush"):
                 self._gcs_write_handle.flush()
             self._gcs_write_handle.close()
             self._gcs_write_handle = None
         self._key_name = ""
+        self._current_timestamp = None
 
     def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
         """Process one record when partition_date_field is unset (single-file or chunked by row limit).

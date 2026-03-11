@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Partition-by-field keys:** Cache extraction timestamp when opening a GCS write handle so keys are stable per handle instead of changing every second. `_build_key_for_record` now uses a cached `_current_timestamp` (set on first use after open, cleared in `_close_handle_and_clear_state`), avoiding new keys/handles per second.
+
 ### Changed
 
 - **README:** Clarified "Naming with chunking": added comma before "so" in chunk-index sentence; rewrote timestamp explanation so collisions are defined by chunk start time within the same granularity window (e.g. 12:00:00.500 vs 12:00:00.999), not by processing duration.
