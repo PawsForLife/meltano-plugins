@@ -186,6 +186,15 @@ class GCSSink(RecordSink):
         self._chunk_index += 1
         self._records_written_in_current_file = 0
 
+    def _close_handle_and_clear_state(self) -> None:
+        """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
+        if self._gcs_write_handle is not None:
+            if hasattr(self._gcs_write_handle, "flush"):
+                self._gcs_write_handle.flush()
+            self._gcs_write_handle.close()
+            self._gcs_write_handle = None
+        self._key_name = ""
+
     def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
         """Process one record when partition_date_field is unset (single-file or chunked by row limit).
 
@@ -227,12 +236,7 @@ class GCSSink(RecordSink):
             fallback,
         )
         if partition_path != self._current_partition_path:
-            if self._gcs_write_handle is not None:
-                if hasattr(self._gcs_write_handle, "flush"):
-                    self._gcs_write_handle.flush()
-                self._gcs_write_handle.close()
-                self._gcs_write_handle = None
-            self._key_name = ""
+            self._close_handle_and_clear_state()
             self._current_partition_path = partition_path
             self._chunk_index = 0
             self._records_written_in_current_file = 0
@@ -245,11 +249,7 @@ class GCSSink(RecordSink):
             self._rotate_to_new_chunk()
         key = self._build_key_for_record(record, partition_path)
         if self._gcs_write_handle is None or self._key_name != key:
-            if self._gcs_write_handle is not None:
-                if hasattr(self._gcs_write_handle, "flush"):
-                    self._gcs_write_handle.flush()
-                self._gcs_write_handle.close()
-                self._gcs_write_handle = None
+            self._close_handle_and_clear_state()
             self._key_name = key
             client = Client()
             self._gcs_write_handle = smart_open.open(

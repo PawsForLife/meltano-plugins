@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
+
 ### Fixed
 
 - **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
