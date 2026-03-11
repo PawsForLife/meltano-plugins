@@ -78,6 +78,7 @@ def test_partition_path_valid_iso_datetime_in_field():
 
 def test_partition_path_fallback_format():
     """Fallback strptime path in get_partition_path_from_record is used when fromisoformat fails. WHAT: When ISO parse fails, %Y-%m-%d strptime is tried and produces correct Hive path. WHY: Ensures non-ISO or edge date strings still resolve via fallback."""
+
     # Use a datetime subclass whose fromisoformat raises so the fallback branch (strptime) is exercised.
     class FailingIsoDatetime(datetime):
         @classmethod
