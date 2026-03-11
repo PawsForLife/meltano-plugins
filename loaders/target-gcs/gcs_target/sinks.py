@@ -207,29 +207,23 @@ class GCSSink(RecordSink):
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
 
-    def process_record(self, record: dict, context: dict) -> None:
-        """Process one record (RECORD message payload).
+    def _process_record_partition_by_field(self, record: dict, context: dict) -> None:
+        """Process one record when partition_date_field is set (partition-by-field strategy).
 
-        When partition_date_field is set: resolve partition path from record;
-        on partition change close handle and clear key/partition state and reset
-        chunk index; on chunk rotation (max_records_per_file) rotate within
-        partition; build key via _build_key_for_record; open handle when none or
-        key changed; write record. When partition "returns" (same value again),
-        a new key (new file) is used, not a reopen. When partition_date_field is
-        unset: delegates to _process_record_single_or_chunked (single key and
-        handle, or chunking by max_records_per_file).
+        Assumes partition_date_field is set. Resolves partition path from record;
+        on partition change closes handle and clears key/partition state and resets
+        chunk index; rotates within partition when at max_records_per_file; builds
+        key via _build_key_for_record; opens handle when none or key changed;
+        writes record and increments count when chunking.
         """
-        partition_date_field = self.config.get("partition_date_field")
-        if not partition_date_field:
-            self._process_record_single_or_chunked(record, context)
-            return
-
-        # Partition-by-field branch: resolve path, handle lifecycle, build key, write.
         fallback = self._date_fn() if self._date_fn else datetime.today()
+        partition_date_format = (
+            self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT
+        )
         partition_path = get_partition_path_from_record(
             record,
-            partition_date_field,
-            self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT,
+            self.config["partition_date_field"],
+            partition_date_format,
             fallback,
         )
         if partition_path != self._current_partition_path:
@@ -268,3 +262,16 @@ class GCSSink(RecordSink):
         )
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
+
+    def process_record(self, record: dict, context: dict) -> None:
+        """Process one record (RECORD message payload).
+
+        When partition_date_field is set: delegates to _process_record_partition_by_field.
+        When unset: delegates to _process_record_single_or_chunked (single key and
+        handle, or chunking by max_records_per_file).
+        """
+        partition_date_field = self.config.get("partition_date_field")
+        if not partition_date_field:
+            self._process_record_single_or_chunked(record, context)
+            return
+        self._process_record_partition_by_field(record, context)
