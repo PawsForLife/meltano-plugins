@@ -2,10 +2,12 @@
 
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
 import orjson
+import pytest
 
 from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
@@ -325,4 +327,32 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     ids = [r["id"] for r in records]
     assert len(ids) == 25 and set(ids) == set(range(25)), (
         "all 25 records must be written exactly once with ids 0..24 (no duplicate or dropped)"
+    )
+
+
+@pytest.mark.xfail(
+    reason="Decimal serialization not yet implemented; orjson default callback in task 03-04"
+)
+def test_record_with_decimal_serializes_to_valid_json():
+    """Record containing decimal.Decimal is written as valid JSONL with the numeric value as a JSON number.
+    Regression guard: orjson does not natively serialize Decimal; the sink will use a default callback (later task).
+    WHAT: process_record accepts a record with Decimal and writes JSONL where the value is a number. WHY: prevent regression when adding Decimal support."""
+    write_payloads = []
+
+    def capture_write(data):
+        write_payloads.append(data)
+
+    mock_handle = MagicMock()
+    mock_handle.write.side_effect = capture_write
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", return_value=mock_handle
+    ):
+        sink = build_sink()
+        record = {"id": 1, "score": Decimal("12.34")}
+        sink.process_record(record, {})
+
+    assert len(write_payloads) >= 1, "at least one line must be written"
+    decoded = orjson.loads(write_payloads[-1].strip())
+    assert decoded["score"] == 12.34, (
+        "Decimal must appear in written JSON as a numeric value equal to float(Decimal)"
     )
