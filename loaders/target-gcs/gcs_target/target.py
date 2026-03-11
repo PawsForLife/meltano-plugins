@@ -14,5 +14,11 @@ class GCSTarget(Target):
         th.Property("bucket_name", th.StringType, required=True),
         th.Property("key_prefix", th.StringType, required=False),
         th.Property("key_naming_convention", th.StringType, required=False),
+        th.Property(
+            "max_records_per_file",
+            th.IntegerType,
+            required=False,
+            description="Maximum records per GCS object; 0 or unset = no chunking.",
+        ),
     ).to_dict()
     default_sink_class = GCSSink

@@ -70,6 +70,37 @@ def test_config_schema_has_no_credentials_file():
     assert "credentials_file" not in properties
 
 
+def test_config_schema_includes_max_records_per_file():
+    """Schema exposes max_records_per_file so the sink can read it for record-count-based chunking; config is validated by schema."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "max_records_per_file" in properties
+    prop = properties["max_records_per_file"]
+    type_val = prop.get("type")
+    assert type_val == "integer" or (
+        isinstance(type_val, list) and "integer" in type_val
+    )
+    required = schema.get("required") or []
+    assert "max_records_per_file" not in required
+
+
+def test_config_validates_with_max_records_per_file():
+    """Config including max_records_per_file is valid; target instantiates without validation error."""
+    config = {"bucket_name": "b", "max_records_per_file": 1000}
+    target = GCSTarget(config=config)
+    assert target.config["max_records_per_file"] == 1000
+
+
+def test_config_validates_without_max_records_per_file():
+    """Config without max_records_per_file is valid; optional property may be omitted."""
+    config = {"bucket_name": "b"}
+    target = GCSTarget(config=config)
+    assert (
+        target.config.get("max_records_per_file") is None
+        or target.config.get("max_records_per_file") == 0
+    )
+
+
 def test_gcs_client_created_without_credentials_path():
     """Sink must use Client() (ADC) only; no explicit credentials path passed from config file."""
     with patch("gcs_target.sinks.Client") as mock_client:
