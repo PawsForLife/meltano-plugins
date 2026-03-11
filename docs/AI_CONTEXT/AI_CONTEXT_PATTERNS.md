@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
-| Last Updated | 2025-03-11 |
+| Version | 1.2 |
+| Last Updated | 2026-03-11 |
 | Tags | patterns, conventions, TDD, models, DI, validation, testing, meltano, singer |
-| Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) |
+| Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) |
 
 ---
 
@@ -18,7 +18,7 @@
 - **Module responsibilities**:
   - **Tap**: `tap.py` — Tap class, config schema (`common_properties`, `top_level_properties`), stream discovery (`discover_streams()`); `streams.py` — `DynamicStream`; `auth.py` — `get_authenticator`, `select_authenticator`; `client.py` — `RestApiStream`, `_request`, `request_records`; `pagination.py`; `utils.py` (e.g. `flatten_json`).
   - **Target**: `target.py` — Target class, `config_jsonschema`, `default_sink_class`; `sinks.py` — `GCSSink` (`key_name`, `gcs_write_handle`, `process_record`).
-- **Config schema**: Declared on the Tap/Target class via `singer_sdk.typing` (`th.PropertiesList`, `th.Property`). Target example: `config_jsonschema = th.PropertiesList(th.Property("bucket_name", th.StringType, required=True), ...).to_dict()`. Stream-level and top-level properties are merged in tap config (e.g. `stream.get("key", self.config.get("key", default))` in `discover_streams()`).
+- **Config schema**: Declared on the Tap/Target class via `singer_sdk.typing` (`th.PropertiesList`, `th.Property`). Target example in `gcs_target/target.py`: `config_jsonschema = th.PropertiesList(th.Property("bucket_name", th.StringType, required=True), ...).to_dict()`. Stream-level and top-level properties are merged in tap config (e.g. `stream.get("key", self.config.get("key", default))` in `discover_streams()`).
 
 ---
 
@@ -27,13 +27,13 @@
 - **Config and schema**: Use Singer SDK typing (`singer_sdk.typing` as `th`). Properties are defined with `th.Property(name, type, required=..., description=...)`. Complex or nested data is described via `th.ObjectType()`, `th.ArrayType()`, etc. No Pydantic/dataclass for config; validation is “load into SDK schema + fail fast.”
 - **Validation over re-checking**: Ingested data that must be parsed is loaded into a model (or SDK schema). If validation fails, do not use the data. Once valid, do not check validity again downstream.
 - **Typing in code**: Parameters and return types are annotated (e.g. `def parse_response(self, response: requests.Response) -> Iterable[dict]`). Optional and generic types from `typing` are used where appropriate.
-- **Stream/sink construction**: Tap builds stream instances with explicit kwargs from resolved config (e.g. `DynamicStream(tap=self, name=..., path=..., schema=..., authenticator=self._authenticator)`). No implicit global state for stream options.
+- **Stream/sink construction**: Tap builds stream instances with explicit kwargs from resolved config (e.g. in `tap.py`: `DynamicStream(tap=self, name=..., path=..., schema=..., authenticator=self._authenticator)`). No implicit global state for stream options.
 
 ---
 
 ## Error Handling & Logging
 
-- **Fatal vs non-fatal**: Initial request failures (e.g. 404 on first page) are fatal and surface via SDK (e.g. `FatalAPIError`). Next-page 404 can be treated as end-of-stream; the tap returns records already fetched and stops (see `restful_api_tap/client.py` `_request` and `request_records`).
+- **Fatal vs non-fatal**: Initial request failures (e.g. 404 on first page) are fatal and surface via SDK (e.g. `FatalAPIError`). Next-page 404 is treated as end-of-stream in `restful_api_tap/client.py`: in `_request()`, when `response.status_code == 404` and `_is_next_page_request` is True, return without calling `validate_response(response)`; in `request_records()`, break the loop on 404 and stop yielding.
 - **Validation errors**: Invalid config or response shape raises (e.g. `ValueError` for unknown auth method or non-dict record). Schema inference requires dict records; otherwise `ValueError("Input must be a dict object.")`.
 - **Logging**: Use the SDK/stream `self.logger` for info/debug/error. No tests assert on log output (black-box testing). Log messages are descriptive (e.g. “Pagination stopped after N pages because no records were found”).
 - **Backoff**: Rate-limited APIs use config-driven backoff (`backoff_type`: `message`, `header`, or default). Streams can override `backoff_wait_generator` to return a generator that yields wait times from response message or header (e.g. `RestfulApiTap` streams).
@@ -56,7 +56,7 @@
 
 ## Dependency Injection & Validation
 
-- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; GCS sink uses `Client()` from constructor/config context, and tests patch `gcs_target.sinks.Client` to assert it is called with the expected args (e.g. no credentials path for ADC).
+- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; `GCSSink` in `gcs_target/sinks.py` accepts optional `time_fn` and `date_fn` callables in `__init__` for deterministic key naming and partition fallback in tests (e.g. `build_sink(time_fn=..., date_fn=...)` in `loaders/target-gcs/tests/test_sinks.py`). GCS client is constructed from config context; tests patch `gcs_target.sinks.Client` to assert constructor args (e.g. no credentials path for ADC).
 - **Authenticator caching**: The tap caches the authenticator in `_authenticator` and reuses it across streams. OAuth refresh is handled inside the authenticator; `get_authenticator(self)` returns the cached instance or builds one via `select_authenticator(self)`.
 - **Config resolution**: Tap merges top-level and stream-level config (e.g. `params = {**self.config.get("params", {}), **stream.get("params", {})}`). Required settings (e.g. `api_url`, `bucket_name`) are enforced by the config schema and runtime checks. Config is supplied via config file or Meltano-injected env.
 
@@ -90,7 +90,7 @@
 
 ### How do I treat 404 as end-of-stream?
 
-- Only for **next-page** requests. In `RestApiStream._request()` (client.py), when `response.status_code == 404` and `_is_next_page_request` is True, return the response without calling `validate_response(response)`. In `request_records()`, when the response is 404 after a request, break the loop and do not yield further records. The initial request must still raise on 404 (e.g. `FatalAPIError`). See `tests/test_404_end_of_stream.py` for tests.
+- Only for **next-page** requests. In `RestApiStream._request()` (`taps/restful-api-tap/restful_api_tap/client.py`), when `response.status_code == 404` and `_is_next_page_request` is True, return the response without calling `validate_response(response)`. In `request_records()`, when the response is 404, break the loop and do not yield further records. The initial request must still raise on 404 (e.g. `FatalAPIError`). Tests: `taps/restful-api-tap/tests/test_404_end_of_stream.py` — e.g. `test_initial_request_404_raises_fatal_error` uses `pytest.raises(FatalAPIError)` and `test_next_page_request_404_treated_as_end_of_stream` asserts record count from first page only.
 
 ### How do I add a new pagination style?
 
@@ -101,6 +101,10 @@
 ### How do I validate that the target does not accept a credentials file?
 
 - Assert on the public config schema: in a test, load `GCSTarget.config_jsonschema` and assert `"credentials_file" not in (schema.get("properties") or {})`. Optionally assert that the GCS client is constructed without a credentials path by patching `Client` and checking constructor args (e.g. in `loaders/target-gcs/tests/test_sinks.py`). This documents that auth is ADC or env-only.
+
+### How do I make tests deterministic for time/date?
+
+- Inject time/date via constructor. In `gcs_target/sinks.py`, `GCSSink` accepts optional `time_fn` and `date_fn` callables; production uses `time.time` and `datetime.today` when not provided. In tests (e.g. `loaders/target-gcs/tests/test_sinks.py`), use `build_sink(time_fn=..., date_fn=...)` so key names and partition paths are deterministic. Do not patch `time` or `datetime` inside the unit under test; pass functions as parameters (DI).
 
 ### How do I run the test suite?
 

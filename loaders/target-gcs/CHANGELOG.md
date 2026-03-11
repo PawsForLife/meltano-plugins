@@ -4,7 +4,19 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **README:** Corrected `key_naming_convention` default in config table from `{timestamp}` to `{stream}_{timestamp}.jsonl` to match GCSSink behavior in `sinks.py`.
+
+- **Chunk rotation:** Refresh cached file timestamp (`_current_timestamp`) in `_rotate_to_new_chunk()` so the next key is unique for the new chunk; avoids reusing or truncating the previous key when `max_records_per_file` triggers rotation.
+
+- **Partition-by-field keys:** Cache extraction timestamp when opening a GCS write handle so keys are stable per handle instead of changing every second. `_build_key_for_record` now uses a cached `_current_timestamp` (set on first use after open, cleared in `_close_handle_and_clear_state`), avoiding new keys/handles per second.
+
 ### Changed
+
+- **Tests:** Removed `test_partition_path_fallback_format` (relied on patching `datetime.fromisoformat`; no natural input triggers the strptime fallback; valid/invalid paths already covered by other tests).
+
+- **Tests:** Split partition-path and key-generation tests from `test_sinks.py` into `test_partition_key_generation.py` so each file stays under the 500-line limit.
 
 - **README:** Clarified "Naming with chunking": added comma before "so" in chunk-index sentence; rewrote timestamp explanation so collisions are defined by chunk start time within the same granularity window (e.g. 12:00:00.500 vs 12:00:00.999), not by processing duration.
 

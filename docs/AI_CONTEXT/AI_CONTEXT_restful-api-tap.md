@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Last Updated | 2026-03-11 |
 | Tags | restful-api-tap, singer, tap, REST, extractor, meltano, streams, discovery, replication |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, troubleshooting), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, streams, SCHEMA/RECORD/STATE, config file, state file, Catalog, Discovery, replication), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) (downstream target) |
@@ -26,9 +26,10 @@
 
 ## Public Interfaces
 
-### Entry Point
+### Entry Points
 
-- **CLI:** `restful-api-tap` → `restful_api_tap.tap:RestfulApiTap.cli` (from `pyproject.toml`).
+- **CLI (script):** `restful-api-tap.sh` runs `uv sync --extra dev` then `uv run restful-api-tap "$@"` (Meltano `executable` in `meltano.yml`).
+- **CLI (entry point):** `restful-api-tap` → `restful_api_tap.tap:RestfulApiTap.cli` (from `pyproject.toml`).
 
 ### Main Types
 
@@ -40,7 +41,7 @@
 
 - **Required:** `api_url`, `streams` (array of stream defs; each has `name`).
 - **Top-level (examples):** `auth_method`, `api_keys`, `client_id`/`client_secret`, `username`/`password`, `bearer_token`, `refresh_token`, `grant_type`, `scope`, `access_token_url`, `redirect_uri`, `oauth_extras`, `oauth_expiration_secs`, `aws_credentials`; `next_page_token_path`, `pagination_request_style`, `pagination_response_style`, `use_request_body_not_params`; `backoff_type`, `backoff_param`, `backoff_time_extension`; `store_raw_json_message`, `flatten_records`; `pagination_page_size`, `pagination_results_limit`, `pagination_next_page_param`, `pagination_limit_per_page_param`, `pagination_total_limit_param`, `pagination_initial_offset`; `offset_records_jsonpath`; `discovery_request_limit`, `discovery_limit_param`.
-- **Per-stream (merge with top-level):** `name`, `path`, `params`, `headers`, `records_path`, `primary_keys`, `replication_key`, `except_keys`, `num_inference_records`, `start_date`, `source_search_field`, `source_search_query`, `schema` (path string, dict, or omitted for inference), `flatten_records`.
+- **Per-stream (merge with top-level):** `name`, `path`, `params`, `headers`, `records_path`, `primary_keys`, `replication_key`, `except_keys`, `num_inference_records`, `start_date`, `source_search_field`, `source_search_query`, `is_sorted`, `schema` (path string, dict, or omitted for inference), `flatten_records`.
 
 ### Key Methods
 
@@ -54,7 +55,7 @@
 
 ## Lifecycle / Entry Points
 
-1. **Invocation:** Meltano or CLI runs `restful-api-tap` with `--config <path>` (config file) and optional `--state` (state file), `--catalog` (catalog). Config can be from file or Meltano-injected.
+1. **Invocation:** Meltano runs the plugin via `executable` (`restful-api-tap.sh`, which invokes `uv run restful-api-tap`). CLI can run `restful-api-tap` directly with `--config <path>` (config file) and optional `--state` (state file), `--catalog` (catalog). Config can be from file or Meltano-injected.
 2. **Discovery:** Tap loads config; `discover_streams()` builds `DynamicStream` list. Schema per stream: from file path, from dict, or inferred via `get_schema` (auth resolved once, cached in `_authenticator`). Output is a Catalog (streams + schemas) to stdout.
 3. **Sync:** For each selected stream, SDK drives `request_records(context)`: paginator → prepare_request (params or body by `pagination_response_style` and `use_request_body_not_params`) → `_request` (auth via `authenticator`; 404 on next-page → end-of-stream) → `parse_response` → records yielded; SDK applies `post_process` when writing RECORD messages. Bookmarks (state) updated per stream; STATE messages emitted to stdout.
 4. **Output:** Singer JSONL (SCHEMA, RECORD, STATE) to stdout; typically piped to a target (e.g. target-gcs).
@@ -143,6 +144,7 @@
 
 - **test_tap.py:** Schema inference, schema from file/object, `flatten_records` in config schema, `get_schema` with `flatten_records` true/false, multiple streams.
 - **test_streams.py:** `post_process` flatten vs nested, stream-level override of top-level `flatten_records`, pagination (default style).
+- **test_is_sorted.py:** Stream-level `is_sorted` config passed through to discovered streams (resumable state when replication_key set).
 - **test_core.py:** SDK standard tap test class with mocked API.
 - **test_utils.py:** `flatten_json` and `except_keys`.
 - **test_404_end_of_stream.py:** Initial 404 → `FatalAPIError`; next-page 404 → end-of-stream, only prior pages yielded.

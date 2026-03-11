@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
+
 ### Fixed
 
 - **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
@@ -10,6 +14,16 @@
 
 ### Added
 
+- **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
+  - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
+  - Add unit tests for get_partition_path_from_record (valid ISO date/datetime, fallback format, missing field, invalid value, custom format); stub in sinks.py until task 03.
+  - Implement get_partition_path_from_record: parse record field (ISO date/datetime, fallback %Y-%m-%d); use fallback_date when missing or unparseable; add DEFAULT_PARTITION_DATE_FORMAT (Hive-style); remove xfail from partition resolution tests.
+  - Add optional date_fn to GCSSink.__init__ and _current_partition_path when partition_date_field is set; extend build_sink in tests to accept and pass date_fn (task 04).
+  - Add _build_key_for_record(record, partition_path) and partition_date in key when partition_date_field set; key_name returns current key or empty when partition-by-field on; tests for key differs by partition, Hive path in key, fallback path, unset leaves behaviour unchanged (task 05).
+  - Integrate partition-by-field into process_record and handle lifecycle: resolve partition path per record; on partition change close handle and clear state, reset chunk index; chunk rotation within partition; build key via _build_key_for_record; when partition returns use new key (no reopen). Tests: chunking with same partition yields two keys; partition A→B→A yields three distinct keys (task 06).
+  - Regression and backward compatibility: full test suite passes; add explicit test that when partition_date_field is unset, key_name uses run date and single-key-per-stream behaviour is unchanged; use date_fn in key_name when unset for deterministic tests (task 07).
+  - Documentation and sample config: README config table for partition_date_field and partition_date_format; subsection on Hive partitioning by record date field ({partition_date} token, fallback, example, chunking); sample.config.json and meltano.yml with partition options and key_naming_convention using {partition_date} (task 08).
+  - AI context and docstrings: update docs/AI_CONTEXT/AI_CONTEXT_target-gcs.md (config, {partition_date} token, partition-by-field behaviour, extension points); verify/add docstrings in sinks.py for get_partition_path_from_record, GCSSink, _build_key_for_record; verify target.py property descriptions (task 09).
 - **target-gcs file chunking by record count** — Details: [target-gcs-file-chunking-by-record-count.md](_archive/target-gcs-file-chunking-by-record-count/target-gcs-file-chunking-by-record-count.md)
   - Add optional `max_records_per_file` to target config schema; schema and validation tests in test_sinks.py.
   - Add tests for chunking disabled: one key and one handle, key without chunk_index (backward compatibility).
@@ -40,6 +54,10 @@
 
 ### Changed
 
+- **target-gcs-split-process-record** — Details: [target-gcs-split-process-record.md](_archive/target-gcs-split-process-record/target-gcs-split-process-record.md)
+  - Extract single-file/chunked path to _process_record_single_or_chunked; process_record delegates when partition_date_field unset (task 01).
+  - Extract partition-by-field path to _process_record_partition_by_field; process_record delegates when partition_date_field set (task 02).
+  - Make process_record thin dispatch only: config read, branch on partition_date_field, delegate; docstring updated (task 04).
 - **custom-meltano-plugins-documentation** — Details: [custom-meltano-plugins-documentation.md](_archive/custom-meltano-plugins-documentation/custom-meltano-plugins-documentation.md)
   - Docs state plugins are custom (not on Meltano Hub or PyPI); install via `meltano.yml` and `pip_url` with `#subdirectory=`, variant **petcircle** in examples.
   - Root README, docs/monorepo, docs/README, AI_CONTEXT (quick reference, repository), and tap README updated; tap README has "Install from this monorepo" subsection.

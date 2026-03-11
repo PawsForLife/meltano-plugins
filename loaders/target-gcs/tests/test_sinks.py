@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
 import orjson
@@ -10,9 +11,13 @@ from gcs_target.sinks import GCSSink
 from gcs_target.target import GCSTarget
 
 
-def build_sink(config=None, time_fn=None):
+def build_sink(
+    config=None,
+    time_fn=None,
+    date_fn: Optional[Callable[[], datetime]] = None,
+):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn for deterministic key generation in tests."""
+    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
@@ -20,6 +25,8 @@ def build_sink(config=None, time_fn=None):
     kwargs = {}
     if time_fn is not None:
         kwargs["time_fn"] = time_fn
+    if date_fn is not None:
+        kwargs["date_fn"] = date_fn
     return GCSSink(
         GCSTarget(config=config),
         "my_stream",
@@ -84,6 +91,15 @@ def test_key_name_uses_injectable_time_fn_when_provided():
     assert subject.key_name == "file/12345.txt"
 
 
+def test_sink_accepts_date_fn_and_stores_it():
+    """Sink stores and uses injectable date_fn when provided. WHAT: date_fn is injectable for run-date.
+    WHY: Deterministic tests for partition fallback and key names in later tasks."""
+    fixed_date = datetime(2024, 3, 11)
+    subject = build_sink(date_fn=lambda: fixed_date)
+    assert subject._date_fn is not None
+    assert subject._date_fn() == fixed_date
+
+
 def test_config_schema_has_no_credentials_file():
     """Target config file schema must not accept credentials_file; auth uses ADC or GOOGLE_APPLICATION_CREDENTIALS only."""
     schema = GCSTarget.config_jsonschema
@@ -120,6 +136,45 @@ def test_config_validates_without_max_records_per_file():
         target.config.get("max_records_per_file") is None
         or target.config.get("max_records_per_file") == 0
     )
+
+
+def test_config_schema_includes_partition_date_field():
+    """Schema exposes partition_date_field so config can enable partition-by-record-date; config contract for record field name."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "partition_date_field" in properties
+    prop = properties["partition_date_field"]
+    type_val = prop.get("type")
+    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
+    required = schema.get("required") or []
+    assert "partition_date_field" not in required
+
+
+def test_config_schema_includes_partition_date_format():
+    """Schema exposes partition_date_format so config can set strftime format for Hive path segment; config contract for format."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "partition_date_format" in properties
+    prop = properties["partition_date_format"]
+    type_val = prop.get("type")
+    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
+    required = schema.get("required") or []
+    assert "partition_date_format" not in required
+
+
+def test_config_validates_with_partition_date_field():
+    """Config including partition_date_field (and optionally partition_date_format) is valid; target instantiates without validation error. Backward compatibility and new usage."""
+    config = {"bucket_name": "b", "partition_date_field": "created_at"}
+    target = GCSTarget(config=config)
+    assert target.config["partition_date_field"] == "created_at"
+    config_with_format = {
+        "bucket_name": "b",
+        "partition_date_field": "x",
+        "partition_date_format": "year=%Y/month=%m",
+    }
+    target_with_format = GCSTarget(config=config_with_format)
+    assert target_with_format.config["partition_date_field"] == "x"
+    assert target_with_format.config["partition_date_format"] == "year=%Y/month=%m"
 
 
 def test_gcs_client_created_without_credentials_path():
@@ -186,7 +241,7 @@ def _key_from_open_call(call_args: tuple) -> str:
 
 def test_chunking_rotation_at_threshold():
     """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
-    timestamps = iter([1000.0, 1001.0])
+    timestamps = iter([1000.0, 1001.0, 1002.0])  # first key, rotate refresh, second key
 
     def time_fn():
         return next(timestamps)
@@ -219,7 +274,7 @@ def test_chunking_rotation_at_threshold():
 
 def test_chunking_key_format_includes_chunk_index():
     """Key includes chunk_index when chunking is on: key_naming_convention may include {chunk_index} so multiple chunks in the same second have distinct keys. Uniqueness when multiple chunks in same second."""
-    timestamps = iter([2000.0, 2001.0])
+    timestamps = iter([2000.0, 2001.0, 2002.0])  # first key, rotate refresh, second key
 
     def time_fn():
         return next(timestamps)

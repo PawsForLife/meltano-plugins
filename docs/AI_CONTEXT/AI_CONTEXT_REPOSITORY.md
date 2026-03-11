@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Last Updated | 2026-03-11 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
 | Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
@@ -13,7 +13,7 @@
 
 ## High-Level Overview
 
-This repository is a **Meltano/Singer SDK monorepo** containing two standalone plugins: one Singer **tap** (extractor) and one Singer **target** (loader). Both are maintained by PawsForLife as forks of upstream projects. They are **custom** (not on the Meltano Hub or PyPI); add them in a Meltano project by editing `meltano.yml` with `pip_url` (Git URL + `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`) and optionally `variant: petcircle`.
+This repository is a **Meltano/Singer SDK monorepo** containing two standalone plugins: one Singer **tap** (extractor) and one Singer **target** (loader). Both are maintained by PawsForLife as forks of upstream projects. They are **custom** (not on the Meltano Hub or PyPI); add them in a Meltano project by editing `meltano.yml` with `pip_url` (Git URL + `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`) and `namespace`; omit `variant` so Meltano uses the project definition.
 
 - **restful-api-tap** — Extracts data from REST APIs. Streams and schemas are configured or auto-discovered; supports multiple auth types (Basic, API Key, Bearer, OAuth, AWS). Emits Singer-formatted JSONL to stdout.
 - **target-gcs** — Loads Singer JSONL from stdin into Google Cloud Storage. Writes to a configurable bucket with configurable key naming.
@@ -50,8 +50,7 @@ meltano-plugins/
 │       ├── tests/                # Loader tests
 │       ├── pyproject.toml        # Deps, script entry point
 │       ├── install.sh            # Venv, deps, lint, test
-│       ├── meltano.yml           # Plugin definition
-│       └── sample.config.json   # Sample config
+│       └── meltano.yml           # Plugin definition
 ├── docs/                         # Project documentation
 │   ├── AI_CONTEXT/               # AI context docs ({context_docs_dir})
 │   │   ├── GLOSSARY_MELTANO_SINGER.md
@@ -164,7 +163,7 @@ No shared process state; communication is Singer JSONL on stdout → stdin. Stat
 - **restful-api-tap**: `singer-sdk`, `requests`, `genson`, `atomicwrites`, `requests-aws4auth`, `boto3`. Python ≥3.12.
 - **target-gcs**: `singer-sdk`, `google-cloud-storage`, `google-api-python-client`, `smart-open[gcs]`, `orjson`, `requests`. Python ≥3.8,<4.0.
 
-Each plugin is installable on its own via `pip` from its subdirectory (`pip install -e .` or Meltano `pip_url` with `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`; use `variant: petcircle` in `meltano.yml` when following this repo's install examples).
+Each plugin is installable on its own via `pip` from its subdirectory (`pip install -e .` or Meltano `pip_url` with `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`; see README for `meltano.yml` examples).
 
 ---
 
@@ -176,8 +175,8 @@ Each plugin is installable on its own via `pip` from its subdirectory (`pip inst
 | target-gcs | `target-gcs` | `gcs_target.target:GCSTarget.cli` |
 
 - **Running** — After install (Meltano or `uv sync` in plugin dir), run the CLI with `--config <path>` (tap/target read config from config file or Meltano-injected env). Target reads Singer messages from stdin.
-- **Extension points**  
-  - **Tap**: Subclass `RestfulApiTap`; add or override streams (e.g. subclass or replace `DynamicStream`); add auth via `get_authenticator` / custom `APIAuthenticatorBase`; custom pagination in `restful_api_tap.pagination` and stream classes.  
+- **Extension points**
+  - **Tap**: Subclass `RestfulApiTap`; add or override streams (e.g. subclass or replace `DynamicStream`); add auth via `get_authenticator` / custom `APIAuthenticatorBase`; custom pagination in `restful_api_tap.pagination` and stream classes.
   - **Target**: Subclass `GCSTarget` and/or `GCSSink`; override `default_sink_class` or sink behavior (e.g. key naming, batch size, format).
 
 Discovery of components: the repo layout is the source of truth; the two main components are the directories under `taps/` and `loaders/` that contain a `pyproject.toml` and a Singer tap or target implementation.
