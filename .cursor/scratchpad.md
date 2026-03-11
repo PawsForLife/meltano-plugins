@@ -19,7 +19,7 @@
 - **Tasks directory:** _features/root-pre-commit-and-install/tasks/
 - **Task count:** 4.
 - **Execution order:** 01-wrapper-script.md, 02-root-install-sh.md, 03-root-pre-commit-config.md, 04-documentation-updates.md.
-- **Task Completion Status:** Task 01-wrapper-script completed, tests passing. Task 02-root-install-sh completed, tests passing. Task 03-root-pre-commit-config completed, tests passing.
+- **Task Completion Status:** Task 01-wrapper-script completed, tests passing. Task 02-root-install-sh completed, tests passing. Task 03-root-pre-commit-config completed, tests passing. Task 04-documentation-updates completed, tests passing (target-gcs has known ConfigValidationError failures).
 - Task plan created: 03-root-pre-commit-config at plans/tasks/03-root-pre-commit-config.md
 - Task plan created: 04-documentation-updates at plans/tasks/04-documentation-updates.md
 - Task plan created: 02-root-install-sh at plans/tasks/02-root-install-sh.md

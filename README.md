@@ -74,6 +74,15 @@ pip_url: git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirect
 
 ---
 
+## Development
+
+To bootstrap all plugins and git hooks from the repository root:
+
+- Run **`./install.sh`** — discovers plugins via `scripts/list_packages.py`, runs each plugin's `install.sh`, installs pre-commit if not present, and runs `pre-commit install`. Run this at least once so each plugin has a `.venv`; pre-commit hooks depend on it.
+- To run all checks without committing: **`pre-commit run --all-files`**.
+
+---
+
 ## Directory layout
 
 - `taps/restful-api-tap/` — **restful-api-tap** (Singer tap for REST API sources; Meltano extractor (tap))

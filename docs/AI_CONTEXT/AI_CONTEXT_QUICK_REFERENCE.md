@@ -41,7 +41,17 @@ Activate venv before commands: `source .venv/bin/activate` from the plugin direc
 
 ## Key Commands (Shell)
 
-Run from each plugin root: `taps/restful-api-tap/` or `loaders/target-gcs/`. No repo-wide `install.sh`.
+### Repo root
+
+From the repository root:
+
+| Action | Command |
+|--------|---------|
+| Bootstrap all plugins and pre-commit | `./install.sh` (runs each plugin's install.sh, installs pre-commit if missing, runs `pre-commit install`) |
+| Install git hooks | `pre-commit install` (run after root install.sh) |
+| Run all hooks on all files | `pre-commit run --all-files` |
+
+Per-plugin commands below are for working in a single plugin directory.
 
 ### restful-api-tap (`taps/restful-api-tap/`)
 
