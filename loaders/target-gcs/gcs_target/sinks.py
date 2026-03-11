@@ -1,10 +1,11 @@
 """RecordSink implementation for the GCS target. Each sink handles one stream, receiving SCHEMA, RECORD, and STATE messages from the target and writing record data to the destination (GCS). The sink uses the config file for bucket and key settings. On close or when the target drains the sink (sink drain), buffered data is flushed to the destination."""
 
+import decimal
 import time
 from collections import defaultdict
 from datetime import date, datetime
 from io import FileIO
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import orjson
 import smart_open
@@ -13,6 +14,17 @@ from singer_sdk.sinks import RecordSink
 
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+
+
+def _json_default(obj: Any) -> float:
+    """Used as orjson default to serialize Decimal as float.
+
+    Returns float(obj) when obj is a decimal.Decimal; raises TypeError for any
+    other type so non-serializable values are not silently converted.
+    """
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON-serializable")
 
 
 def get_partition_path_from_record(
