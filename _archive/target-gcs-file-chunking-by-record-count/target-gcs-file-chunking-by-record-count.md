@@ -1,6 +1,6 @@
 # Archive: target-gcs file chunking by record count
 
-**Feature:** target-gcs-file-chunking-by-record-count  
+**Feature:** target-gcs-file-chunking-by-record-count
 **Plugin:** target-gcs (loaders/target-gcs)
 
 ---
