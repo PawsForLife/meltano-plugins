@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **Chunk rotation:** Refresh cached file timestamp (`_current_timestamp`) in `_rotate_to_new_chunk()` so the next key is unique for the new chunk; avoids reusing or truncating the previous key when `max_records_per_file` triggers rotation.
+
 - **Partition-by-field keys:** Cache extraction timestamp when opening a GCS write handle so keys are stable per handle instead of changing every second. `_build_key_for_record` now uses a cached `_current_timestamp` (set on first use after open, cleared in `_close_handle_and_clear_state`), avoiding new keys/handles per second.
 
 ### Changed

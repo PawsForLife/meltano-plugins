@@ -241,7 +241,7 @@ def _key_from_open_call(call_args: tuple) -> str:
 
 def test_chunking_rotation_at_threshold():
     """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
-    timestamps = iter([1000.0, 1001.0])
+    timestamps = iter([1000.0, 1001.0, 1002.0])  # first key, rotate refresh, second key
 
     def time_fn():
         return next(timestamps)
@@ -274,7 +274,7 @@ def test_chunking_rotation_at_threshold():
 
 def test_chunking_key_format_includes_chunk_index():
     """Key includes chunk_index when chunking is on: key_naming_convention may include {chunk_index} so multiple chunks in the same second have distinct keys. Uniqueness when multiple chunks in same second."""
-    timestamps = iter([2000.0, 2001.0])
+    timestamps = iter([2000.0, 2001.0, 2002.0])  # first key, rotate refresh, second key
 
     def time_fn():
         return next(timestamps)

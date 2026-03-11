@@ -84,7 +84,9 @@ class GCSSink(RecordSink):
             0  # Records written to current file; reset on rotation.
         )
         self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
-        self._current_timestamp: Optional[int] = None  # Cached at handle open; used for key building.
+        self._current_timestamp: Optional[int] = (
+            None  # Cached at handle open; used for key building.
+        )
         self._time_fn: Optional[Callable[[], float]] = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Optional[Callable[[], datetime]] = date_fn
@@ -179,7 +181,7 @@ class GCSSink(RecordSink):
         return "jsonl"
 
     def _rotate_to_new_chunk(self) -> None:
-        """Close the current file handle, clear key cache, increment chunk index, and reset record count. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
+        """Close the current file handle, clear key cache, increment chunk index, reset record count, and refresh cached timestamp for key generation. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
         if self._gcs_write_handle is not None:
             if hasattr(self._gcs_write_handle, "flush"):
                 self._gcs_write_handle.flush()
@@ -188,6 +190,7 @@ class GCSSink(RecordSink):
         self._key_name = ""
         self._chunk_index += 1
         self._records_written_in_current_file = 0
+        self._current_timestamp = round((self._time_fn or time.time)())
 
     def _close_handle_and_clear_state(self) -> None:
         """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string and _current_timestamp to None so the next open gets a fresh timestamp. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
