@@ -19,6 +19,7 @@
   - Add test that non-Decimal non-serializable value in record raises TypeError (test_non_serializable_non_decimal_type_raises_type_error; black-box, documents contract).
   - Add _json_default helper and decimal import in sinks.py (module-private; returns float for Decimal, raises TypeError otherwise; not yet wired at orjson call sites).
   - Wire default=_json_default at both orjson.dumps call sites in sinks.py (_process_record_single_or_chunked and _process_record_partition_by_field); remove xfail from Decimal regression test.
+  - Verify full test suite and lint/type checks: pytest, ruff check, ruff format --check, mypy gcs_target all pass.
 - **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
   - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
   - Add unit tests for get_partition_path_from_record (valid ISO date/datetime, fallback format, missing field, invalid value, custom format); stub in sinks.py until task 03.
