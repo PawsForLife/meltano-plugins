@@ -144,7 +144,8 @@ class GCSSink(RecordSink):
                     "//", "/"
                 )
             ).lstrip("/")
-            date = datetime.today().strftime(self.config.get("date_format", "%Y-%m-%d"))
+            run_date = self._date_fn() if self._date_fn else datetime.today()
+            date = run_date.strftime(self.config.get("date_format", "%Y-%m-%d"))
             max_records = self.config.get("max_records_per_file", 0)
             format_map = defaultdict(
                 str,

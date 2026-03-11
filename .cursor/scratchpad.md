@@ -37,3 +37,4 @@ Task 03-partition-resolution-implementation completed, tests passing.
 Task 04-sink-date-fn-and-partition-state completed: optional date_fn and _current_partition_path on GCSSink; build_sink accepts date_fn; tests passing.
 Task 05-key-building-with-partition-date completed, tests passing.
 Task 06-handle-lifecycle-and-process-record-integration completed, tests passing.
+Task 07-regression-and-backward-compatibility completed, tests passing.

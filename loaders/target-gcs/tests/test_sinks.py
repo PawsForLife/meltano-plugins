@@ -472,6 +472,30 @@ def test_key_name_unchanged_when_partition_date_field_unset():
     assert f"file/{datetime.today().strftime(date_format)}.txt" == subject.key_name
 
 
+def test_backward_compat_key_name_unchanged_when_partition_date_field_unset():
+    """When partition_date_field is unset, key_name uses run date (not record content) and single-key-per-stream semantics are unchanged. WHAT: Explicit backward-compatibility guarantee: no record-driven partition path; key does not depend on record data. WHY: Regression gate and explicit backward-compatibility requirement (task 07)."""
+    fixed_date = datetime(2024, 3, 11)
+    date_format = "%Y-%m-%d"
+    expected_date_str = fixed_date.strftime(date_format)
+    subject = build_sink(
+        config={"key_naming_convention": "file/{date}.txt"},
+        date_fn=lambda: fixed_date,
+    )
+    assert subject.config.get("partition_date_field") in (None, "")
+    assert subject.key_name == f"file/{expected_date_str}.txt"
+    with patch("gcs_target.sinks.Client"), patch(
+        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    ) as mock_open:
+        context = {}
+        for i in range(3):
+            subject.process_record(
+                {"id": i, "created_at": "2024-01-01", "x": i}, context
+            )
+        keys_opened = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert mock_open.call_count == 1
+    assert keys_opened[0] == f"file/{expected_date_str}.txt"
+
+
 def test_chunking_with_partition_rotation_within_partition():
     """Chunk rotation within same partition produces two keys with same partition path. WHAT: With partition_date_field and max_records_per_file=2, three records in same partition yield two files (chunk 0 and 1), both under same partition path. WHY: Chunking interaction with partition-by-field."""
     # Same timestamp for first two records (chunk 0), then next for chunk 1 so keys differ only by chunk_index.
