@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-This task wires the stream-level **`is_sorted`** config into discovery so that every constructed `DynamicStream` receives the correct value. In `discover_streams()` the tap resolves `is_sorted` from each stream’s config (default `False` when omitted) and passes it into `DynamicStream(...)`. After this task, the stream instance has `stream.is_sorted` set as intended, and the task 01 tests (all four cases) must pass.
+This task wires the stream-level **`is_sorted`** config into discovery so that every constructed `DynamicStream` receives the correct value. In `discover_streams()` the tap resolves `is_sorted` from each stream's config (default `False` when omitted) and passes it into `DynamicStream(...)`. After this task, the stream instance has `stream.is_sorted` set as intended, and the task 01 tests (all four cases) must pass.
 
 **Prerequisites:** Task 03 (common_properties defines `is_sorted`) and task 04 (DynamicStream accepts `is_sorted` and sets `self.is_sorted`) must be complete. This task does not add schema or stream-class code; it only connects config to the existing parameter.
 

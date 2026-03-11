@@ -2,7 +2,7 @@
 
 ## Background
 
-`discover_streams()` must read `is_sorted` from each stream’s config and pass it into `DynamicStream(...)`. This task depends on task 03 (common_properties defines the key) and task 04 (DynamicStream accepts the parameter). After this task, task 01 tests should pass.
+`discover_streams()` must read `is_sorted` from each stream's config and pass it into `DynamicStream(...)`. This task depends on task 03 (common_properties defines the key) and task 04 (DynamicStream accepts the parameter). After this task, task 01 tests should pass.
 
 ## This Task
 

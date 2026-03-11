@@ -7,6 +7,7 @@
 - **restful-api-tap is_sorted stream config** — Details: [restful-api-tap-is-sorted-stream-config.md](_archive/restful-api-tap-is-sorted-stream-config/restful-api-tap-is-sorted-stream-config.md)
   - Add black-box tests for stream-level `is_sorted` (true, omitted, false, multi-stream); tests marked xfail until tasks 02–05 wire config.
   - Add `is_sorted` stream setting (boolean) to plugin schema in meltano.yml.
+  - Wire `is_sorted` in discover_streams: resolve from stream config (default False), pass to DynamicStream; enable all four is_sorted tests.
   - Add `is_sorted` to common_properties in tap.py (BooleanType, default False) so config validation accepts the key.
   - Add `is_sorted` param to DynamicStream (streams.py); set instance attribute and override property for SDK compatibility.
 - **Plugin source folder naming** — Details: [plugin-source-folder-naming.md](_archive/plugin-source-folder-naming/plugin-source-folder-naming.md)
