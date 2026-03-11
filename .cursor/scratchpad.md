@@ -34,3 +34,4 @@ Task plan created: 08-documentation-readme-and-sample-config at plans/tasks/08-d
 Task 01-add-config-schema completed, tests passing.
 Task 02-partition-resolution-tests completed, tests passing.
 Task 03-partition-resolution-implementation completed, tests passing.
+Task 04-sink-date-fn-and-partition-state completed: optional date_fn and _current_partition_path on GCSSink; build_sink accepts date_fn; tests passing.

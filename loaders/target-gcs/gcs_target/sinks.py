@@ -71,6 +71,7 @@ class GCSSink(RecordSink):
         key_properties,
         *,
         time_fn: Optional[Callable[[], float]] = None,
+        date_fn: Optional[Callable[[], datetime]] = None,
     ):
         super().__init__(
             target=target,
@@ -85,6 +86,11 @@ class GCSSink(RecordSink):
         )
         self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
         self._time_fn: Optional[Callable[[], float]] = time_fn
+        # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
+        self._date_fn: Optional[Callable[[], datetime]] = date_fn
+        if self.config.get("partition_date_field"):
+            # Current partition path when partition-by-field is on; None when cleared or not yet set.
+            self._current_partition_path: Optional[str] = None
 
     @property
     def key_name(self) -> str:

@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
 import orjson
@@ -14,9 +15,13 @@ FALLBACK_DATE = datetime(2024, 3, 11)
 DEFAULT_HIVE_FORMAT = "year=%Y/month=%m/day=%d"
 
 
-def build_sink(config=None, time_fn=None):
+def build_sink(
+    config=None,
+    time_fn=None,
+    date_fn: Optional[Callable[[], datetime]] = None,
+):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn for deterministic key generation in tests."""
+    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
@@ -24,6 +29,8 @@ def build_sink(config=None, time_fn=None):
     kwargs = {}
     if time_fn is not None:
         kwargs["time_fn"] = time_fn
+    if date_fn is not None:
+        kwargs["date_fn"] = date_fn
     return GCSSink(
         GCSTarget(config=config),
         "my_stream",
@@ -86,6 +93,23 @@ def test_key_name_uses_injectable_time_fn_when_provided():
         time_fn=lambda: fixed_ts,
     )
     assert subject.key_name == "file/12345.txt"
+
+
+def test_sink_accepts_date_fn_and_stores_it():
+    """Sink stores and uses injectable date_fn when provided. WHAT: date_fn is injectable for run-date.
+    WHY: Deterministic tests for partition fallback and key names in later tasks."""
+    fixed_date = datetime(2024, 3, 11)
+    subject = build_sink(date_fn=lambda: fixed_date)
+    assert subject._date_fn is not None
+    assert subject._date_fn() == fixed_date
+
+
+def test_sink_has_current_partition_path_when_partition_date_field_set():
+    """Sink has _current_partition_path when partition_date_field is set. WHAT: Partition state exists when feature enabled.
+    WHY: Handle lifecycle (later tasks) relies on this state."""
+    subject = build_sink(config={"partition_date_field": "created_at"})
+    assert hasattr(subject, "_current_partition_path")
+    assert subject._current_partition_path is None
 
 
 def test_config_schema_has_no_credentials_file():
