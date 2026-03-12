@@ -19,3 +19,4 @@ Task plan created: 02-implement-validation-helper at plans/tasks/02-implement-va
 
 Task 01-validation-helper-unit-tests completed, tests written (expected to fail until task 02).
 Task 02-implement-validation-helper completed, tests passing.
+Task 03-sink-integration-tests completed, tests passing (3 new tests expect ValueError and fail until task 04 wires validation into GCSSink).

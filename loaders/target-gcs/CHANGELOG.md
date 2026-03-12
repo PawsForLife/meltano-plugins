@@ -7,6 +7,7 @@
 - **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
   - Add unit tests for validate_partition_date_field_schema.
   - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
+  - Add sink integration tests for partition_date_field validation (build_sink extended with optional schema/stream_name; tests for missing field, null-only, integer, valid string, unset; ValueError message asserts stream and field name).
 
 - **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
   - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
