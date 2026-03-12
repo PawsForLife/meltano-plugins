@@ -28,7 +28,7 @@ Plugins are **custom** (not on Meltano Hub or PyPI). Install via Meltano by edit
 |------|--------|
 | Language | Python |
 | restful-api-tap | `requires-python = ">=3.12"` |
-| target-gcs | `requires-python = ">=3.8,<4.0"` |
+| target-gcs | `requires-python = ">=3.12"` |
 | Package manager | **uv** (venv, sync deps) |
 | Linter / formatter | **Ruff** |
 | Type checker | **MyPy** |

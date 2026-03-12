@@ -94,7 +94,7 @@ tap-carbon-intensity | target-gcs --config /path/to/your-config.json
 
 ## Developer Resources
 
-The project uses **uv** for dependency management and **Ruff** and **mypy** for linting, formatting, and type checking. The lockfile is `uv.lock`.
+Requires **Python 3.12+**. The project uses **uv** for dependency management and **Ruff** and **mypy** for linting, formatting, and type checking. The lockfile is `uv.lock`.
 
 ### Initialize your Development Environment
 
