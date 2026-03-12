@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **install.sh** — Record failures when `pip3 install pre-commit` or `pip install pre-commit` fails: check exit status after each pip command, append to FAILED and set PRECOMMIT_FAILED=1 so the summary and script exit code reflect the failure; set PRECOMMIT_FAILED=1 in the no-pip branch for consistency.
 - **run_plugin_checks.sh** — Run `list_packages.py` once before the loop; capture stdout and exit status, exit script on non-zero; feed captured output to the loop via here-string so the Python command's exit code is not hidden.
 - **fix-mypy-standard-target-tests-base-class** — Details: [fix-mypy-standard-target-tests-base-class.md](_archive/fix-mypy-standard-target-tests-base-class/fix-mypy-standard-target-tests-base-class.md)
   - In Plugin unit tests workflow, run mypy on the derived source package only (from `matrix.path`: last component, hyphens → underscores) instead of `.`, so test code is not type-checked and CI no longer fails on `StandardTargetTests` base class.

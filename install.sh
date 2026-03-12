@@ -20,21 +20,31 @@ while IFS= read -r path || [[ -n "$path" ]]; do
 done < <(python "$ROOT/scripts/list_packages.py" "$ROOT")
 
 # Ensure pre-commit is available; install via pip if missing.
+PRECOMMIT_FAILED=0
 if ! command -v pre-commit &>/dev/null; then
   echo "==> Installing pre-commit..."
   if command -v pip3 &>/dev/null; then
     pip3 install pre-commit
+    if [[ $? -ne 0 ]]; then
+      FAILED+=("pre-commit (pip install)")
+      PRECOMMIT_FAILED=1
+    fi
   elif command -v pip &>/dev/null; then
     pip install pre-commit
+    if [[ $? -ne 0 ]]; then
+      FAILED+=("pre-commit (pip install)")
+      PRECOMMIT_FAILED=1
+    fi
   else
     echo "pre-commit not found and neither pip nor pip3 available." >&2
     FAILED+=("pre-commit (pip install)")
+    PRECOMMIT_FAILED=1
   fi
 fi
 
 # Install only the pre-push hook (checks run on push, not on commit). Uninstall pre-commit hook if present.
-PRECOMMIT_FAILED=0
 if command -v pre-commit &>/dev/null; then
+  PRECOMMIT_FAILED=0
   cd "$ROOT"
   pre-commit uninstall 2>/dev/null || true
   if ! pre-commit install --hook-type pre-push; then
