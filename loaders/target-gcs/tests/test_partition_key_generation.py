@@ -1,7 +1,7 @@
 """Tests for partition path resolution and key generation: get_partition_path_from_record, _build_key_for_record, and partition/chunking behaviour."""
 
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
 from target_gcs.sinks import GCSSink, get_partition_path_from_record
@@ -15,7 +15,7 @@ DEFAULT_HIVE_FORMAT = "year=%Y/month=%m/day=%d"
 def build_sink(
     config=None,
     time_fn=None,
-    date_fn: Optional[Callable[[], datetime]] = None,
+    date_fn: Callable[[], datetime] | None = None,
 ):
     """Build a sink for the target using the given config (config file contents).
     Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
@@ -187,9 +187,12 @@ def test_backward_compat_key_name_unchanged_when_partition_date_field_unset():
     )
     assert subject.config.get("partition_date_field") in (None, "")
     assert subject.key_name == f"file/{expected_date_str}.txt"
-    with patch("target_gcs.sinks.Client"), patch(
-        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-    ) as mock_open:
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
+        ) as mock_open,
+    ):
         context = {}
         for i in range(3):
             subject.process_record(
@@ -209,9 +212,12 @@ def test_chunking_with_partition_rotation_within_partition():
         return next(timestamps)
 
     mock_handles = [MagicMock(), MagicMock()]
-    with patch("target_gcs.sinks.Client"), patch(
-        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
-    ) as mock_open:
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open", side_effect=mock_handles
+        ) as mock_open,
+    ):
         sink = build_sink(
             config={
                 "partition_date_field": "dt",
@@ -239,10 +245,13 @@ def test_partition_change_then_return_creates_three_distinct_keys():
     def time_fn():
         return next(timestamps)
 
-    with patch("target_gcs.sinks.Client"), patch(
-        "target_gcs.sinks.smart_open.open",
-        side_effect=[MagicMock(), MagicMock(), MagicMock()],
-    ) as mock_open:
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open",
+            side_effect=[MagicMock(), MagicMock(), MagicMock()],
+        ) as mock_open,
+    ):
         sink = build_sink(
             config={
                 "partition_date_field": "dt",

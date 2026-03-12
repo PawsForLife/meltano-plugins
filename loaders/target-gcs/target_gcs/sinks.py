@@ -3,9 +3,10 @@
 import decimal
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import date, datetime
 from io import FileIO
-from typing import Any, Callable, Optional
+from typing import Any
 
 import orjson
 import smart_open
@@ -81,9 +82,9 @@ class GCSSink(RecordSink):
         schema,
         key_properties,
         *,
-        time_fn: Optional[Callable[[], float]] = None,
-        date_fn: Optional[Callable[[], datetime]] = None,
-        storage_client: Optional[Any] = None,
+        time_fn: Callable[[], float] | None = None,
+        date_fn: Callable[[], datetime] | None = None,
+        storage_client: Any | None = None,
     ):
         super().__init__(
             target=target,
@@ -91,22 +92,22 @@ class GCSSink(RecordSink):
             schema=schema,
             key_properties=key_properties,
         )
-        self._gcs_write_handle: Optional[FileIO] = None
+        self._gcs_write_handle: FileIO | None = None
         self._key_name: str = ""
         self._records_written_in_current_file: int = (
             0  # Records written to current file; reset on rotation.
         )
         self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
-        self._current_timestamp: Optional[int] = (
+        self._current_timestamp: int | None = (
             None  # Cached at handle open; used for key building.
         )
-        self._time_fn: Optional[Callable[[], float]] = time_fn
+        self._time_fn: Callable[[], float] | None = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
-        self._date_fn: Optional[Callable[[], datetime]] = date_fn
-        self._storage_client: Optional[Any] = storage_client
+        self._date_fn: Callable[[], datetime] | None = date_fn
+        self._storage_client: Any | None = storage_client
         if self.config.get("partition_date_field"):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
-            self._current_partition_path: Optional[str] = None
+            self._current_partition_path: str | None = None
 
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when partition_date_field is set.

@@ -3,7 +3,7 @@
 Uses sample config file contents for target configuration.
 """
 
-from typing import Any, Dict, cast
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from singer_sdk.testing import get_target_test_class
@@ -12,7 +12,7 @@ from singer_sdk.testing.factory import BaseTestClass
 from target_gcs.target import GCSTarget
 
 # Minimal config for SDK template tests; matches test_sinks and test_partition_key_generation.
-SAMPLE_CONFIG: Dict[str, Any] = {"bucket_name": "test-bucket"}
+SAMPLE_CONFIG: dict[str, Any] = {"bucket_name": "test-bucket"}
 
 
 class GCSTargetWithMockStorage(GCSTarget):
