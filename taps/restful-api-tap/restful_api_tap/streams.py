@@ -57,15 +57,17 @@ class DynamicStream(RestApiStream):
         name: str,
         records_path: str,
         path: str,
-        params: dict | None = None,
-        headers: dict | None = None,
-        primary_keys: list | None = None,
-        replication_key: str | None = None,
-        except_keys: list | None = None,
+        params: dict,
+        headers: dict,
+        primary_keys: list,
+        replication_key: str,
+        except_keys: list,
+        schema: dict,
+        pagination_request_style: str,
+        pagination_response_style: str,
+        source_search_field: str,
+        source_search_query: str,
         next_page_token_path: str | None = None,
-        schema: dict | None = None,
-        pagination_request_style: str = "default",
-        pagination_response_style: str = "default",
         pagination_page_size: int | None = None,
         pagination_results_limit: int | None = None,
         pagination_next_page_param: str | None = None,
@@ -74,15 +76,13 @@ class DynamicStream(RestApiStream):
         pagination_initial_offset: int = 1,
         offset_records_jsonpath: str | None = None,
         start_date: datetime | None = None,
-        source_search_field: str | None = None,
-        source_search_query: str | None = None,
         use_request_body_not_params: bool | None = False,
         backoff_type: str | None = None,
         backoff_param: str | None = "Retry-After",
-        backoff_time_extension: int | None = 0,
+        backoff_time_extension: int = 0,
         store_raw_json_message: bool | None = False,
-        flatten_records: bool | None = False,
-        is_sorted: bool | None = False,
+        flatten_records: bool = False,
+        is_sorted: bool = False,
         authenticator: object | None = None,
     ) -> None:
         """Class initialization.
@@ -127,12 +127,9 @@ class DynamicStream(RestApiStream):
         """
         super().__init__(tap=tap, name=tap.name, schema=schema)
 
-        if primary_keys is None:
-            primary_keys = []
-
         self.name = name
         self.path = path
-        self.params = params if params else {}
+        self.params = params
         self.headers = headers
         self.assigned_authenticator = authenticator
         self._authenticator = authenticator
@@ -167,10 +164,10 @@ class DynamicStream(RestApiStream):
         self.use_request_body_not_params = use_request_body_not_params
         self.backoff_type = backoff_type
         self.backoff_param = backoff_param
-        self.backoff_time_extension = backoff_time_extension or 0
+        self.backoff_time_extension = backoff_time_extension
         self.store_raw_json_message = store_raw_json_message
         self.flatten_records = flatten_records
-        self._is_sorted = bool(is_sorted) if is_sorted is not None else False
+        self._is_sorted = is_sorted
         if self.use_request_body_not_params:
             self.prepare_request_payload = get_url_params_styles.get(  # type: ignore
                 pagination_response_style, self._get_url_params_page_style

@@ -6,10 +6,6 @@
 
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).
 
-### Fixed
-
-- `DynamicStream`: normalize `backoff_time_extension` on assignment so the attribute is always an int (use 0 when None), preventing `TypeError` in `backoff_wait_generator()` when adding to header/response values.
-
 ## [1.6.0] - 2026-03-12
 
 ### Changed
