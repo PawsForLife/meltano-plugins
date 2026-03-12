@@ -37,3 +37,5 @@ Task 03-partition-path-unparseable-visibility-tests completed, tests passing.
 Task 04-partition-path-unknown-timezone-tests completed, tests passing.
 
 Task 05-implement-partition-path-dateutil completed, tests passing.
+
+Task 06-sink-exception-handling completed, tests passing.

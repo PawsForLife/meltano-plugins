@@ -9,6 +9,7 @@ from typing import Any
 
 import orjson
 import smart_open
+from dateutil.parser import ParserError
 from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
@@ -52,6 +53,8 @@ class GCSSink(RecordSink):
         self._time_fn: Callable[[], float] | None = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Callable[[], datetime] | None = date_fn
+        self.fallback = self._date_fn() if self._date_fn else datetime.today()
+
         self._storage_client: Any | None = storage_client
 
         if self.config.get("partition_date_field"):
@@ -206,16 +209,19 @@ class GCSSink(RecordSink):
         key via _build_key_for_record; opens handle when none or key changed;
         writes record and increments count when chunking.
         """
-        fallback = self._date_fn() if self._date_fn else datetime.today()
         partition_date_format = (
             self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT
         )
-        partition_path = get_partition_path_from_record(
-            record,
-            self.config["partition_date_field"],
-            partition_date_format,
-            fallback,
-        )
+        try:
+            partition_path = get_partition_path_from_record(
+                record,
+                self.config["partition_date_field"],
+                partition_date_format,
+                self.fallback,
+            )
+        except ParserError:
+            # Unparseable partition date string: re-raise so the run fails visibly.
+            raise
         if partition_path != self._current_partition_path:
             self._close_handle_and_clear_state()
             self._current_partition_path = partition_path
