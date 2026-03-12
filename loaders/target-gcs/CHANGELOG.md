@@ -11,6 +11,7 @@
   - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
   - Implement partition path dateutil parsing: string timestamps parsed with dateutil.parser.parse (no tzinfos); unparseable raises ParserError; unknown timezone surfaces UnknownTimezoneWarning; xfail removed from partition path tests.
   - Sink exception handling: in _process_record_partition_by_field, catch ParserError from get_partition_path_from_record and re-raise so the run fails visibly when a record has an unparseable partition date (no silent skip).
+  - Integration tests for partition key: record with dateutil-parsable non-ISO partition value (e.g. "2024/03/11") produces key containing expected partition path; unparseable partition field leads to ParserError from process_record.
 
 ### Changed
 

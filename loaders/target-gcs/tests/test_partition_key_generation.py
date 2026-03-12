@@ -4,6 +4,9 @@ from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
+from dateutil.parser import ParserError
+
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
 
@@ -208,3 +211,57 @@ def test_partition_change_then_return_creates_three_distinct_keys():
     keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
     assert len(keys) == len(set(keys)), "all three keys must be distinct"
     assert keys[2] != keys[0], "third key (A') must differ from first (A); no reopen"
+
+
+def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
+    """Record with dateutil-parsable non-ISO partition value produces key with expected partition path.
+    WHAT: Sink uses helper output for dateutil-only formats; key passed to smart_open.open contains
+    the partition path segment (e.g. year=2024/month=03/day=11). WHY: Integration guarantee that
+    the full path from record → partition path → key is correct for non-ISO date strings."""
+    fixed_ts = 55555.0
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open",
+            return_value=MagicMock(),
+        ) as mock_open,
+    ):
+        sink = build_sink(
+            config={
+                "partition_date_field": "created_at",
+                "partition_date_format": DEFAULT_HIVE_FORMAT,
+                "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
+            },
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: FALLBACK_DATE,
+        )
+        record = {"id": 1, "created_at": "2024/03/11"}
+        sink.process_record(record, {})
+    key = _key_from_open_call(mock_open.call_args)
+    expected_segment = "year=2024/month=03/day=11"
+    assert expected_segment in key, (
+        "key must contain partition path from dateutil-parsed value"
+    )
+
+
+def test_sink_raises_parser_error_when_partition_field_unparseable():
+    """Unparseable partition field causes ParserError to propagate from the sink.
+    WHAT: Record with unparseable partition value (e.g. 'not-a-date') leads to exception;
+    observable outcome is exception, not silent write. WHY: Integration guarantee that
+    unparseable input fails visibly."""
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch("target_gcs.sinks.smart_open.open", return_value=MagicMock()),
+    ):
+        sink = build_sink(
+            config={
+                "partition_date_field": "created_at",
+                "partition_date_format": DEFAULT_HIVE_FORMAT,
+                "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
+            },
+            time_fn=lambda: 12345.0,
+            date_fn=lambda: FALLBACK_DATE,
+        )
+        record = {"id": 1, "created_at": "not-a-date"}
+        with pytest.raises(ParserError):
+            sink.process_record(record, {})
