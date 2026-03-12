@@ -4,6 +4,7 @@
 
 ### Added
 
+- **target-gcs partition_date_field validation** — When set, the sink validates at startup that the field exists in the stream schema and has a date-parseable type; invalid config raises `ValueError` with stream name, field name, and reason.
 - **dateutils-partition-timestamps** — Archive summary: [dateutils-partition-timestamps.md](_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
 
 ### Changed

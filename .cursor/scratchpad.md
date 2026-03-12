@@ -21,3 +21,4 @@ Task 01-validation-helper-unit-tests completed, tests written (expected to fail 
 Task 02-implement-validation-helper completed, tests passing.
 Task 03-sink-integration-tests completed, tests passing (3 new tests expect ValueError and fail until task 04 wires validation into GCSSink).
 Task 04-integrate-validation-into-sink completed: GCSSink.__init__ calls validate_partition_date_field_schema when partition_date_field is set; test_partition_key_generation.build_sink updated to pass schema with partition field so all tests pass.
+Task 05-documentation-and-changelog completed.

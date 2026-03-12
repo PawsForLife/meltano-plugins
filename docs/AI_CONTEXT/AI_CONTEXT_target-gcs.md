@@ -86,6 +86,10 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 
 When `partition_date_field` is set, the sink uses one active write handle. On each record it resolves the partition path from the record via `get_partition_path_from_record` (string values parsed with dateutil; many formats supported). When the field is missing or not a string, run date is used as fallback (formatted with `partition_date_format`). Unparseable strings raise `ParserError`; unsupported timezone may produce `UnknownTimezoneWarning`—both are visible (warning or error), not silent fallback. When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition.
 
+### Partition-date-field validation (sink init)
+
+When `partition_date_field` is set, the sink validates at init that the field exists in the stream schema and has a date-parseable type. Validation runs in `GCSSink.__init__` after `super().__init__`, via the helper `validate_partition_date_field_schema` in `target_gcs.helpers.partition_schema`. The field must be present in `schema["properties"]`, must not be null-only, and must have a type that can be parsed to a date (e.g. `string`, with or without `date`/`date-time` format; nullable string allowed). On failure a `ValueError` is raised with the stream name, field name, and reason (e.g. not in schema, null-only, or non–date-parseable type).
+
 ---
 
 ## Extension Points
