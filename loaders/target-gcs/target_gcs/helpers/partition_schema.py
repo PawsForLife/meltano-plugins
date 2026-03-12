@@ -24,13 +24,20 @@ def validate_partition_date_field_schema(
 
     Raises:
         ValueError: With message including stream name, field name, and one of:
-            "is not in schema", "is null-only and cannot be parsed to a date",
+            "is not in schema", "must be required for the stream",
+            "is null-only and cannot be parsed to a date",
             "has non–date-parseable type".
     """
     properties = schema.get("properties") or {}
     if field_name not in properties:
         raise ValueError(
             f"Stream '{stream_name}': partition_date_field '{field_name}' is not in schema."
+        )
+
+    required = schema.get("required")
+    if not isinstance(required, list) or field_name not in required:
+        raise ValueError(
+            f"Stream '{stream_name}': partition_date_field '{field_name}' must be required for the stream."
         )
 
     prop_schema = properties[field_name]

@@ -429,9 +429,9 @@ def test_partition_date_field_set_field_integer_raises_value_error():
 
 
 def test_partition_date_field_set_field_string_valid_constructs_successfully():
-    """partition_date_field set with string type for the field must allow sink construction; string is date-parseable."""
+    """partition_date_field set with string type and field required must allow sink construction; string is date-parseable."""
     config = {"partition_date_field": "dt"}
-    schema = {"properties": {"dt": {"type": "string"}}}
+    schema = {"properties": {"dt": {"type": "string"}}, "required": ["dt"]}
     sink = build_sink(config=config, schema=schema)
     assert sink.stream_name == "my_stream"
 
