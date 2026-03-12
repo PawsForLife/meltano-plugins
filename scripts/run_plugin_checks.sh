@@ -7,23 +7,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Derive mypy package name from last path component (e.g. taps/restful-api-tap -> restful-api-tap).
-# Fallback map for known exceptions; default: target-* -> *_target, else replace - with _.
+# Derive mypy package name: last path component with hyphens replaced by underscores
+# (e.g. loaders/target-gcs -> target_gcs).
 get_mypy_package() {
   local path="$1"
   local comp="${path##*/}"
-  case "$comp" in
-    restful-api-tap) echo "restful_api_tap" ;;
-    target-gcs) echo "gcs_target" ;;
-    target-*)
-      local suffix="${comp#target-}"
-      suffix="${suffix//-/_}"
-      echo "${suffix}_target"
-      ;;
-    *)
-      echo "${comp//-/_}"
-      ;;
-  esac
+  echo "${comp//-/_}"
 }
 
 while IFS= read -r line || [[ -n "$line" ]]; do

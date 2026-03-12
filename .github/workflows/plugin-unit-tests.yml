@@ -62,7 +62,11 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Mypy
-        run: uv run mypy .
+        run: |
+          comp="${{ matrix.path }}"
+          comp="${comp##*/}"
+          mypy_pkg="${comp//-/_}"
+          uv run mypy "$mypy_pkg"
 
       - name: Pytest
         run: uv run pytest
