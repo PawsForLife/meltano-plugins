@@ -3,7 +3,7 @@ name = "target-gcs"
 version = "2.0.0"
 description = "`target-gcs` is a Singer target for GCS, built with the Meltano SDK for Singer Targets."
 readme = "README.md"
-requires-python = ">=3.8,<4.0"
+requires-python = ">=3.12,<4.0"
 license = { text = "Apache 2.0" }
 authors = [{ name = "Datateer Ops" }]
 keywords = ["ELT", "GCS"]
@@ -38,7 +38,7 @@ packages = ["target_gcs"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
@@ -48,7 +48,7 @@ ignore = ["E501"]
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 strict = false
