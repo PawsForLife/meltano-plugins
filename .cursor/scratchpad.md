@@ -29,3 +29,5 @@ Task plan created: 06-sink-exception-handling at plans/tasks/06-sink-exception-h
 Task plan created: 08-documentation-updates at plans/tasks/08-documentation-updates.md
 
 Task 01-add-dateutil-dependency completed, tests passing.
+
+Task 02-partition-path-dateutil-format-tests completed, tests passing.
