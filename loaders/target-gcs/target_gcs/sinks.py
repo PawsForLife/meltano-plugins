@@ -1,10 +1,11 @@
 """RecordSink implementation for the GCS target. Each sink handles one stream, receiving SCHEMA, RECORD, and STATE messages from the target and writing record data to the destination (GCS). The sink uses the config file for bucket and key settings. On close or when the target drains the sink (sink drain), buffered data is flushed to the destination."""
 
+import decimal
 import time
 from collections import defaultdict
 from datetime import date, datetime
 from io import FileIO
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import orjson
 import smart_open
@@ -13,6 +14,17 @@ from singer_sdk.sinks import RecordSink
 
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+
+
+def _json_default(obj: Any) -> float:
+    """Used as orjson default to serialize Decimal as float.
+
+    Returns float(obj) when obj is a decimal.Decimal; raises TypeError for any
+    other type so non-serializable values are not silently converted.
+    """
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON-serializable")
 
 
 def get_partition_path_from_record(
@@ -71,6 +83,7 @@ class GCSSink(RecordSink):
         *,
         time_fn: Optional[Callable[[], float]] = None,
         date_fn: Optional[Callable[[], datetime]] = None,
+        storage_client: Optional[Any] = None,
     ):
         super().__init__(
             target=target,
@@ -90,6 +103,7 @@ class GCSSink(RecordSink):
         self._time_fn: Optional[Callable[[], float]] = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Optional[Callable[[], datetime]] = date_fn
+        self._storage_client: Optional[Any] = storage_client
         if self.config.get("partition_date_field"):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
             self._current_partition_path: Optional[str] = None
@@ -167,7 +181,9 @@ class GCSSink(RecordSink):
     def gcs_write_handle(self) -> FileIO:
         """Opens a write handle for the destination (GCS object) for this stream."""
         if not self._gcs_write_handle:
-            client = Client()
+            client = (
+                self._storage_client if self._storage_client is not None else Client()
+            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{self.key_name}",
                 "wb",
@@ -218,7 +234,11 @@ class GCSSink(RecordSink):
         ):
             self._rotate_to_new_chunk()
         self.gcs_write_handle.write(
-            orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
         )
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
@@ -258,14 +278,20 @@ class GCSSink(RecordSink):
         if self._gcs_write_handle is None or self._key_name != key:
             self._close_handle_and_clear_state()
             self._key_name = key
-            client = Client()
+            client = (
+                self._storage_client if self._storage_client is not None else Client()
+            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{key}",
                 "wb",
                 transport_params={"client": client},
             )
         self._gcs_write_handle.write(
-            orjson.dumps(record, option=orjson.OPT_APPEND_NEWLINE)
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
         )
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1

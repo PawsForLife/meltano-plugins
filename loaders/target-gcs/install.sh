@@ -54,7 +54,7 @@ uv run ruff check .
 printf "\n${GREEN}Running ruff format --check...${NC}\n"
 uv run ruff format --check .
 printf "\n${GREEN}Running mypy...${NC}\n"
-uv run mypy gcs_target
+uv run mypy target_gcs
 
 # Run tests; script exit code = pytest exit code
 printf "\n${GREEN}Running pytest...${NC}\n"

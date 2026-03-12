@@ -1,6 +1,6 @@
 [project]
 name = "target-gcs"
-version = "1.2.3"
+version = "2.0.0"
 description = "`target-gcs` is a Singer target for GCS, built with the Meltano SDK for Singer Targets."
 readme = "README.md"
 requires-python = ">=3.8,<4.0"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-target-gcs = "gcs_target.target:GCSTarget.cli"
+target-gcs = "target_gcs.target:GCSTarget.cli"
 
 [project.optional-dependencies]
 dev = [
@@ -34,7 +34,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["gcs_target"]
+packages = ["target_gcs"]
 
 [tool.ruff]
 line-length = 88

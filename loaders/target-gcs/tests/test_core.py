@@ -3,27 +3,36 @@
 Uses sample config file contents for target configuration.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, cast
+from unittest.mock import MagicMock
 
-from singer_sdk.testing import get_standard_target_tests
+from singer_sdk.testing import get_target_test_class
+from singer_sdk.testing.factory import BaseTestClass
 
-from gcs_target.target import GCSTarget
+from target_gcs.target import GCSTarget
 
-# Sample config file contents for the target (minimal).
-SAMPLE_CONFIG: Dict[str, Any] = {
-    # TODO: Initialize minimal target config file contents
-}
+# Minimal config for SDK template tests; matches test_sinks and test_partition_key_generation.
+SAMPLE_CONFIG: Dict[str, Any] = {"bucket_name": "test-bucket"}
 
 
-# Run standard built-in target tests from the SDK:
-def test_standard_target_tests():
-    """Run standard target tests from the SDK for this target using sample config."""
-    tests = get_standard_target_tests(
-        GCSTarget,
-        config=SAMPLE_CONFIG,
-    )
-    for test in tests:
-        test()
+class GCSTargetWithMockStorage(GCSTarget):
+    """Target subclass that injects a mock GCS client so tests run without ADC."""
+
+    def __init__(self, *, config=None, **kwargs):
+        super().__init__(config=config, **kwargs)
+        self._storage_client = MagicMock()
+
+
+# Run standard built-in target tests from the SDK (class-based; pytest discovers test methods).
+StandardTargetTests = cast(
+    type[BaseTestClass],
+    get_target_test_class(target_class=GCSTargetWithMockStorage, config=SAMPLE_CONFIG),
+)
+
+
+# Mypy does not accept variables as base classes; cast above documents the type.
+class TestGCSTarget(StandardTargetTests):  # type: ignore[valid-type,misc]
+    """Standard Target Tests for target-gcs."""
 
 
 # TODO: Create additional tests as appropriate for this target.

@@ -2,22 +2,25 @@
 
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
 import orjson
+import pytest
 
-from gcs_target.sinks import GCSSink
-from gcs_target.target import GCSTarget
+from target_gcs.sinks import GCSSink
+from target_gcs.target import GCSTarget
 
 
 def build_sink(
     config=None,
     time_fn=None,
     date_fn: Optional[Callable[[], datetime]] = None,
+    storage_client=None,
 ):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
+    Optionally pass time_fn, date_fn for deterministic keys; storage_client for tests."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
@@ -27,6 +30,8 @@ def build_sink(
         kwargs["time_fn"] = time_fn
     if date_fn is not None:
         kwargs["date_fn"] = date_fn
+    if storage_client is not None:
+        kwargs["storage_client"] = storage_client
     return GCSSink(
         GCSTarget(config=config),
         "my_stream",
@@ -179,7 +184,7 @@ def test_config_validates_with_partition_date_field():
 
 def test_gcs_client_created_without_credentials_path():
     """Sink must use Client() (ADC) only; no explicit credentials path passed from config file."""
-    with patch("gcs_target.sinks.Client") as mock_client:
+    with patch("target_gcs.sinks.Client") as mock_client:
         sink = build_sink()
         _ = sink.gcs_write_handle
         mock_client.assert_called_once_with()
@@ -187,7 +192,7 @@ def test_gcs_client_created_without_credentials_path():
 
 def test_gcs_client_uses_adc_when_google_application_credentials_set():
     """When GOOGLE_APPLICATION_CREDENTIALS is set, the sink's client is still created with no path (ADC honours env)."""
-    with patch("gcs_target.sinks.Client") as mock_client:
+    with patch("target_gcs.sinks.Client") as mock_client:
         with patch.dict("os.environ", {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/dummy"}):
             sink = build_sink()
             _ = sink.gcs_write_handle
@@ -198,8 +203,8 @@ def test_one_key_and_one_handle_when_chunking_disabled():
     """When max_records_per_file is unset or 0, multiple records use a single key and a single handle (no rotation).
     Backward compatibility: existing behaviour must be unchanged when the option is off."""
     mock_handle = MagicMock()
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=mock_handle
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=mock_handle
     ) as mock_open:
         sink = build_sink()
         context = {}
@@ -220,8 +225,8 @@ def test_one_key_and_one_handle_when_chunking_disabled():
 def test_key_has_no_chunk_index_when_chunking_disabled():
     """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp pattern.
     Backward compatibility: key format is unchanged when chunking is off."""
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
     ):
         sink = build_sink()
         sink.process_record({"id": 1}, {})
@@ -247,8 +252,8 @@ def test_chunking_rotation_at_threshold():
         return next(timestamps)
 
     mock_handles = [MagicMock(), MagicMock()]
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
     ) as mock_open:
         sink = build_sink(
             config={
@@ -279,8 +284,8 @@ def test_chunking_key_format_includes_chunk_index():
     def time_fn():
         return next(timestamps)
 
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
     ) as mock_open:
         sink = build_sink(
             config={
@@ -311,8 +316,8 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     mock_handles = [MagicMock() for _ in range(4)]
     for h in mock_handles:
         h.write.side_effect = capture_write
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
     ) as mock_open:
         sink = build_sink(config={"max_records_per_file": 10})
         for i in range(25):
@@ -326,3 +331,42 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     assert len(ids) == 25 and set(ids) == set(range(25)), (
         "all 25 records must be written exactly once with ids 0..24 (no duplicate or dropped)"
     )
+
+
+def test_record_with_decimal_serializes_to_valid_json():
+    """Record containing decimal.Decimal is written as valid JSONL with the numeric value as a JSON number.
+    Regression guard: orjson does not natively serialize Decimal; the sink will use a default callback (later task).
+    WHAT: process_record accepts a record with Decimal and writes JSONL where the value is a number. WHY: prevent regression when adding Decimal support."""
+    write_payloads = []
+
+    def capture_write(data):
+        write_payloads.append(data)
+
+    mock_handle = MagicMock()
+    mock_handle.write.side_effect = capture_write
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=mock_handle
+    ):
+        sink = build_sink()
+        record = {"id": 1, "score": Decimal("12.34")}
+        sink.process_record(record, {})
+
+    assert len(write_payloads) >= 1, "at least one line must be written"
+    decoded = orjson.loads(write_payloads[-1].strip())
+    assert decoded["score"] == 12.34, (
+        "Decimal must appear in written JSON as a numeric value equal to float(Decimal)"
+    )
+
+
+def test_non_serializable_non_decimal_type_raises_type_error():
+    """Record containing a non-JSON-serializable value that is not Decimal raises TypeError when process_record runs.
+    Documents the contract that only Decimal is coerced to float; other non-serializable types must raise TypeError
+    so unknown types are not silently coerced. Black-box: asserts only that TypeError is raised."""
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
+    ):
+        sink = build_sink()
+        record = {"id": 1, "bad": object()}
+        context = {}
+        with pytest.raises(TypeError):
+            sink.process_record(record, context)

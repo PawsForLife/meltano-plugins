@@ -61,6 +61,10 @@ Each subdirectory is a standalone Python package with its own `pyproject.toml` a
 
 CI discovers packages via `scripts/list_packages.py` (directories with a `pyproject.toml`) and runs a matrix job over them. Each plugin must have an `install.sh` that runs **uv**, install, **pytest**, **ruff**, and **mypy**. Tests must live in the package-root `tests/` directory. The workflow is in [.github/workflows/plugin-matrix.yml](../../.github/workflows/plugin-matrix.yml).
 
+## Root-level tooling
+
+The repository provides a root **install.sh** that discovers plugin directories via `scripts/list_packages.py` and runs each plugin's `install.sh` in order (exits on first failure); it also installs pre-commit if missing and runs `pre-commit install`. Root **pre-commit** runs ruff, mypy (and optionally pytest) per plugin using that plugin's virtual environment; discovery uses the same `list_packages.py` as CI.
+
 ## Version pinning
 
 To pin to a tag, branch, or commit, put the ref **before** the `#` in the URL:

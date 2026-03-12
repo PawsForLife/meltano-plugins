@@ -7,7 +7,7 @@ plugins:
       pip_url: meltanolabs-tap-csv
   loaders:
     - name: target-gcs
-      namespace: gcs_target
+      namespace: target_gcs
       pip_url: -e .
       settings:
         - name: bucket_name

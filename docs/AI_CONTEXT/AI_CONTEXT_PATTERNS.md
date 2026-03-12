@@ -14,11 +14,11 @@
 ## Code Organization
 
 - **Monorepo layout**: Each plugin is a standalone package under `taps/` or `loaders/` with its own `pyproject.toml`, source package, and `tests/`. No shared library; tap and target communicate via Singer JSONL on stdout/stdin.
-- **Source package naming**: Snake_case directory matching the CLI name (e.g. `restful_api_tap/`, `gcs_target/`). Entry module is `tap.py` (tap) or `target.py` (target).
+- **Source package naming**: Source package = plugin directory name with hyphens replaced by underscores (e.g. `restful_api_tap/`, `target_gcs/`). Entry module is `tap.py` (tap) or `target.py` (target).
 - **Module responsibilities**:
   - **Tap**: `tap.py` — Tap class, config schema (`common_properties`, `top_level_properties`), stream discovery (`discover_streams()`); `streams.py` — `DynamicStream`; `auth.py` — `get_authenticator`, `select_authenticator`; `client.py` — `RestApiStream`, `_request`, `request_records`; `pagination.py`; `utils.py` (e.g. `flatten_json`).
   - **Target**: `target.py` — Target class, `config_jsonschema`, `default_sink_class`; `sinks.py` — `GCSSink` (`key_name`, `gcs_write_handle`, `process_record`).
-- **Config schema**: Declared on the Tap/Target class via `singer_sdk.typing` (`th.PropertiesList`, `th.Property`). Target example in `gcs_target/target.py`: `config_jsonschema = th.PropertiesList(th.Property("bucket_name", th.StringType, required=True), ...).to_dict()`. Stream-level and top-level properties are merged in tap config (e.g. `stream.get("key", self.config.get("key", default))` in `discover_streams()`).
+- **Config schema**: Declared on the Tap/Target class via `singer_sdk.typing` (`th.PropertiesList`, `th.Property`). Target example in `target_gcs/target.py`: `config_jsonschema = th.PropertiesList(th.Property("bucket_name", th.StringType, required=True), ...).to_dict()`. Stream-level and top-level properties are merged in tap config (e.g. `stream.get("key", self.config.get("key", default))` in `discover_streams()`).
 
 ---
 
@@ -49,14 +49,14 @@
 - **Black-box**: Tests assert on observable behaviour (returned objects, emitted records, raised exceptions). They do not assert on “called_once”, log lines, or internal call counts. For external data changes, the mock (e.g. `requests_mock`) provides the changed response; for internal state, assert on returned or mutated objects.
 - **Exception tests**: Use `pytest.raises(ExpectedException)` to assert that a specific exception type is raised (e.g. `with pytest.raises(FatalAPIError): list(stream.get_records({}))`).
 - **Fixtures and helpers**: Shared config and API mocks are factored into helpers (e.g. `config()`, `setup_api()`, `json_resp()`, `build_sink()`) in test modules. Schema files under `tests/` (e.g. `tests/schema.json`) are used when discovery is bypassed.
-- **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_standard_target_tests(GCSTarget, config=...)`. Run these in a test that iterates and invokes each case.
+- **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_target_test_class(GCSTarget, config=...)` and a test class that subclasses the result (e.g. `class TestGCSTarget(StandardTargetTests)`).
 - **Regression gate**: Any failing test that is not explicitly marked as expected failure (`@pytest.mark.xfail`, `@unittest.expectedFailure`) is a regression and must be fixed before the task is complete.
 
 ---
 
 ## Dependency Injection & Validation
 
-- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; `GCSSink` in `gcs_target/sinks.py` accepts optional `time_fn` and `date_fn` callables in `__init__` for deterministic key naming and partition fallback in tests (e.g. `build_sink(time_fn=..., date_fn=...)` in `loaders/target-gcs/tests/test_sinks.py`). GCS client is constructed from config context; tests patch `gcs_target.sinks.Client` to assert constructor args (e.g. no credentials path for ADC).
+- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; `GCSSink` in `target_gcs/sinks.py` accepts optional `time_fn` and `date_fn` callables in `__init__` for deterministic key naming and partition fallback in tests (e.g. `build_sink(time_fn=..., date_fn=...)` in `loaders/target-gcs/tests/test_sinks.py`). GCS client is constructed from config context; tests patch `target_gcs.sinks.Client` to assert constructor args (e.g. no credentials path for ADC).
 - **Authenticator caching**: The tap caches the authenticator in `_authenticator` and reuses it across streams. OAuth refresh is handled inside the authenticator; `get_authenticator(self)` returns the cached instance or builds one via `select_authenticator(self)`.
 - **Config resolution**: Tap merges top-level and stream-level config (e.g. `params = {**self.config.get("params", {}), **stream.get("params", {})}`). Required settings (e.g. `api_url`, `bucket_name`) are enforced by the config schema and runtime checks. Config is supplied via config file or Meltano-injected env.
 
@@ -78,7 +78,7 @@
 
 ### How do I add a new target option?
 
-1. Add a `th.Property(...)` to `GCSTarget.config_jsonschema` in `loaders/target-gcs/gcs_target/target.py` (e.g. `key_naming_convention`, `date_format`).
+1. Add a `th.Property(...)` to `GCSTarget.config_jsonschema` in `loaders/target-gcs/target_gcs/target.py` (e.g. `key_naming_convention`, `date_format`).
 2. Read the option in the sink from `self.config.get("option_name", default)` (e.g. in `GCSSink.key_name` and related logic in `sinks.py`).
 3. Add or adjust tests that build the sink with the new config and assert on behaviour (e.g. key name format), not on call counts.
 
@@ -104,7 +104,7 @@
 
 ### How do I make tests deterministic for time/date?
 
-- Inject time/date via constructor. In `gcs_target/sinks.py`, `GCSSink` accepts optional `time_fn` and `date_fn` callables; production uses `time.time` and `datetime.today` when not provided. In tests (e.g. `loaders/target-gcs/tests/test_sinks.py`), use `build_sink(time_fn=..., date_fn=...)` so key names and partition paths are deterministic. Do not patch `time` or `datetime` inside the unit under test; pass functions as parameters (DI).
+- Inject time/date via constructor. In `target_gcs/sinks.py`, `GCSSink` accepts optional `time_fn` and `date_fn` callables; production uses `time.time` and `datetime.today` when not provided. In tests (e.g. `loaders/target-gcs/tests/test_sinks.py`), use `build_sink(time_fn=..., date_fn=...)` so key names and partition paths are deterministic. Do not patch `time` or `datetime` inside the unit under test; pass functions as parameters (DI).
 
 ### How do I run the test suite?
 
@@ -116,8 +116,8 @@
 
 | Purpose | Tap | Target |
 |--------|-----|--------|
-| Entry, config schema | `taps/restful-api-tap/restful_api_tap/tap.py` | `loaders/target-gcs/gcs_target/target.py` |
-| Stream/sink logic | `restful_api_tap/streams.py`, `client.py` | `gcs_target/sinks.py` |
+| Entry, config schema | `taps/restful-api-tap/restful_api_tap/tap.py` | `loaders/target-gcs/target_gcs/target.py` |
+| Stream/sink logic | `restful_api_tap/streams.py`, `client.py` | `target_gcs/sinks.py` |
 | Auth | `restful_api_tap/auth.py` | — |
 | Helpers | `restful_api_tap/utils.py`, `pagination.py` | — |
 | Tests | `taps/restful-api-tap/tests/*.py` | `loaders/target-gcs/tests/*.py` |

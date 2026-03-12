@@ -1,10 +1,16 @@
 # Changelog
 
-<!--next-version-placeholder-->
-
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-12
+
 ### Fixed
+
+- **fix-target-gcs-real-client-in-tests** — Tests no longer perform real GCP actions: GCS client is injectable so CI runs without ADC. Details: [_archive/fix-target-gcs-real-client-in-tests/fix-target-gcs-real-client-in-tests.md](../../_archive/fix-target-gcs-real-client-in-tests/fix-target-gcs-real-client-in-tests.md)
+  - GCSSink accepts optional `storage_client`; used in `gcs_write_handle` and partition-by-field path when provided.
+  - GCSTarget holds `_storage_client` and overrides `get_sink()` to pass it when creating sinks.
+  - test_core uses `GCSTargetWithMockStorage` in `get_target_test_class()` so standard target tests run without credentials.
+  - test_sinks `build_sink()` accepts optional `storage_client` for write-path tests.
 
 - **README:** Corrected `key_naming_convention` default in config table from `{timestamp}` to `{stream}_{timestamp}.jsonl` to match GCSSink behavior in `sinks.py`.
 
@@ -21,6 +27,8 @@
 - **README:** Clarified "Naming with chunking": added comma before "so" in chunk-index sentence; rewrote timestamp explanation so collisions are defined by chunk start time within the same granularity window (e.g. 12:00:00.500 vs 12:00:00.999), not by processing duration.
 
 - **Glossary alignment:** Plugin, package, and directory were renamed for Singer/Meltano glossary alignment: CLI/plugin `target-gcs`, Python package `gcs_target`, path `loaders/target-gcs/`. See the [repo root CHANGELOG](../../CHANGELOG.md) for user migration (update `meltano.yml` to use `target-gcs`, re-run `meltano install`).
+
+- **Package/namespace rename:** Python package and namespace renamed from `gcs_target` to `target_gcs` (normalise-plugin-source-folders). See the [repo root CHANGELOG](../../CHANGELOG.md) for user migration (namespace `target_gcs`, re-run `meltano install`, `mypy target_gcs`).
 
 ### Breaking
 

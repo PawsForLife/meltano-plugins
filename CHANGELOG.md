@@ -1,19 +1,81 @@
 # Changelog
 
-## [Unreleased]
+## 2025-03-12
 
 ### Changed
 
+- **Root changelog format** — Root `CHANGELOG.md` now uses date-based headings (`## YYYY-MM-DD`) only; no version numbers. Repo is released by pushing. Feature and bug pipelines, CONVENTIONS § Changelogs, and implement workflows updated accordingly.
+
+- **README Development section** — Document that push-time and local pre-commit checks run ruff, mypy, and pytest (pre-commit hook and wrapper already did; README now matches).
+- **Normalise plugin source folders** — Details: [normalise-plugin-source-folders.md](_archive/normalise-plugin-source-folders/normalise-plugin-source-folders.md)
+  - Rename source package `gcs_target` to `target_gcs` in loaders/target-gcs (directory rename only; config and imports in later tasks).
+  - Point plugin config to `target_gcs`: pyproject.toml (scripts entry point and wheel packages), meltano.yml (namespace), install.sh (mypy target).
+  - Update Python imports and test patches in loaders/target-gcs from `gcs_target` to `target_gcs` (target.py, tests/__init__.py, test_core.py, test_sinks.py, test_partition_key_generation.py).
+  - Derive mypy package from plugin path in `scripts/run_plugin_checks.sh` and `.github/workflows/plugin-unit-tests.yml`: last path component with hyphens replaced by underscores (no plugin-specific case blocks).
+  - Update documentation: README and AI context use `target_gcs`; root and plugin CHANGELOGs add migration note.
+- **target-gcs migration (normalise-plugin-source-folders):** Package/namespace renamed from `gcs_target` to `target_gcs`. Users: update `meltano.yml` namespace to `target_gcs` and re-run `meltano install`; verification commands use `mypy target_gcs`.
 - **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
+- **root-pre-commit-and-install archive** — Update failure-behaviour and root install.sh description to match implementation: root install runs all plugin installs, prints succeeded/failed summary, exits non-zero if any failed (no longer "stop on first failure").
+- **target-gcs-split-process-record** — Details: [target-gcs-split-process-record.md](_archive/target-gcs-split-process-record/target-gcs-split-process-record.md)
+  - Extract single-file/chunked path to _process_record_single_or_chunked; process_record delegates when partition_date_field unset (task 01).
+  - Extract partition-by-field path to _process_record_partition_by_field; process_record delegates when partition_date_field set (task 02).
+  - Make process_record thin dispatch only: config read, branch on partition_date_field, delegate; docstring updated (task 04).
+- **custom-meltano-plugins-documentation** — Details: [custom-meltano-plugins-documentation.md](_archive/custom-meltano-plugins-documentation/custom-meltano-plugins-documentation.md)
+  - Docs state plugins are custom (not on Meltano Hub or PyPI); install via `meltano.yml` and `pip_url` with `#subdirectory=`, variant **petcircle** in examples.
+  - Root README, docs/monorepo, docs/README, AI_CONTEXT (quick reference, repository), and tap README updated; tap README has "Install from this monorepo" subsection.
+- **glossary-terminology-repo** — Details: [glossary-terminology-repo.md](_archive/glossary-terminology-repo/glossary-terminology-repo.md)
+  - Align root README and CHANGELOG to glossary terminology (tap, target, extractor, loader, source, destination, stream, catalog, config file, state file).
+  - Align scripts: comments and docstrings in `scripts/list_packages.py` and `scripts/tests/*.py` to glossary (tap, target, extractor, loader); no logic or path changes.
+  - Align GitHub workflows: job names, comments, and step descriptions in `.github/workflows/*.yml` to glossary (tap, target, plugin); no run/paths/matrix or logic changes.
+  - Align Cursor commands: `.cursor/commands/update_context.md` updated so AI context docs describe extractors as taps and loaders as targets per glossary; prose only, no behaviour or path changes.
+  - Align Cursor agents: `.cursor/agents/*.md` use glossary terms (tap, target, config file, state file, catalog, stream); added Resources bullet to architect, archivist, debug-specialist, implementer, researcher, task-decomposer; ai-context-writer already referenced glossary.
+  - Align Cursor commands: `.cursor/commands/*.md` use glossary (extractor as tap, loader as target); update_context already compliant; audit only.
+  - Align Cursor workflows: `.cursor/workflows/*.md` use glossary terminology (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE) where describing Singer/Meltano pipelines or plugins; pipeline state preserved for scratchpad/workflow state.
+  - Align Cursor agents: `.cursor/agents/*.md` use glossary (tap, target, config file, state file, catalog, stream) in Resources; all seven agents already compliant.
+- **Target filenames and glossary alignment** — Details: [target-filenames-and-glossary-alignment.md](_archive/target-filenames-and-glossary-alignment/target-filenames-and-glossary-alignment.md)
+  - Rename Python package `gcs_loader` → `gcs_target` and CLI/plugin `gcs-loader` → `target-gcs` under `loaders/gcs-loader/` (pyproject.toml, meltano.yml, install.sh, source, tests; top-level dir unchanged until task 02).
+  - Top-level directory renamed `loaders/gcs-loader/` → `loaders/target-gcs/`; repo-wide path and plugin references updated.
+  - Package README and sample config updated to use `target-gcs` and `gcs_target`; root CHANGELOG documents migration.
+  - **User migration:** Plugin name is `target-gcs`, path is `loaders/target-gcs/`, package is `gcs_target`. Update `meltano.yml` to use `target-gcs` and re-run `meltano install`.
+- **Glossary terminology (target)** — Details: [glossary-terminology-target.md](_archive/glossary-terminology-target/glossary-terminology-target.md)
+  - Rename class and entry point: `GCSLoader` → `GCSTarget` in `loaders/gcs-loader`; CLI entry point set to `GCSTarget.cli`; module/class docstrings updated per glossary (target, destination, config file).
+  - Terminology in source: align docstrings and comments in `target.py` and `sinks.py` with glossary (target, sink, destination, config file, state file, SCHEMA, RECORD, STATE, RecordSink, sink drain, stream, record).
+  - Terminology in tests: align docstrings and comments in `test_core.py` and `test_sinks.py` with glossary (target, sink, config file); no assertion or behavioural changes.
+  - In-package docs: README aligned with glossary (target, loader, config file, destination); CLI name and config schema unchanged.
+- **Plugin class name alignment** — Details: [plugin-class-name-alignment.md](_archive/plugin-class-name-alignment/plugin-class-name-alignment.md)
+  - GCS loader (target): class renamed TargetGCS → GCSLoader, name set to "gcs-loader"; tests, pyproject.toml, meltano.yml, README updated.
+  - Restful API tap: class renamed TapRestApiMsdk → RestfulApiTap, name set to "restful-api-tap"; script restful-api-tap.sh, pyproject.toml, meltano.yml, tests, README and AI_CONTEXT docs updated.
+  - Repo docs: root README and docs/monorepo updated to use gcs-loader and restful-api-tap in plugins table, installation YAML, directory layout, and pipeline examples.
+- **Cursor workflows and commands** — Normalized `{task_file}` to mean filename without `.md`; paths use `{task_file}.md`; applied across `5-plan-task-bug.md`, `5-plan-task-feature.md`, `implement-task-fix.md`, `implement-task-feature.md`, `bug-pipeline.md`, `feature-pipeline.md`, and `architect.md`.
 
 ### Fixed
 
+- **install.sh** — Use fail-early throughout: exit on package discovery failure, on first package install failure, and on pre-commit (pip or hook) failure; remove SUCCEEDED/FAILED arrays and summary section.
+- **target-gcs tests** — Annotate `StandardTargetTests` with `cast(type[BaseTestClass], ...)` and import `BaseTestClass` from `singer_sdk.testing.factory` so the test base is explicitly typed; add targeted `# type: ignore[valid-type,misc]` on `TestGCSTarget` because mypy does not accept variables as base classes.
+- **install.sh** — Run package discovery (`list_packages.py`) once into a temp file; check its exit status and exit non-zero on failure before the install loop, so discovery errors are propagated instead of the loop silently seeing no packages.
+- **install.sh** — Record failures when `pip3 install pre-commit` or `pip install pre-commit` fails: check exit status after each pip command, append to FAILED and set PRECOMMIT_FAILED=1 so the summary and script exit code reflect the failure; set PRECOMMIT_FAILED=1 in the no-pip branch for consistency.
+- **run_plugin_checks.sh** — Run `list_packages.py` once before the loop; capture stdout and exit status, exit script on non-zero; feed captured output to the loop via here-string so the Python command's exit code is not hidden.
+- **fix-mypy-standard-target-tests-base-class** — Details: [fix-mypy-standard-target-tests-base-class.md](_archive/fix-mypy-standard-target-tests-base-class/fix-mypy-standard-target-tests-base-class.md)
+  - In Plugin unit tests workflow, run mypy on the derived source package only (from `matrix.path`: last component, hyphens → underscores) instead of `.`, so test code is not type-checked and CI no longer fails on `StandardTargetTests` base class.
+- **fix-target-gcs-template-tests-config-validation** — Details: [fix-target-gcs-template-tests-config-validation.md](_archive/fix-target-gcs-template-tests-config-validation/fix-target-gcs-template-tests-config-validation.md)
+  - Set `SAMPLE_CONFIG` in `loaders/target-gcs/tests/test_core.py` to `{"bucket_name": "test-bucket"}` so SDK template tests pass config validation.
 - **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
   - Add regression test that JSON output from `list_packages.py --json` ends with newline (heredoc/GITHUB_OUTPUT compatibility).
   - Emit trailing newline from `list_packages.py` when outputting JSON so GitHub Actions discover step no longer fails with "Matching delimiter not found 'EOF'".
 
 ### Added
 
+- **root-pre-commit-and-install** — Details: [root-pre-commit-and-install.md](_archive/root-pre-commit-and-install/root-pre-commit-and-install.md)
+  - Add `scripts/run_plugin_checks.sh`: discover plugins via `list_packages.py`, run ruff (check + format --check) and mypy per plugin using each plugin's `.venv`; optional pytest when `RUN_PYTEST=1`; exit on first failure; mypy package name from path with fallback map.
+  - Add root `install.sh`: discover plugins via `list_packages.py`, run each plugin's `./install.sh` for all plugins (do not stop on first failure), print succeeded/failed summary, exit non-zero if any failed; install pre-commit via pip if missing; run `pre-commit install` from repo root.
+  - Add root `.pre-commit-config.yaml`: single local hook (plugin-checks) invoking `scripts/run_plugin_checks.sh`; language system, pass_filenames false; runs when files under `taps/` or `loaders/` change.
+  - Documentation: README Development section (root `./install.sh`, pre-commit install, `pre-commit run --all-files`); docs/monorepo root-level tooling (install.sh and pre-commit discovery via list_packages.py); AI_CONTEXT_QUICK_REFERENCE Repo root commands and removal of "No repo-wide install.sh".
+- **target-gcs-handle-decimal-in-records** — Details: [target-gcs-handle-decimal-in-records.md](_archive/target-gcs-handle-decimal-in-records/target-gcs-handle-decimal-in-records.md)
+  - Add regression test for record with Decimal: test_record_with_decimal_serializes_to_valid_json (captures GCS writes, asserts JSONL decodes and numeric value correct; xfail until orjson default in task 03–04).
+  - Add test that non-Decimal non-serializable value in record raises TypeError (test_non_serializable_non_decimal_type_raises_type_error; black-box, documents contract).
+  - Add _json_default helper and decimal import in sinks.py (module-private; returns float for Decimal, raises TypeError otherwise; not yet wired at orjson call sites).
+  - Wire default=_json_default at both orjson.dumps call sites in sinks.py (_process_record_single_or_chunked and _process_record_partition_by_field); remove xfail from Decimal regression test.
+  - Verify full test suite and lint/type checks: pytest, ruff check, ruff format --check, mypy gcs_target all pass.
 - **target-gcs hive partitioning by field** — Details: [target-gcs-hive-partitioning-by-field.md](_archive/target-gcs-hive-partitioning-by-field/target-gcs-hive-partitioning-by-field.md)
   - Add partition_date_field and partition_date_format to config schema (optional strings); schema and validation tests in test_sinks.py.
   - Add unit tests for get_partition_path_from_record (valid ISO date/datetime, fallback format, missing field, invalid value, custom format); stub in sinks.py until task 03.
@@ -51,36 +113,3 @@
   - restful-api-tap install.sh: run uv run pytest, ruff check/format --check, mypy tap_rest_api_msdk; exit code = pytest; tox removed from primary contract.
   - GitHub workflow: `.github/workflows/plugin-matrix.yml` — discover job runs `scripts/list_packages.py`, converts stdout to JSON matrix, runs script tests; test job matrix over packages, runs `bash install.sh` per package. Triggers on push/PR to main or master with path filters (scripts/, taps/, loaders/, .github/).
   - Documentation: `docs/monorepo/README.md` — added "CI and plugin standards" (matrix over pyproject.toml dirs, install.sh runs uv/pytest/ruff/mypy, tests in package root `tests/`). Plugin READMEs (gcs-loader, restful-api-tap) updated to state install.sh runs pytest, ruff, mypy; CI relies on install.sh.
-
-### Changed
-
-- **target-gcs-split-process-record** — Details: [target-gcs-split-process-record.md](_archive/target-gcs-split-process-record/target-gcs-split-process-record.md)
-  - Extract single-file/chunked path to _process_record_single_or_chunked; process_record delegates when partition_date_field unset (task 01).
-  - Extract partition-by-field path to _process_record_partition_by_field; process_record delegates when partition_date_field set (task 02).
-  - Make process_record thin dispatch only: config read, branch on partition_date_field, delegate; docstring updated (task 04).
-- **custom-meltano-plugins-documentation** — Details: [custom-meltano-plugins-documentation.md](_archive/custom-meltano-plugins-documentation/custom-meltano-plugins-documentation.md)
-  - Docs state plugins are custom (not on Meltano Hub or PyPI); install via `meltano.yml` and `pip_url` with `#subdirectory=`, variant **petcircle** in examples.
-  - Root README, docs/monorepo, docs/README, AI_CONTEXT (quick reference, repository), and tap README updated; tap README has "Install from this monorepo" subsection.
-- **glossary-terminology-repo** — Details: [glossary-terminology-repo.md](_archive/glossary-terminology-repo/glossary-terminology-repo.md)
-  - Align root README and CHANGELOG to glossary terminology (tap, target, extractor, loader, source, destination, stream, catalog, config file, state file).
-  - Align scripts: comments and docstrings in `scripts/list_packages.py` and `scripts/tests/*.py` to glossary (tap, target, extractor, loader); no logic or path changes.
-  - Align GitHub workflows: job names, comments, and step descriptions in `.github/workflows/*.yml` to glossary (tap, target, plugin); no run/paths/matrix or logic changes.
-  - Align Cursor commands: `.cursor/commands/update_context.md` updated so AI context docs describe extractors as taps and loaders as targets per glossary; prose only, no behaviour or path changes.
-  - Align Cursor agents: `.cursor/agents/*.md` use glossary terms (tap, target, config file, state file, catalog, stream); added Resources bullet to architect, archivist, debug-specialist, implementer, researcher, task-decomposer; ai-context-writer already referenced glossary.
-  - Align Cursor commands: `.cursor/commands/*.md` use glossary (extractor as tap, loader as target); update_context already compliant; audit only.
-  - Align Cursor workflows: `.cursor/workflows/*.md` use glossary terminology (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE) where describing Singer/Meltano pipelines or plugins; pipeline state preserved for scratchpad/workflow state.
-  - Align Cursor agents: `.cursor/agents/*.md` use glossary (tap, target, config file, state file, catalog, stream) in Resources; all seven agents already compliant.
-- **Target filenames and glossary alignment** — Details: [target-filenames-and-glossary-alignment.md](_archive/target-filenames-and-glossary-alignment/target-filenames-and-glossary-alignment.md)
-  - Rename Python package `gcs_loader` → `gcs_target` and CLI/plugin `gcs-loader` → `target-gcs` under `loaders/gcs-loader/` (pyproject.toml, meltano.yml, install.sh, source, tests; top-level dir unchanged until task 02).
-  - Top-level directory renamed `loaders/gcs-loader/` → `loaders/target-gcs/`; repo-wide path and plugin references updated.
-  - Package README and sample config updated to use `target-gcs` and `gcs_target`; root CHANGELOG documents migration.
-  - **User migration:** Plugin name is `target-gcs`, path is `loaders/target-gcs/`, package is `gcs_target`. Update `meltano.yml` to use `target-gcs` and re-run `meltano install`.
-- **Glossary terminology (target)** — Details: [glossary-terminology-target.md](_archive/glossary-terminology-target/glossary-terminology-target.md)
-  - Rename class and entry point: `GCSLoader` → `GCSTarget` in `loaders/gcs-loader`; CLI entry point set to `GCSTarget.cli`; module/class docstrings updated per glossary (target, destination, config file).
-  - Terminology in source: align docstrings and comments in `target.py` and `sinks.py` with glossary (target, sink, destination, config file, state file, SCHEMA, RECORD, STATE, RecordSink, sink drain, stream, record).
-  - Terminology in tests: align docstrings and comments in `test_core.py` and `test_sinks.py` with glossary (target, sink, config file); no assertion or behavioural changes.
-  - In-package docs: README aligned with glossary (target, loader, config file, destination); CLI name and config schema unchanged.
-- **Plugin class name alignment** — Details: [plugin-class-name-alignment.md](_archive/plugin-class-name-alignment/plugin-class-name-alignment.md)
-  - GCS loader (target): class renamed TargetGCS → GCSLoader, name set to "gcs-loader"; tests, pyproject.toml, meltano.yml, README updated.
-  - Restful API tap: class renamed TapRestApiMsdk → RestfulApiTap, name set to "restful-api-tap"; script restful-api-tap.sh, pyproject.toml, meltano.yml, tests, README and AI_CONTEXT docs updated.
-  - Repo docs: root README and docs/monorepo updated to use gcs-loader and restful-api-tap in plugins table, installation YAML, directory layout, and pipeline examples.
