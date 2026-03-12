@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-11 |
+| Version | 1.3 |
+| Last Updated | 2026-03-12 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
 | Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
 
@@ -74,7 +74,8 @@ meltano-plugins/
 │   ├── skills/
 │   └── commands/
 ├── scripts/                      # Repo-level scripts (e.g. list_packages)
-├── .github/workflows/            # CI (e.g. plugin-matrix)
+│   └── tests/                    # Tests for repo-level scripts
+├── .github/workflows/            # CI (e.g. plugin-matrix, script-tests)
 ├── README.md                     # Project summary, install, layout
 └── CHANGELOG.md
 ```
@@ -161,7 +162,7 @@ No shared process state; communication is Singer JSONL on stdout → stdin. Stat
 ### Key external dependencies (per plugin)
 
 - **restful-api-tap**: `singer-sdk`, `requests`, `genson`, `atomicwrites`, `requests-aws4auth`, `boto3`. Python ≥3.12.
-- **target-gcs**: `singer-sdk`, `google-cloud-storage`, `google-api-python-client`, `smart-open[gcs]`, `orjson`, `requests`. Python ≥3.8,<4.0.
+- **target-gcs**: `singer-sdk`, `google-cloud-storage`, `google-api-python-client`, `smart-open[gcs]`, `orjson`, `requests`. Python ≥3.12,<4.0.
 
 Each plugin is installable on its own via `pip` from its subdirectory (`pip install -e .` or Meltano `pip_url` with `#subdirectory=taps/restful-api-tap` or `#subdirectory=loaders/target-gcs`; see README for `meltano.yml` examples).
 

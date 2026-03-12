@@ -6,11 +6,26 @@ Build with the [Meltano Target SDK](https://sdk.meltano.com).
 
 ## Installation
 
-- [ ] `Developer TODO:` Update the below as needed to correctly describe the install procedure. For instance, if you do not have a PyPi repo, or if you want users to directly install from your git repo, you can modify this step as appropriate.
+**Use from a Meltano project (recommended):** This is a custom plugin (not on the Meltano Hub or PyPI). Add the loader to your project's `meltano.yml` with `pip_url` and `namespace: target_gcs`; do not set `variant`. Then run `meltano install`.
+
+```yaml
+plugins:
+  loaders:
+    - name: target-gcs
+      namespace: target_gcs
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=loaders/target-gcs
+```
+
+See the [repo root README](../../README.md) for full instructions and troubleshooting.
+
+**Local development:** From the repo root, clone and run:
 
 ```bash
-pipx install target-gcs
+cd loaders/target-gcs
+./install.sh
 ```
+
+Or install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run `uv sync --extra dev` in this directory.
 
 ## Supported formats
 
@@ -44,15 +59,19 @@ When you set `partition_date_field` to a record property name (e.g. `created_at`
 
 **Fallback:** If the record is missing the field or the value is unparseable (not a valid date/datetime string), the target uses the run date formatted with `partition_date_format` as the partition path and does not raise an error.
 
-**Example:** To write keys like `{stream}/export_date=year=2024/month=03/day=11/{timestamp}.jsonl` using the record’s date field:
+**Example:** To write keys like `{stream}/export_date=year=2024/month=03/day=11/{timestamp}.jsonl` using the record’s date field, set the loader `config` in `meltano.yml`:
 
-```json
-{
-  "bucket_name": "my-bucket",
-  "partition_date_field": "created_at",
-  "partition_date_format": "year=%Y/month=%m/day=%d",
-  "key_naming_convention": "{stream}/export_date={partition_date}/{timestamp}.jsonl"
-}
+```yaml
+plugins:
+  loaders:
+    - name: target-gcs
+      namespace: target_gcs
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=loaders/target-gcs
+      config:
+        bucket_name: my-bucket
+        partition_date_field: created_at
+        partition_date_format: "year=%Y/month=%m/day=%d"
+        key_naming_convention: "{stream}/export_date={partition_date}/{timestamp}.jsonl"
 ```
 
 **Chunking:** When both `max_records_per_file` and `partition_date_field` are set, the target rotates to a new file after that many records **within the current partition**. The partition path stays the same; the new file uses a new timestamp (and optionally `{chunk_index}`) in the key.
@@ -70,12 +89,11 @@ Authentication uses [Application Default Credentials (ADC)](https://cloud.google
 
 ### Configure using environment variables
 
-This Singer target will automatically import any environment variables within the working directory's
-`.env` if the `--config=ENV` is provided, so that config file values can be supplemented or overridden by matching environment variables set in the terminal context or in the `.env` file.
+Configuration is recommended via Meltano (`meltano.yml`) or environment variables rather than JSON config files. This Singer target will automatically import any environment variables within the working directory's `.env` if `--config=ENV` is provided, so that config can be supplemented or overridden by matching environment variables set in the terminal context or in the `.env` file.
 
 ### Source Authentication and Authorization
 
-- [ ] `Developer TODO:` If your target requires special access on the source system, or any special authentication requirements, provide those here.
+This target writes to GCS only; it does not require source-specific authentication. GCS access uses [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials) or `GOOGLE_APPLICATION_CREDENTIALS` as described in the Authentication section above.
 
 ## Usage
 
@@ -86,15 +104,15 @@ You can easily run `target-gcs` by itself or in a pipeline using [Meltano](https
 ```bash
 target-gcs --version
 target-gcs --help
-# With Meltano (config from meltano.yml):
+# With Meltano (config from meltano.yml; recommended):
 meltano run tap-carbon-intensity target-gcs
-# Or run the target directly with a config file:
-tap-carbon-intensity | target-gcs --config /path/to/your-config.json
 ```
+
+For non-Meltano use, supply config via environment variables: `tap-carbon-intensity | target-gcs --config=ENV` (with `TARGET_GCS_*` vars or a `.env` file in the working directory).
 
 ## Developer Resources
 
-The project uses **uv** for dependency management and **Ruff** and **mypy** for linting, formatting, and type checking. The lockfile is `uv.lock`.
+Requires **Python 3.12+**. The project uses **uv** for dependency management and **Ruff** and **mypy** for linting, formatting, and type checking. The lockfile is `uv.lock`.
 
 ### Initialize your Development Environment
 
@@ -143,9 +161,9 @@ the file.
 Next, install Meltano (if you haven't already) and any needed plugins:
 
 ```bash
-# Install meltano
-pipx install meltano
-# Initialize meltano within this directory
+# Install Meltano with uv (if needed)
+uv tool install meltano
+# From this directory, install plugins
 cd loaders/target-gcs
 meltano install
 ```

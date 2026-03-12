@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-11 |
+| Version | 1.3 |
+| Last Updated | 2026-03-12 |
 | Tags | restful-api-tap, singer, tap, REST, extractor, meltano, streams, discovery, replication |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, troubleshooting), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, streams, SCHEMA/RECORD/STATE, config file, state file, Catalog, Discovery, replication), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) (downstream target) |
 

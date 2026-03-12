@@ -1,13 +1,13 @@
 """Basic utility functions."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 
 def flatten_json(
     obj: dict,
-    except_keys: Optional[list] = None,
-    store_raw_json_message: Optional[bool] = False,
+    except_keys: list | None = None,
+    store_raw_json_message: bool | None = False,
 ) -> dict:
     """Flattens a json object by appending the patch as a key in the returned object.
 
@@ -96,7 +96,7 @@ def unnest_dict(d):
     return result
 
 
-def get_start_date(self, context: Optional[dict]) -> Any:
+def get_start_date(self, context: dict | None) -> Any:
     """Return a start date if a DateTime bookmark is available.
 
     Otherwise returns the start date from the config file

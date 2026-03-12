@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.1 |
-| Last Updated | 2026-03-11 |
+| Version | 1.2 |
+| Last Updated | 2026-03-12 |
 | Tags | quick-reference, meltano, singer, sdk, taps, targets, python |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, entry points, data flow), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, config file, state file, Catalog, streams), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) |
 
@@ -28,7 +28,7 @@ Plugins are **custom** (not on Meltano Hub or PyPI). Install via Meltano by edit
 |------|--------|
 | Language | Python |
 | restful-api-tap | `requires-python = ">=3.12"` |
-| target-gcs | `requires-python = ">=3.8,<4.0"` |
+| target-gcs | `requires-python = ">=3.12,<4.0"` |
 | Package manager | **uv** (venv, sync deps) |
 | Linter / formatter | **Ruff** |
 | Type checker | **MyPy** |
@@ -47,7 +47,8 @@ From the repository root:
 
 | Action | Command |
 |--------|---------|
-| Bootstrap all plugins and pre-push hook | `./install.sh` (runs each plugin's install.sh in order, exits on first failure; installs pre-commit if missing, runs `pre-commit install --hook-type pre-push` only) |
+| Bootstrap all plugins and pre-push hook | `./install.sh` (discovers plugins via `scripts/list_packages.py`, runs each plugin's `install.sh`, exits on first failure; installs pre-commit if missing, runs `pre-commit install --hook-type pre-push` only) |
+| Run all plugin checks (ruff, mypy, pytest) per plugin | `./scripts/run_plugin_checks.sh` (uses each plugin's `.venv`; requires root `install.sh` run first) |
 | Install git hook (pre-push only) | `pre-commit install --hook-type pre-push` (run after root install.sh). Checks run on **push** only, not on commit. |
 | Run all hooks on all files | `pre-commit run --all-files` |
 
@@ -105,7 +106,10 @@ Meltano passes **config** (and optionally **state file** and **Catalog**) to the
 From plugin directory with venv active:
 
 ```bash
-# Tap: config file required; optional state file and Catalog
+# Tap: Discovery — output catalog to stdout (save to file or pipe)
+restful-api-tap --config config.json --discover
+
+# Tap: Sync — config required; optional state file and Catalog
 restful-api-tap --config config.json
 
 # Target: reads Singer JSONL from stdin; optional config
@@ -114,7 +118,7 @@ cat stream.jsonl | target-gcs --config config.json
 
 - **Config file** — JSON with tap params (api_url, auth, streams) or target params (bucket_name, key_prefix). Required for tap; optional for target.
 - **State file** — Optional JSON for incremental sync (bookmarks per stream); tap may emit STATE to update it.
-- **Catalog** — Describes which streams to extract and replication metadata; from tap `--discover` or Meltano.
+- **Catalog** — Describes which **streams** to extract and replication metadata; from tap `--discover` or Meltano. See [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md).
 
 ---
 

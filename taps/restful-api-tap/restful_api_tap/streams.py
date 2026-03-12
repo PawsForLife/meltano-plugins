@@ -8,7 +8,7 @@ import email.utils
 import json
 from datetime import datetime
 from string import Template
-from typing import Any, Dict, Generator, Iterable, Optional, Union, cast
+from typing import Any, Generator, Iterable, cast
 from urllib.parse import parse_qs, parse_qsl, urlparse
 
 import requests
@@ -57,33 +57,33 @@ class DynamicStream(RestApiStream):
         name: str,
         records_path: str,
         path: str,
-        params: Optional[dict] = None,
-        headers: Optional[dict] = None,
-        primary_keys: Optional[list] = None,
-        replication_key: Optional[str] = None,
-        except_keys: Optional[list] = None,
-        next_page_token_path: Optional[str] = None,
-        schema: Optional[dict] = None,
-        pagination_request_style: str = "default",
-        pagination_response_style: str = "default",
-        pagination_page_size: Optional[int] = None,
-        pagination_results_limit: Optional[int] = None,
-        pagination_next_page_param: Optional[str] = None,
-        pagination_limit_per_page_param: Optional[str] = None,
-        pagination_total_limit_param: Optional[str] = None,
+        params: dict,
+        headers: dict,
+        primary_keys: list,
+        replication_key: str,
+        except_keys: list,
+        schema: dict,
+        pagination_request_style: str,
+        pagination_response_style: str,
+        source_search_field: str,
+        source_search_query: str,
+        next_page_token_path: str | None = None,
+        pagination_page_size: int | None = None,
+        pagination_results_limit: int | None = None,
+        pagination_next_page_param: str | None = None,
+        pagination_limit_per_page_param: str | None = None,
+        pagination_total_limit_param: str | None = None,
         pagination_initial_offset: int = 1,
-        offset_records_jsonpath: Optional[str] = None,
-        start_date: Optional[datetime] = None,
-        source_search_field: Optional[str] = None,
-        source_search_query: Optional[str] = None,
-        use_request_body_not_params: Optional[bool] = False,
-        backoff_type: Optional[str] = None,
-        backoff_param: Optional[str] = "Retry-After",
-        backoff_time_extension: Optional[int] = 0,
-        store_raw_json_message: Optional[bool] = False,
-        flatten_records: Optional[bool] = False,
-        is_sorted: Optional[bool] = False,
-        authenticator: Optional[object] = None,
+        offset_records_jsonpath: str | None = None,
+        start_date: datetime | None = None,
+        use_request_body_not_params: bool | None = False,
+        backoff_type: str | None = None,
+        backoff_param: str | None = "Retry-After",
+        backoff_time_extension: int = 0,
+        store_raw_json_message: bool | None = False,
+        flatten_records: bool = False,
+        is_sorted: bool = False,
+        authenticator: object | None = None,
     ) -> None:
         """Class initialization.
 
@@ -127,12 +127,9 @@ class DynamicStream(RestApiStream):
         """
         super().__init__(tap=tap, name=tap.name, schema=schema)
 
-        if primary_keys is None:
-            primary_keys = []
-
         self.name = name
         self.path = path
-        self.params = params if params else {}
+        self.params = params
         self.headers = headers
         self.assigned_authenticator = authenticator
         self._authenticator = authenticator
@@ -170,7 +167,7 @@ class DynamicStream(RestApiStream):
         self.backoff_time_extension = backoff_time_extension
         self.store_raw_json_message = store_raw_json_message
         self.flatten_records = flatten_records
-        self._is_sorted = bool(is_sorted) if is_sorted is not None else False
+        self._is_sorted = is_sorted
         if self.use_request_body_not_params:
             self.prepare_request_payload = get_url_params_styles.get(  # type: ignore
                 pagination_response_style, self._get_url_params_page_style
@@ -188,7 +185,7 @@ class DynamicStream(RestApiStream):
         self.start_date = start_date
         self.source_search_field = source_search_field
         self.source_search_query = source_search_query
-        self.pagination_page_size: Optional[int]
+        self.pagination_page_size: int | None
         self.pagination_initial_offset = pagination_initial_offset
         self.offset_records_jsonpath = offset_records_jsonpath
 
@@ -263,7 +260,7 @@ class DynamicStream(RestApiStream):
 
     def backoff_wait_generator(
         self,
-    ) -> Generator[Union[int, float], None, None]:
+    ) -> Generator[int | float, None, None]:
         """Return a backoff generator as required to manage Rate Limited APIs.
 
         Supply a backoff_type in the config file to indicate the style of backoff.
@@ -371,8 +368,8 @@ class DynamicStream(RestApiStream):
             )
 
     def _get_url_params_page_style(
-        self, context: Optional[dict], next_page_token: Optional[Any]
-    ) -> Dict[str, Any]:
+        self, context: dict | None, next_page_token: Any | None
+    ) -> dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization.
 
         Args:
@@ -418,8 +415,8 @@ class DynamicStream(RestApiStream):
         return params
 
     def _get_url_params_offset_style(
-        self, context: Optional[dict], next_page_token: Optional[Any]
-    ) -> Dict[str, Any]:
+        self, context: dict | None, next_page_token: Any | None
+    ) -> dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization.
 
         Args:
@@ -472,8 +469,8 @@ class DynamicStream(RestApiStream):
         return params
 
     def _get_url_params_header_link(
-        self, context: Optional[Dict], next_page_token: Optional[Any]
-    ) -> Dict[str, Any]:
+        self, context: dict | None, next_page_token: Any | None
+    ) -> dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization.
 
         Logic based on https://github.com/MeltanoLabs/tap-github
@@ -538,8 +535,8 @@ class DynamicStream(RestApiStream):
         return params
 
     def _get_url_params_hateoas_body(
-        self, context: Optional[dict], next_page_token: Optional[Any]
-    ) -> Dict[str, Any]:
+        self, context: dict | None, next_page_token: Any | None
+    ) -> dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization.
 
         Args:
@@ -617,8 +614,8 @@ class DynamicStream(RestApiStream):
     def post_process(  # noqa: PLR6301
         self,
         row: types.Record,
-        context: Optional[types.Context] = None,  # noqa: ARG002
-    ) -> Optional[dict]:
+        context: types.Context | None = None,  # noqa: ARG002
+    ) -> dict | None:
         """As needed, append or transform a record to match structure expected for RECORD messages.
 
         When flatten_records is True, returns flatten_json(row, ...); when False,
@@ -638,4 +635,4 @@ class DynamicStream(RestApiStream):
         if self.store_raw_json_message:
             # Store by reference to avoid doubling per-record memory; Singer target must not mutate.
             row["_sdc_raw_json"] = row
-        return cast(Optional[dict], row)
+        return cast(dict | None, row)
