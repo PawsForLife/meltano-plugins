@@ -74,7 +74,7 @@ Per-plugin commands below are for working in a single plugin directory.
 | Install deps | `uv sync` |
 | Lint | `uv run ruff check .` |
 | Format check | `uv run ruff format --check` |
-| Type check | `uv run mypy gcs_target` |
+| Type check | `uv run mypy target_gcs` |
 | Tests | `uv run pytest` |
 
 **Quality gate:** Tests and linters must pass before merge; no failing tests except those explicitly marked as expected failures.
