@@ -88,7 +88,7 @@ Plugins run as Singer executables. After install (Meltano or `pip install -e .` 
 | Plugin | CLI | Entry point (pyproject) |
 |--------|-----|-------------------------|
 | restful-api-tap | `restful-api-tap` | `restful_api_tap.tap:RestfulApiTap.cli` |
-| target-gcs | `target-gcs` | `gcs_target.target:GCSTarget.cli` |
+| target-gcs | `target-gcs` | `target_gcs.target:GCSTarget.cli` |
 
 ### Via Meltano
 
@@ -146,8 +146,8 @@ from restful_api_tap.auth import get_authenticator
 from singer_sdk import typing as th
 from singer_sdk.target_base import Target
 from singer_sdk.sinks import RecordSink
-from gcs_target.target import GCSTarget
-from gcs_target.sinks import GCSSink
+from target_gcs.target import GCSTarget
+from target_gcs.sinks import GCSSink
 ```
 
 ---
@@ -157,7 +157,7 @@ from gcs_target.sinks import GCSSink
 | Symptom | Check / Action |
 |--------|----------------|
 | `restful-api-tap` / `target-gcs` not found | Install in active env: `uv sync` (or `meltano install`). Run from plugin root or ensure venv `bin` is on PATH. |
-| Import errors `restful_api_tap` / `gcs_target` | Run from correct plugin dir; venv must have that package (`uv sync` there). |
+| Import errors `restful_api_tap` / `target_gcs` | Run from correct plugin dir; venv must have that package (`uv sync` there). |
 | Ruff/mypy failures | Run `ruff check .`, `ruff format --check`, `mypy <package>` from plugin root; fix reported issues. |
 | Tests fail | `uv run pytest` from plugin root; fix regressions. No failures (except explicit xfail) before merge. |
 | **"Extractor/Loader 'X' is not known to Meltano"** | Do **not** set `variant` on custom plugins. Set `namespace` and use `pip_url` with `#subdirectory=...` so Meltano uses the project definition. |

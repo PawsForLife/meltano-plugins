@@ -17,25 +17,25 @@
 
 | Module / File | Responsibility |
 |---------------|----------------|
-| `gcs_target/target.py` | Target class, config JSON schema, and default sink binding. Entry point for the CLI. |
-| `gcs_target/sinks.py` | `GCSSink`: key naming, GCS write handle (smart_open), and record writing (JSONL via orjson). |
+| `target_gcs/target.py` | Target class, config JSON schema, and default sink binding. Entry point for the CLI. |
+| `target_gcs/sinks.py` | `GCSSink`: key naming, GCS write handle (smart_open), and record writing (JSONL via orjson). |
 
-Package root: `loaders/target-gcs/`. Source package: `gcs_target/`. No shared code with the tap; communicates via Singer JSONL on stdin.
+Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared code with the tap; communicates via Singer JSONL on stdin.
 
 ---
 
 ## Public Interfaces
 
-### `get_partition_path_from_record` (`gcs_target.sinks`)
+### `get_partition_path_from_record` (`target_gcs.sinks`)
 
 - **Signature**: `get_partition_path_from_record(record: dict, partition_date_field: str, partition_date_format: str, fallback_date: datetime) -> str`
 - **Role**: Resolve partition path string from a record’s date field for partition-by-field behaviour. Reads the record property named by `partition_date_field`; parses as date/datetime (ISO via `fromisoformat`, then `%Y-%m-%d`). If missing or unparseable, returns `fallback_date` formatted with `partition_date_format`. Used by `GCSSink`; callable from custom sinks or tests.
 - **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style).
 
-### GCSTarget (`gcs_target.target`)
+### GCSTarget (`target_gcs.target`)
 
 - **Base**: `singer_sdk.target_base.Target`
-- **CLI**: `target-gcs` → `gcs_target.target:GCSTarget.cli` (from `pyproject.toml`).
+- **CLI**: `target-gcs` → `target_gcs.target:GCSTarget.cli` (from `pyproject.toml`).
 - **Config schema** (`config_jsonschema`): Declared with `singer_sdk.typing`:
   - `bucket_name` (string, **required**): GCS bucket name.
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
@@ -47,7 +47,7 @@ Package root: `loaders/target-gcs/`. Source package: `gcs_target/`. No shared co
 
 The sink also reads `date_format` from config (used for the `{date}` token). It is not in `config_jsonschema`; Meltano or external config file can pass it (e.g. `meltano.yml` settings). Default in code: `%Y-%m-%d`.
 
-### GCSSink (`gcs_target.sinks`)
+### GCSSink (`target_gcs.sinks`)
 
 - **Base**: `singer_sdk.sinks.RecordSink`
 - **Constructor**: `GCSSink(target, stream_name, schema, key_properties, *, time_fn=None, date_fn=None)` — same contract as SDK `RecordSink`; optional `time_fn` (callable returning float) for key generation; optional `date_fn` (callable returning datetime) for partition fallback and tests.
@@ -159,4 +159,4 @@ target-gcs --config /path/to/your-config.json < singer_output.jsonl
   - Config must not expose `credentials_file`.
   - GCS client is created with `Client()` only (no credentials path); same when `GOOGLE_APPLICATION_CREDENTIALS` is set.
 
-Tests use mocks for GCS (`patch("gcs_target.sinks.Client")`) so no real bucket is required. Black-box style: assert on `key_name` and client call arguments, not internal call counts.
+Tests use mocks for GCS (`patch("target_gcs.sinks.Client")`) so no real bucket is required. Black-box style: assert on `key_name` and client call arguments, not internal call counts.

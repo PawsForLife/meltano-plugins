@@ -9,6 +9,8 @@
   - Point plugin config to `target_gcs`: pyproject.toml (scripts entry point and wheel packages), meltano.yml (namespace), install.sh (mypy target).
   - Update Python imports and test patches in loaders/target-gcs from `gcs_target` to `target_gcs` (target.py, tests/__init__.py, test_core.py, test_sinks.py, test_partition_key_generation.py).
   - Derive mypy package from plugin path in `scripts/run_plugin_checks.sh` and `.github/workflows/plugin-unit-tests.yml`: last path component with hyphens replaced by underscores (no plugin-specific case blocks).
+  - Update documentation: README and AI context use `target_gcs`; root and plugin CHANGELOGs add migration note.
+- **target-gcs migration (normalise-plugin-source-folders):** Package/namespace renamed from `gcs_target` to `target_gcs`. Users: update `meltano.yml` namespace to `target_gcs` and re-run `meltano install`; verification commands use `mypy target_gcs`.
 - **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
 
 ### Fixed

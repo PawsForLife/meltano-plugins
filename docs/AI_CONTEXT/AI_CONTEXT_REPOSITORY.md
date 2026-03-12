@@ -44,7 +44,7 @@ meltano-plugins/
 │       └── config.sample.json    # Sample config
 ├── loaders/
 │   └── target-gcs/               # Target (loader) package
-│       ├── gcs_target/            # Source package
+│       ├── target_gcs/            # Source package
 │       │   ├── target.py         # Target class, CLI entry
 │       │   └── sinks.py         # GCSSink
 │       ├── tests/                # Loader tests
@@ -102,7 +102,7 @@ Details: [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md).
 | Responsibility | Description |
 |----------------|-------------|
 | **Role** | Singer target: reads Singer JSONL from stdin, writes record batches to GCS. |
-| **Entry** | `target-gcs` CLI → `gcs_target.target:GCSTarget.cli`. |
+| **Entry** | `target-gcs` CLI → `target_gcs.target:GCSTarget.cli`. |
 | **Core modules** | `target.py` (GCSTarget, config_jsonschema, default_sink_class), `sinks.py` (GCSSink, key naming, batch writes via smart_open / GCS client). |
 | **Config** | bucket_name (required), key_prefix, key_naming_convention, date_format. |
 | **Input** | Singer JSONL (SCHEMA, RECORD, STATE) on stdin. |
@@ -172,7 +172,7 @@ Each plugin is installable on its own via `pip` from its subdirectory (`pip inst
 | Plugin | CLI command | Entry point (pyproject.toml) |
 |--------|-------------|------------------------------|
 | restful-api-tap | `restful-api-tap` | `restful_api_tap.tap:RestfulApiTap.cli` |
-| target-gcs | `target-gcs` | `gcs_target.target:GCSTarget.cli` |
+| target-gcs | `target-gcs` | `target_gcs.target:GCSTarget.cli` |
 
 - **Running** — After install (Meltano or `uv sync` in plugin dir), run the CLI with `--config <path>` (tap/target read config from config file or Meltano-injected env). Target reads Singer messages from stdin.
 - **Extension points**

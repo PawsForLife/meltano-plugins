@@ -1,6 +1,6 @@
 # target-gcs
 
-`target-gcs` is a Singer **target** that loads data into the **destination** (Google Cloud Storage). The Python package is `gcs_target`. In Meltano, this target runs as a **loader**.
+`target-gcs` is a Singer **target** that loads data into the **destination** (Google Cloud Storage). The Python package is `target_gcs`. In Meltano, this target runs as a **loader**.
 
 Build with the [Meltano Target SDK](https://sdk.meltano.com).
 
@@ -115,7 +115,7 @@ uv sync --extra dev
 ```bash
 uv run ruff check .
 uv run ruff format .          # format in place; CI runs ruff format --check
-uv run mypy gcs_target
+uv run mypy target_gcs
 ```
 
 ### Create and Run Tests

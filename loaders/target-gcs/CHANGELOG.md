@@ -22,6 +22,8 @@
 
 - **Glossary alignment:** Plugin, package, and directory were renamed for Singer/Meltano glossary alignment: CLI/plugin `target-gcs`, Python package `gcs_target`, path `loaders/target-gcs/`. See the [repo root CHANGELOG](../../CHANGELOG.md) for user migration (update `meltano.yml` to use `target-gcs`, re-run `meltano install`).
 
+- **Package/namespace rename:** Python package and namespace renamed from `gcs_target` to `target_gcs` (normalise-plugin-source-folders). See the [repo root CHANGELOG](../../CHANGELOG.md) for user migration (namespace `target_gcs`, re-run `meltano install`, `mypy target_gcs`).
+
 ### Breaking
 
 - **Credentials**: Remove `credentials_file` from config. Authentication uses Application Default Credentials (ADC) only. To use a credentials file, set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable; the target no longer accepts a credentials path in config.
