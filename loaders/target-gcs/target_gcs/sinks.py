@@ -83,6 +83,7 @@ class GCSSink(RecordSink):
         *,
         time_fn: Optional[Callable[[], float]] = None,
         date_fn: Optional[Callable[[], datetime]] = None,
+        storage_client: Optional[Any] = None,
     ):
         super().__init__(
             target=target,
@@ -102,6 +103,7 @@ class GCSSink(RecordSink):
         self._time_fn: Optional[Callable[[], float]] = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Optional[Callable[[], datetime]] = date_fn
+        self._storage_client: Optional[Any] = storage_client
         if self.config.get("partition_date_field"):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
             self._current_partition_path: Optional[str] = None
@@ -179,7 +181,9 @@ class GCSSink(RecordSink):
     def gcs_write_handle(self) -> FileIO:
         """Opens a write handle for the destination (GCS object) for this stream."""
         if not self._gcs_write_handle:
-            client = Client()
+            client = (
+                self._storage_client if self._storage_client is not None else Client()
+            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{self.key_name}",
                 "wb",
@@ -274,7 +278,9 @@ class GCSSink(RecordSink):
         if self._gcs_write_handle is None or self._key_name != key:
             self._close_handle_and_clear_state()
             self._key_name = key
-            client = Client()
+            client = (
+                self._storage_client if self._storage_client is not None else Client()
+            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{key}",
                 "wb",

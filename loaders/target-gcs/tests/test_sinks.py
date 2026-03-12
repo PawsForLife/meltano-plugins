@@ -17,9 +17,10 @@ def build_sink(
     config=None,
     time_fn=None,
     date_fn: Optional[Callable[[], datetime]] = None,
+    storage_client=None,
 ):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
+    Optionally pass time_fn, date_fn for deterministic keys; storage_client for tests."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
@@ -29,6 +30,8 @@ def build_sink(
         kwargs["time_fn"] = time_fn
     if date_fn is not None:
         kwargs["date_fn"] = date_fn
+    if storage_client is not None:
+        kwargs["storage_client"] = storage_client
     return GCSSink(
         GCSTarget(config=config),
         "my_stream",

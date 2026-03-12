@@ -6,6 +6,12 @@
 
 ### Fixed
 
+- **fix-target-gcs-real-client-in-tests** — Tests no longer perform real GCP actions: GCS client is injectable so CI runs without ADC. Details: [_archive/fix-target-gcs-real-client-in-tests/fix-target-gcs-real-client-in-tests.md](../../_archive/fix-target-gcs-real-client-in-tests/fix-target-gcs-real-client-in-tests.md)
+  - GCSSink accepts optional `storage_client`; used in `gcs_write_handle` and partition-by-field path when provided.
+  - GCSTarget holds `_storage_client` and overrides `get_sink()` to pass it when creating sinks.
+  - test_core uses `GCSTargetWithMockStorage` in `get_target_test_class()` so standard target tests run without credentials.
+  - test_sinks `build_sink()` accepts optional `storage_client` for write-path tests.
+
 - **README:** Corrected `key_naming_convention` default in config table from `{timestamp}` to `{stream}_{timestamp}.jsonl` to match GCSSink behavior in `sinks.py`.
 
 - **Chunk rotation:** Refresh cached file timestamp (`_current_timestamp`) in `_rotate_to_new_chunk()` so the next key is unique for the new chunk; avoids reusing or truncating the previous key when `max_records_per_file` triggers rotation.
