@@ -31,3 +31,5 @@ Task plan created: 08-documentation-updates at plans/tasks/08-documentation-upda
 Task 01-add-dateutil-dependency completed, tests passing.
 
 Task 02-partition-path-dateutil-format-tests completed, tests passing.
+
+Task 03-partition-path-unparseable-visibility-tests completed, tests passing.

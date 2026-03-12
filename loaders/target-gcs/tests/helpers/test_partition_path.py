@@ -3,6 +3,7 @@
 from datetime import datetime
 
 import pytest
+from dateutil.parser import ParserError
 
 from target_gcs.helpers import get_partition_path_from_record
 
@@ -44,15 +45,18 @@ def test_partition_path_missing_field_uses_fallback():
     assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
-def test_partition_path_invalid_value_uses_fallback():
-    """Non-date string in partition_date_field yields fallback path. WHAT: Unparseable value uses fallback. WHY: Robustness against bad data."""
-    result = get_partition_path_from_record(
-        record={"created_at": "not-a-date"},
-        partition_date_field="created_at",
-        partition_date_format=DEFAULT_HIVE_FORMAT,
-        fallback_date=FALLBACK_DATE,
-    )
-    assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+@pytest.mark.xfail(
+    reason="Requires Task 05: unparseable must raise; current code silently returns fallback."
+)
+def test_partition_path_unparseable_value_raises():
+    """Unparseable string in partition_date_field raises; no silent fallback. WHAT: Unparseable value causes visible exception (ParserError or ValueError). WHY: No silent fallback per feature requirement."""
+    with pytest.raises((ParserError, ValueError)):
+        get_partition_path_from_record(
+            record={"created_at": "not-a-date"},
+            partition_date_field="created_at",
+            partition_date_format=DEFAULT_HIVE_FORMAT,
+            fallback_date=FALLBACK_DATE,
+        )
 
 
 def test_partition_path_custom_format():
