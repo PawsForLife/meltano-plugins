@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **run_plugin_checks.sh** — Run `list_packages.py` once before the loop; capture stdout and exit status, exit script on non-zero; feed captured output to the loop via here-string so the Python command's exit code is not hidden.
 - **fix-mypy-standard-target-tests-base-class** — Details: [fix-mypy-standard-target-tests-base-class.md](_archive/fix-mypy-standard-target-tests-base-class/fix-mypy-standard-target-tests-base-class.md)
   - In Plugin unit tests workflow, run mypy on the derived source package only (from `matrix.path`: last component, hyphens → underscores) instead of `.`, so test code is not type-checked and CI no longer fails on `StandardTargetTests` base class.
 - **fix-target-gcs-template-tests-config-validation** — Details: [fix-target-gcs-template-tests-config-validation.md](_archive/fix-target-gcs-template-tests-config-validation/fix-target-gcs-template-tests-config-validation.md)
