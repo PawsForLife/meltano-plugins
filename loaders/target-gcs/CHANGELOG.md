@@ -8,6 +8,7 @@
   - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
   - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
   - Add TDD test that unparseable partition timestamp raises (no silent fallback); marked xfail until Task 05.
+  - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
 
 ### Changed
 

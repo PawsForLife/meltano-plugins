@@ -1,9 +1,10 @@
 """Tests for get_partition_path_from_record: partition path resolution from record date field."""
 
+import warnings
 from datetime import datetime
 
 import pytest
-from dateutil.parser import ParserError
+from dateutil.parser import ParserError, UnknownTimezoneWarning
 
 from target_gcs.helpers import get_partition_path_from_record
 
@@ -111,3 +112,25 @@ def test_partition_path_long_month_name_yields_hive_path():
         fallback_date=FALLBACK_DATE,
     )
     assert result == "year=2024/month=03/day=20"
+
+
+# Timestamp string with timezone name that dateutil does not resolve (no tzinfos).
+# Used to assert UnknownTimezoneWarning is surfaced when Task 05 implements handling.
+_UNKNOWN_TZ_TRIGGER_STRING = "2024-03-11 12:00:00 FOO"
+
+
+@pytest.mark.xfail(
+    reason="UnknownTimezoneWarning handling not yet implemented (Task 05)."
+)
+def test_partition_path_unknown_timezone_surfaces_visibility():
+    """Unsupported timezone in partition date string yields visible warning or error; no silent fallback. WHAT: String that triggers dateutil UnknownTimezoneWarning results in that warning being recorded or an exception raised. WHY: Feature requires unsupported timezone to be visible, not silently ignored."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        get_partition_path_from_record(
+            record={"created_at": _UNKNOWN_TZ_TRIGGER_STRING},
+            partition_date_field="created_at",
+            partition_date_format=DEFAULT_HIVE_FORMAT,
+            fallback_date=FALLBACK_DATE,
+        )
+    unknown_tz_warnings = [w for w in caught if w.category is UnknownTimezoneWarning]
+    assert len(unknown_tz_warnings) >= 1, "UnknownTimezoneWarning must be surfaced for unsupported timezone"

@@ -33,3 +33,5 @@ Task 01-add-dateutil-dependency completed, tests passing.
 Task 02-partition-path-dateutil-format-tests completed, tests passing.
 
 Task 03-partition-path-unparseable-visibility-tests completed, tests passing.
+
+Task 04-partition-path-unknown-timezone-tests completed, tests passing.
