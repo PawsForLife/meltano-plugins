@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Normalise plugin source folders** — Details: [normalise-plugin-source-folders.md](_archive/normalise-plugin-source-folders/normalise-plugin-source-folders.md)
+  - Rename source package `gcs_target` to `target_gcs` in loaders/target-gcs (directory rename only; config and imports in later tasks).
 - **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
 
 ### Fixed
