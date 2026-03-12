@@ -3,7 +3,7 @@
 from singer_sdk import typing as th
 from singer_sdk.target_base import Target
 
-from gcs_target.sinks import GCSSink
+from target_gcs.sinks import GCSSink
 
 
 class GCSTarget(Target):

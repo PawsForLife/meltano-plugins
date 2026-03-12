@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 import orjson
 import pytest
 
-from gcs_target.sinks import GCSSink
-from gcs_target.target import GCSTarget
+from target_gcs.sinks import GCSSink
+from target_gcs.target import GCSTarget
 
 
 def build_sink(
@@ -181,7 +181,7 @@ def test_config_validates_with_partition_date_field():
 
 def test_gcs_client_created_without_credentials_path():
     """Sink must use Client() (ADC) only; no explicit credentials path passed from config file."""
-    with patch("gcs_target.sinks.Client") as mock_client:
+    with patch("target_gcs.sinks.Client") as mock_client:
         sink = build_sink()
         _ = sink.gcs_write_handle
         mock_client.assert_called_once_with()
@@ -189,7 +189,7 @@ def test_gcs_client_created_without_credentials_path():
 
 def test_gcs_client_uses_adc_when_google_application_credentials_set():
     """When GOOGLE_APPLICATION_CREDENTIALS is set, the sink's client is still created with no path (ADC honours env)."""
-    with patch("gcs_target.sinks.Client") as mock_client:
+    with patch("target_gcs.sinks.Client") as mock_client:
         with patch.dict("os.environ", {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/dummy"}):
             sink = build_sink()
             _ = sink.gcs_write_handle
@@ -200,8 +200,8 @@ def test_one_key_and_one_handle_when_chunking_disabled():
     """When max_records_per_file is unset or 0, multiple records use a single key and a single handle (no rotation).
     Backward compatibility: existing behaviour must be unchanged when the option is off."""
     mock_handle = MagicMock()
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=mock_handle
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=mock_handle
     ) as mock_open:
         sink = build_sink()
         context = {}
@@ -222,8 +222,8 @@ def test_one_key_and_one_handle_when_chunking_disabled():
 def test_key_has_no_chunk_index_when_chunking_disabled():
     """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp pattern.
     Backward compatibility: key format is unchanged when chunking is off."""
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
     ):
         sink = build_sink()
         sink.process_record({"id": 1}, {})
@@ -249,8 +249,8 @@ def test_chunking_rotation_at_threshold():
         return next(timestamps)
 
     mock_handles = [MagicMock(), MagicMock()]
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
     ) as mock_open:
         sink = build_sink(
             config={
@@ -281,8 +281,8 @@ def test_chunking_key_format_includes_chunk_index():
     def time_fn():
         return next(timestamps)
 
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
     ) as mock_open:
         sink = build_sink(
             config={
@@ -313,8 +313,8 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     mock_handles = [MagicMock() for _ in range(4)]
     for h in mock_handles:
         h.write.side_effect = capture_write
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
     ) as mock_open:
         sink = build_sink(config={"max_records_per_file": 10})
         for i in range(25):
@@ -341,8 +341,8 @@ def test_record_with_decimal_serializes_to_valid_json():
 
     mock_handle = MagicMock()
     mock_handle.write.side_effect = capture_write
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=mock_handle
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=mock_handle
     ):
         sink = build_sink()
         record = {"id": 1, "score": Decimal("12.34")}
@@ -359,8 +359,8 @@ def test_non_serializable_non_decimal_type_raises_type_error():
     """Record containing a non-JSON-serializable value that is not Decimal raises TypeError when process_record runs.
     Documents the contract that only Decimal is coerced to float; other non-serializable types must raise TypeError
     so unknown types are not silently coerced. Black-box: asserts only that TypeError is raised."""
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
     ):
         sink = build_sink()
         record = {"id": 1, "bad": object()}

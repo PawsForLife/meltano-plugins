@@ -3,12 +3,14 @@
 ## Feature: normalise-plugin-source-folders
 
 **Pipeline State**: Phase 1 Complete, Phase 2 Complete, Phase 3 Complete, Phase 4 Complete, Phase 5–6 Not started  
-**Task Completion Status**: Task 01-rename-source-directory completed (validation complete; pytest/mypy in target-gcs expected to fail until task 03). Task 02-update-plugin-config completed.  
+**Task Completion Status**: Task 01-rename-source-directory completed (validation complete; pytest/mypy in target-gcs expected to fail until task 03). Task 02-update-plugin-config completed. Task 03-update-python-imports-and-tests completed.  
 **Execution Order**: 01-rename-source-directory.md, 02-update-plugin-config.md, 03-update-python-imports-and-tests.md, 04-update-repository-tooling.md, 05-update-documentation.md.
 
 Task 01-rename-source-directory completed, validation complete.
 
 Task 02-update-plugin-config completed.
+
+Task 03-update-python-imports-and-tests completed.
 
 Task plan created: 05-update-documentation at plans/tasks/05-update-documentation.md
 

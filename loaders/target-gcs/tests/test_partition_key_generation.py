@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Callable, Optional
 from unittest.mock import MagicMock, patch
 
-from gcs_target.sinks import GCSSink, get_partition_path_from_record
-from gcs_target.target import GCSTarget
+from target_gcs.sinks import GCSSink, get_partition_path_from_record
+from target_gcs.target import GCSTarget
 
 # Fixed fallback date for deterministic partition resolution tests (no datetime.today() in tests).
 FALLBACK_DATE = datetime(2024, 3, 11)
@@ -187,8 +187,8 @@ def test_backward_compat_key_name_unchanged_when_partition_date_field_unset():
     )
     assert subject.config.get("partition_date_field") in (None, "")
     assert subject.key_name == f"file/{expected_date_str}.txt"
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", return_value=MagicMock()
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", return_value=MagicMock()
     ) as mock_open:
         context = {}
         for i in range(3):
@@ -209,8 +209,8 @@ def test_chunking_with_partition_rotation_within_partition():
         return next(timestamps)
 
     mock_handles = [MagicMock(), MagicMock()]
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open", side_effect=mock_handles
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open", side_effect=mock_handles
     ) as mock_open:
         sink = build_sink(
             config={
@@ -239,8 +239,8 @@ def test_partition_change_then_return_creates_three_distinct_keys():
     def time_fn():
         return next(timestamps)
 
-    with patch("gcs_target.sinks.Client"), patch(
-        "gcs_target.sinks.smart_open.open",
+    with patch("target_gcs.sinks.Client"), patch(
+        "target_gcs.sinks.smart_open.open",
         side_effect=[MagicMock(), MagicMock(), MagicMock()],
     ) as mock_open:
         sink = build_sink(

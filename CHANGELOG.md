@@ -7,6 +7,7 @@
 - **Normalise plugin source folders** — Details: [normalise-plugin-source-folders.md](_archive/normalise-plugin-source-folders/normalise-plugin-source-folders.md)
   - Rename source package `gcs_target` to `target_gcs` in loaders/target-gcs (directory rename only; config and imports in later tasks).
   - Point plugin config to `target_gcs`: pyproject.toml (scripts entry point and wheel packages), meltano.yml (namespace), install.sh (mypy target).
+  - Update Python imports and test patches in loaders/target-gcs from `gcs_target` to `target_gcs` (target.py, tests/__init__.py, test_core.py, test_sinks.py, test_partition_key_generation.py).
 - **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
 
 ### Fixed
