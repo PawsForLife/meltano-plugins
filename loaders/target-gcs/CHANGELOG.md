@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
+  - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
+
 ### Changed
 
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).
