@@ -167,7 +167,7 @@ class DynamicStream(RestApiStream):
         self.use_request_body_not_params = use_request_body_not_params
         self.backoff_type = backoff_type
         self.backoff_param = backoff_param
-        self.backoff_time_extension = backoff_time_extension
+        self.backoff_time_extension = backoff_time_extension or 0
         self.store_raw_json_message = store_raw_json_message
         self.flatten_records = flatten_records
         self._is_sorted = bool(is_sorted) if is_sorted is not None else False
