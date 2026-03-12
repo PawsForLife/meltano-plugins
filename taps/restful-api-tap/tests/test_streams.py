@@ -7,7 +7,7 @@ import requests
 from restful_api_tap.tap import RestfulApiTap
 
 
-def config(extras: dict = None) -> dict:
+def config(extras: dict | None = None) -> dict:
     """Utility function giving a basic config file structure for tap tests.
 
     Args:
@@ -35,7 +35,7 @@ def config(extras: dict = None) -> dict:
     return contents
 
 
-def json_resp(extras: dict = None) -> dict:
+def json_resp(extras: dict | None = None) -> dict:
     """Utility function returning a common response for mocked API calls.
 
     Args:
@@ -78,9 +78,9 @@ def url_path(path: str = "/path_test") -> str:
 def setup_api(
     requests_mock: Any,
     url_path: str = url_path(),
-    json_extras: dict = None,
-    headers_extras: dict = None,
-    matcher: Any = None,
+    json_extras: dict | None = None,
+    headers_extras: dict | None = None,
+    matcher: Any | None = None,
 ) -> requests.Response:
     """Utility function for mocking API calls.
 

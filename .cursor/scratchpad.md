@@ -11,7 +11,7 @@
 - **Tasks directory:** `_features/typing-312-standards/tasks/`
 - **Task list file:** `_features/typing-312-standards/typing-312-standards-task-list.md`
 - **Task count:** 10
-- **Task Completion Status:** Task 01-configure-ruff-mypy completed, tests passing. Task 02-refactor-tap-streams completed, tests passing. Task 04-refactor-tap-client completed, tests passing. Task 03-refactor-tap-pagination completed, tests passing. Task 06 completed. Task 05 completed.
+- **Task Completion Status:** Task 01-configure-ruff-mypy completed, tests passing. Task 02-refactor-tap-streams completed, tests passing. Task 04-refactor-tap-client completed, tests passing. Task 03-refactor-tap-pagination completed, tests passing. Task 06 completed. Task 05 completed. Task 07 completed. Task 10-update-changelogs completed. Task 09-refactor-scripts completed (audit: no old-style hints; script tests pass).
 - **Execution Order:** 01-configure-ruff-mypy.md, 02-refactor-tap-streams.md, 03-refactor-tap-pagination.md, 04-refactor-tap-client.md, 05-refactor-tap-tap.md, 06-refactor-tap-utils.md, 07-refactor-tap-tests.md, 08-refactor-target-gcs-tests.md, 09-refactor-scripts.md, 10-update-changelogs.md
 - **Task plan created:** 03-refactor-tap-pagination at plans/tasks/03-refactor-tap-pagination.md
 - Task plan created: 02-refactor-tap-streams at plans/tasks/02-refactor-tap-streams.md
