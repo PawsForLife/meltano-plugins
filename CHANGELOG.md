@@ -2,6 +2,10 @@
 
 ## 2026-03-12
 
+### Added
+
+- **dateutils-partition-timestamps** — Archive summary: [dateutils-partition-timestamps.md](_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
+
 ### Changed
 
 - **AI context** — Quick reference table: target-gcs Python constraint updated to `>=3.12,<4.0` to match `loaders/target-gcs/pyproject.toml`.
