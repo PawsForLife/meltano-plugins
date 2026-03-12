@@ -7,6 +7,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUCCEEDED=()
 FAILED=()
 
+# Discover packages once; capture output and exit status so discovery failures are propagated.
+PACKAGES_FILE=$(mktemp)
+trap 'rm -f "$PACKAGES_FILE"' EXIT
+if ! python "$ROOT/scripts/list_packages.py" "$ROOT" > "$PACKAGES_FILE"; then
+  echo "Package discovery failed (list_packages.py)." >&2
+  exit 1
+fi
+
 # Run each plugin's install.sh; record success/failure (do not stop on first failure).
 while IFS= read -r path || [[ -n "$path" ]]; do
   path="$(echo "$path" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
@@ -17,7 +25,7 @@ while IFS= read -r path || [[ -n "$path" ]]; do
   else
     FAILED+=("$path")
   fi
-done < <(python "$ROOT/scripts/list_packages.py" "$ROOT")
+done < "$PACKAGES_FILE"
 
 # Ensure pre-commit is available; install via pip if missing.
 PRECOMMIT_FAILED=0
