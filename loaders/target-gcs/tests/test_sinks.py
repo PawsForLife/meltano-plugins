@@ -18,9 +18,12 @@ def build_sink(
     time_fn=None,
     date_fn: Callable[[], datetime] | None = None,
     storage_client=None,
+    schema: dict | None = None,
+    stream_name: str | None = None,
 ):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn, date_fn for deterministic keys; storage_client for tests."""
+    Optionally pass time_fn, date_fn for deterministic keys; storage_client for tests.
+    Optional schema and stream_name allow tests to pass arbitrary stream schemas and names (default: empty properties, "my_stream")."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
@@ -32,10 +35,12 @@ def build_sink(
         kwargs["date_fn"] = date_fn
     if storage_client is not None:
         kwargs["storage_client"] = storage_client
+    sink_schema = schema if schema is not None else {"properties": {}}
+    name = stream_name if stream_name is not None else "my_stream"
     return GCSSink(
         GCSTarget(config=config),
-        "my_stream",
-        {"properties": {}},
+        name,
+        sink_schema,
         key_properties=config,
         **kwargs,
     )
@@ -385,3 +390,55 @@ def test_non_serializable_non_decimal_type_raises_type_error():
         context = {}
         with pytest.raises(TypeError):
             sink.process_record(record, context)
+
+
+# --- Partition date field schema validation (sink integration) ---
+
+
+def test_partition_date_field_set_field_missing_raises_value_error():
+    """partition_date_field set with field missing from schema must raise ValueError so users get a clear config error at sink init."""
+    config = {"partition_date_field": "dt"}
+    schema = {"properties": {"id": {}}}
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_partition_date_field_set_field_null_only_raises_value_error():
+    """partition_date_field set with null-only type for the field must raise ValueError so the field is not usable for date parsing."""
+    config = {"partition_date_field": "dt"}
+    schema = {"properties": {"dt": {"type": "null"}}}
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_partition_date_field_set_field_integer_raises_value_error():
+    """partition_date_field set with integer type for the field must raise ValueError so only date-parseable types are allowed."""
+    config = {"partition_date_field": "dt"}
+    schema = {"properties": {"dt": {"type": "integer"}}}
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_partition_date_field_set_field_string_valid_constructs_successfully():
+    """partition_date_field set with string type and field required must allow sink construction; string is date-parseable."""
+    config = {"partition_date_field": "dt"}
+    schema = {"properties": {"dt": {"type": "string"}}, "required": ["dt"]}
+    sink = build_sink(config=config, schema=schema)
+    assert sink.stream_name == "my_stream"
+
+
+def test_partition_date_field_unset_constructs_successfully():
+    """When partition_date_field is not set, sink must construct successfully with any schema; no regression when option is unset."""
+    config = {}
+    schema = {"properties": {"id": {}}}
+    sink = build_sink(config=config, schema=schema)
+    assert sink.stream_name == "my_stream"

@@ -2,8 +2,32 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-03-12
+
+### Added
+
+- **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
+  - Add unit tests for validate_partition_date_field_schema.
+  - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
+  - Add sink integration tests for partition_date_field validation (build_sink extended with optional schema/stream_name; tests for missing field, null-only, integer, valid string, unset; ValueError message asserts stream and field name).
+  - Call validate_partition_date_field_schema in GCSSink.__init__ when partition_date_field is set; misconfiguration (missing or non–date-parseable field) is caught at sink init.
+  - Document partition_date_field validation in AI context and changelogs (init-time check, ValueError with stream/field/reason; helper in target_gcs.helpers.partition_schema).
+  - Require partition_date_field to be in schema `required`: validator raises if `schema.required` is not a list or does not contain the field.
+
+- **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
+  - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
+  - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
+  - Add TDD test that unparseable partition timestamp raises (no silent fallback); marked xfail until Task 05.
+  - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
+  - Implement partition path dateutil parsing: string timestamps parsed with dateutil.parser.parse (no tzinfos); unparseable raises ParserError; unknown timezone surfaces UnknownTimezoneWarning; xfail removed from partition path tests.
+  - Sink exception handling: in _process_record_partition_by_field, catch ParserError from get_partition_path_from_record and re-raise so the run fails visibly when a record has an unparseable partition date (no silent skip).
+  - Integration tests for partition key: record with dateutil-parsable non-ISO partition value (e.g. "2024/03/11") produces key containing expected partition path; unparseable partition field leads to ParserError from process_record.
+  - Documentation: AI context (docs/AI_CONTEXT/AI_CONTEXT_target-gcs.md) updated to describe partition path resolution with dateutil (python-dateutil), ParserError for unparseable values (no silent fallback), and UnknownTimezoneWarning for unsupported timezone; aligned Public Interfaces, GCSSink record processing, and Partition-by-field behaviour sections.
+
 ### Changed
 
+- **AI context (target-gcs)** — Partition-date-field validation docs: document that the partition field must be in `schema["required"]`, that non-list `schema["required"]` is rejected, and that failures raise `ValueError` with stream name, field name, and reason.
+- **dateutils-partition-timestamps** — Add types-python-dateutil to dev dependencies for mypy.
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).
 
 ### Breaking

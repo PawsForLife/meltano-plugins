@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-03-12
+
 ### Changed
 
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).

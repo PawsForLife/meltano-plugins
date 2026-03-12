@@ -1,73 +1,26 @@
 """RecordSink implementation for the GCS target. Each sink handles one stream, receiving SCHEMA, RECORD, and STATE messages from the target and writing record data to the destination (GCS). The sink uses the config file for bucket and key settings. On close or when the target drains the sink (sink drain), buffered data is flushed to the destination."""
 
-import decimal
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import datetime
 from io import FileIO
 from typing import Any
 
 import orjson
 import smart_open
+from dateutil.parser import ParserError
 from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
+from .helpers import (
+    _json_default,
+    get_partition_path_from_record,
+    validate_partition_date_field_schema,
+)
+
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
-
-
-def _json_default(obj: Any) -> float:
-    """Used as orjson default to serialize Decimal as float.
-
-    Returns float(obj) when obj is a decimal.Decimal; raises TypeError for any
-    other type so non-serializable values are not silently converted.
-    """
-    if isinstance(obj, decimal.Decimal):
-        return float(obj)
-    raise TypeError(f"Object of type {type(obj).__name__} is not JSON-serializable")
-
-
-def get_partition_path_from_record(
-    record: dict,
-    partition_date_field: str,
-    partition_date_format: str,
-    fallback_date: datetime,
-) -> str:
-    """Resolve partition path string from the record's date field.
-
-    Reads the record field named by partition_date_field. Parses as date/datetime
-    (ISO via fromisoformat, then fallback %Y-%m-%d). If the field is missing or
-    unparseable, returns fallback_date formatted with partition_date_format.
-    Callers may use DEFAULT_PARTITION_DATE_FORMAT for Hive-style paths.
-
-    Args:
-        record: Record dict containing the partition date field.
-        partition_date_field: Key in record for the date/datetime value.
-        partition_date_format: strftime format for the returned path segment.
-        fallback_date: Date used when field is missing or unparseable.
-
-    Returns:
-        Partition path string (e.g. "year=2024/month=03/day=11").
-    """
-    value = record.get(partition_date_field)
-    if value is None:
-        return fallback_date.strftime(partition_date_format)
-    if isinstance(value, (datetime, date)):
-        return value.strftime(partition_date_format)
-    if not isinstance(value, str):
-        return fallback_date.strftime(partition_date_format)
-    try:
-        parsed = datetime.fromisoformat(value)
-        return parsed.strftime(partition_date_format)
-    except (ValueError, TypeError):
-        pass
-    try:
-        parsed = datetime.strptime(value, "%Y-%m-%d")
-        return parsed.strftime(partition_date_format)
-    except (ValueError, TypeError):
-        pass
-    return fallback_date.strftime(partition_date_format)
 
 
 class GCSSink(RecordSink):
@@ -104,10 +57,19 @@ class GCSSink(RecordSink):
         self._time_fn: Callable[[], float] | None = time_fn
         # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Callable[[], datetime] | None = date_fn
+        self.fallback = self._date_fn() if self._date_fn else datetime.today()
+
         self._storage_client: Any | None = storage_client
+
         if self.config.get("partition_date_field"):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
             self._current_partition_path: str | None = None
+            # Validate partition field exists in stream schema and is date-parseable; raises ValueError if not.
+            validate_partition_date_field_schema(
+                self.stream_name,
+                self.config["partition_date_field"],
+                self.schema,
+            )
 
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when partition_date_field is set.
@@ -127,6 +89,7 @@ class GCSSink(RecordSink):
         """
         if self._current_timestamp is None:
             self._current_timestamp = round((self._time_fn or time.time)())
+
         extraction_timestamp = self._current_timestamp
         base_key_name = self.config.get(
             "key_naming_convention",
@@ -146,6 +109,12 @@ class GCSSink(RecordSink):
             f"{self.config.get('key_prefix', '')}/{base}".replace("//", "/")
         ).lstrip("/")
         return prefixed
+
+    @property
+    def storage_client(self) -> Client:
+        if self._storage_client is None:
+            self._storage_client = Client()
+        return self._storage_client
 
     @property
     def key_name(self) -> str:
@@ -182,13 +151,10 @@ class GCSSink(RecordSink):
     def gcs_write_handle(self) -> FileIO:
         """Opens a write handle for the destination (GCS object) for this stream."""
         if not self._gcs_write_handle:
-            client = (
-                self._storage_client if self._storage_client is not None else Client()
-            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{self.key_name}",
                 "wb",
-                transport_params={"client": client},
+                transport_params={"client": self.storage_client},
             )
         return self._gcs_write_handle
 
@@ -253,16 +219,19 @@ class GCSSink(RecordSink):
         key via _build_key_for_record; opens handle when none or key changed;
         writes record and increments count when chunking.
         """
-        fallback = self._date_fn() if self._date_fn else datetime.today()
         partition_date_format = (
             self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT
         )
-        partition_path = get_partition_path_from_record(
-            record,
-            self.config["partition_date_field"],
-            partition_date_format,
-            fallback,
-        )
+        try:
+            partition_path = get_partition_path_from_record(
+                record,
+                self.config["partition_date_field"],
+                partition_date_format,
+                self.fallback,
+            )
+        except ParserError:
+            # Unparseable partition date string: re-raise so the run fails visibly.
+            raise
         if partition_path != self._current_partition_path:
             self._close_handle_and_clear_state()
             self._current_partition_path = partition_path
@@ -279,13 +248,10 @@ class GCSSink(RecordSink):
         if self._gcs_write_handle is None or self._key_name != key:
             self._close_handle_and_clear_state()
             self._key_name = key
-            client = (
-                self._storage_client if self._storage_client is not None else Client()
-            )
             self._gcs_write_handle = smart_open.open(
                 f"gs://{self.config.get('bucket_name')}/{key}",
                 "wb",
-                transport_params={"client": client},
+                transport_params={"client": self.storage_client},
             )
         self._gcs_write_handle.write(
             orjson.dumps(

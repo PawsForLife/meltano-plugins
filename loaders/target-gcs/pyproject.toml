@@ -1,6 +1,6 @@
 [project]
 name = "target-gcs"
-version = "2.0.0"
+version = "3.0.0"
 description = "`target-gcs` is a Singer target for GCS, built with the Meltano SDK for Singer Targets."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -15,6 +15,7 @@ dependencies = [
     "smart-open[gcs]>=6.0.0",
     "pytest-watch>=4.2.0",
     "orjson>=3.6.8",
+    "python-dateutil>=2.8.1",
 ]
 
 [project.scripts]
@@ -27,6 +28,7 @@ dev = [
     "mypy>=1.0.0",
     "coverage>=6.4",
     "types-requests>=2.26.1",
+    "types-python-dateutil>=2.9.0",
 ]
 
 [build-system]

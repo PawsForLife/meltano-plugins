@@ -29,7 +29,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 ### `get_partition_path_from_record` (`target_gcs.sinks`)
 
 - **Signature**: `get_partition_path_from_record(record: dict, partition_date_field: str, partition_date_format: str, fallback_date: datetime) -> str`
-- **Role**: Resolve partition path string from a record’s date field for partition-by-field behaviour. Reads the record property named by `partition_date_field`; parses as date/datetime (ISO via `fromisoformat`, then `%Y-%m-%d`). If missing or unparseable, returns `fallback_date` formatted with `partition_date_format`. Used by `GCSSink`; callable from custom sinks or tests.
+- **Role**: Resolve partition path string from a record’s date field for partition-by-field behaviour. Implemented in `target_gcs.helpers.partition_path`, re-exported in `target_gcs.sinks` and used by `GCSSink`. Reads the record property named by `partition_date_field`. When that value is a **date** or **datetime** object, it is formatted **directly** with `partition_date_format` (no fallback). Only when the field is missing, the value is **None**, or the value is **neither a string nor a date/datetime**, is the fallback run date used (formatted with `partition_date_format`). String values are parsed with **dateutil** (`dateutil.parser.parse`, python-dateutil); many formats are supported without a custom format list. Unparseable strings raise `ParserError` (no silent fallback). Unsupported timezone in the string may produce `UnknownTimezoneWarning` from dateutil. Callable from custom sinks or tests.
 - **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style).
 
 ### GCSTarget (`target_gcs.target`)
@@ -62,7 +62,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
   - `{chunk_index}` — 0-based chunk index; only when `max_records_per_file` is set and > 0.
 - **GCS handle** (`gcs_write_handle` property): Opens via `smart_open.open("gs://{bucket}/{key_name}", "wb", transport_params={"client": client})`. Client is `storage_client` if provided, else `Client()` (ADC only).
 - **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line with `orjson.dumps(..., option=orjson.OPT_APPEND_NEWLINE, default=_json_default)`. `_json_default` serializes `decimal.Decimal` as float; other non-JSON types raise `TypeError`.
-- **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to the open handle. With partition-by-field: partition path is resolved per record via `get_partition_path_from_record`; missing or invalid partition field uses run date as fallback (formatted with `partition_date_format`).
+- **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to the open handle. With partition-by-field: partition path is resolved per record via `get_partition_path_from_record`; date/datetime values are formatted directly with `partition_date_format`; only missing field, None, or value that is neither string nor date/datetime uses run date as fallback. Unparseable partition strings raise `ParserError`; unsupported timezone may produce `UnknownTimezoneWarning` (visible, not silent fallback).
 
 ### Authentication
 
@@ -84,7 +84,11 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 
 ## Partition-by-field behaviour
 
-When `partition_date_field` is set, the sink uses one active write handle. On each record it resolves the partition path from the record (or run date if the field is missing or unparseable). When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition. Fallback for missing or invalid partition field: run date formatted with `partition_date_format`.
+When `partition_date_field` is set, the sink uses one active write handle. On each record it resolves the partition path from the record via `get_partition_path_from_record` (see helper above): date/datetime values are formatted directly with `partition_date_format`; only missing field, None, or value that is neither string nor date/datetime uses run date as fallback. String values are parsed with dateutil; many formats supported. Unparseable strings raise `ParserError`; unsupported timezone may produce `UnknownTimezoneWarning`—both are visible (warning or error), not silent fallback. When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition.
+
+### Partition-date-field validation (sink init)
+
+When `partition_date_field` is set, the sink validates at init that the field exists in the stream schema and has a date-parseable type. Validation runs in `GCSSink.__init__` after `super().__init__`, via the helper `validate_partition_date_field_schema` in `target_gcs.helpers.partition_schema`. The field must be present in `schema["properties"]`, must not be null-only, and must have a type that can be parsed to a date (e.g. `string`, with or without `date`/`date-time` format; nullable string allowed). The partition field must also be listed in `schema["required"]`; if `schema["required"]` is present but not a list, the validator raises an error. On failure a `ValueError` is raised with the stream name, field name, and reason (e.g. not in schema, must be required for the stream, non-list `required`, null-only, or non–date-parseable type).
 
 ---
 
