@@ -570,7 +570,7 @@ class RestfulApiTap(Tap):
                     ),
                     backoff_type=self.config.get("backoff_type"),
                     backoff_param=self.config.get("backoff_param"),
-                    backoff_time_extension=self.config.get("backoff_time_extension"),
+                    backoff_time_extension=self.config.get("backoff_time_extension", 0),
                     store_raw_json_message=self.config.get("store_raw_json_message"),
                     flatten_records=flatten_records,
                     authenticator=self._authenticator,
