@@ -25,7 +25,7 @@ Execute these phases in order. Focus only on this single task.
 
 **Phase 1: Context Gathering**
 - [ ] Step 1.1: Read relevant codebase context from `{context_docs_dir}/`
-- [ ] Step 1.2: Read root `CHANGELOG.md` (or create if it doesn't exist)
+- [ ] Step 1.2: Read relevant changelog(s): root `CHANGELOG.md` and affected plugin `taps/{name}/CHANGELOG.md` or `loaders/{name}/CHANGELOG.md` per task scope (see CONVENTIONS § Changelogs)
 - [ ] Step 1.3: Read task document and task plan
 - [ ] Step 1.4: Read `{scratchpad}` for context
 - [ ] Step 1.5: Identified affected component(s)
@@ -39,7 +39,7 @@ Execute these phases in order. Focus only on this single task.
 - [ ] Step 2.6: Completed validation steps from plan (reproduction, regression)
 
 **Phase 3: Completion**
-- [ ] Step 3.1: Updated root `CHANGELOG.md` under `## [Unreleased]` in `### Fixed`
+- [ ] Step 3.1: Updated the correct changelog(s): root for global scope (date-based `## YYYY-MM-DD`), plugin changelog for that plugin only; one heading per change type per date/version; bug fix and archive summary (no task/plan links)
 - [ ] Step 3.2: Updated relevant documentation in `{context_docs_dir}/` and READMEs (if applicable)
 - [ ] Step 3.3: Archived task and plan files to `{archive_dir}/fix-{bug_name}/`
 - [ ] Step 3.4: Ran full test suite again; all tests passed
@@ -59,9 +59,9 @@ Read relevant files from `{context_docs_dir}/` based on task scope:
 - **Always read**: AI_CONTEXT_PATTERNS.md
 - **If the task affects Singer/Meltano components (taps, targets)**: Use terminology from `GLOSSARY_MELTANO_SINGER.md` (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE)
 
-### Step 1.2: Read Changelog
+### Step 1.2: Read Changelog(s)
 
-Read root `CHANGELOG.md` (create if it doesn't exist). Understand recent changes and changelog format.
+Read the changelog(s) that will be updated (see Step 3.1 and CONVENTIONS § Changelogs): root `CHANGELOG.md` for repo-wide scope; `taps/{tap_name}/CHANGELOG.md` or `loaders/{target_name}/CHANGELOG.md` for that plugin. Create root changelog if it doesn't exist. Understand recent changes, format, and the rule: root uses date headings (`## YYYY-MM-DD`); one heading per change type per date/version (append bullets under existing `### Fixed`, etc.).
 
 ### Step 1.3: Read Task and Plan
 
@@ -116,16 +116,20 @@ Complete validation steps from `{bugs_dir}/{bug_name}/plans/master/validation.md
 
 ## Phase 3: Completion
 
-### Step 3.1: Update Changelog
+### Step 3.1: Update Changelog(s)
 
-Changelog entries reference the **bug fix** and the **archive summary file** only (no links to task/plan files, which are removed during clean-up). Keep the changelog brief; full detail lives in the archive.
+**Which changelog to edit**: Per `@.cursor/CONVENTIONS.md` § Changelogs — **root** `CHANGELOG.md` for repo-wide fixes; **plugin** `taps/{name}/CHANGELOG.md` or `loaders/{name}/CHANGELOG.md` for fixes that affect only that plugin. Update only the changelog(s) for the scope of this task.
 
-Under `## [Unreleased]` → `### Fixed`:
+**Root changelog**: Use date-based heading `## YYYY-MM-DD` (commit date). If that date section exists, append to it; otherwise add `## YYYY-MM-DD` at the top. **Plugin changelog**: Under each version (e.g. `## [Unreleased]`), each change type at most once; append to existing `### Fixed`.
+
+Entries reference the **bug fix** and the **archive summary file** only (no links to task/plan files). Keep entries brief; full detail lives in the archive.
+
+**Root**: Under `## YYYY-MM-DD` (commit date) → `### Fixed` (create subsection if needed). **Plugin**: Under `## [Unreleased]` → `### Fixed`.
 
 1. **If this is the first task for this bug**: Add a bug-level entry that names the fix and references the archive file (created in pipeline Phase 7). Use the path `{archive_dir}/fix-{bug_name}/fix-{bug_name}.md` even if the file does not exist yet.
 2. **Append this task** as a bullet under that entry. Use the task name or a one-line description. Add sub-bullets only for major parts of the change (keep brief).
 
-**Format**:
+**Format** (in the chosen root or plugin changelog):
 
 ```markdown
 ### Fixed
@@ -135,7 +139,7 @@ Under `## [Unreleased]` → `### Fixed`:
   - (Next task adds another bullet at this level)
 ```
 
-When adding a subsequent task for the same bug, locate the existing bug entry and add a new top-level bullet for the new task; do not create a second entry.
+When adding a subsequent task for the same bug, locate the existing bug entry under the same date (root) or version (plugin) and add a new top-level bullet; do not create a second entry.
 
 ### Step 3.2: Update Documentation
 

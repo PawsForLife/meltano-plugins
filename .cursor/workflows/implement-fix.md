@@ -44,7 +44,7 @@ You MUST follow these phases in order. **Planning is mandatory** - do not skip t
 - [ ] Step 3.6: Completed validation steps from plan (reproduction, regression)
 
 **Phase 4: Completion**
-- [ ] Step 4.1: Updated root `CHANGELOG.md` under `## [Unreleased]` in `### Fixed` subsection
+- [ ] Step 4.1: Updated the correct changelog(s) per scope (root date-based, plugin per CONVENTIONS); one heading per change type per section; bug fix and archive summary (no task/plan links)
 - [ ] Step 4.2: Updated relevant documentation in `{context_docs_dir}/` directory
 - [ ] Step 4.3: Archived bug artifacts to `_archive/fix-{bug_name}/` (maintaining folder hierarchy)
 - [ ] Step 4.4: Ran full test suite for affected service(s) and all tests passed
@@ -63,7 +63,7 @@ You MUST follow these phases in order. **Planning is mandatory** - do not skip t
    - **Always read**: AI_CONTEXT_PATTERNS.md for code patterns and conventions
    - **If the fix affects Singer/Meltano components (taps, targets)**: Use terminology from `GLOSSARY_MELTANO_SINGER.md` (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE)
 
-2. Read root `CHANGELOG.md` (create if it doesn't exist) to understand recent changes and changelog format.
+2. Read the relevant changelog(s) (see CONVENTIONS § Changelogs): root and, if the fix affects a single plugin, that plugin's changelog. Create root changelog if it doesn't exist. Understand format and the rule: root uses date headings (`## YYYY-MM-DD`); one heading per change type per section.
 
 ### Step 1.2: Read Bug Artifacts
 
@@ -119,15 +119,16 @@ Emphasize:
 
 ## Phase 4: Completion
 
-### Step 4.1: Update Changelog
+### Step 4.1: Update Changelog(s)
 
-Add entry under `### Fixed` in `## [Unreleased]`:
+**Which changelog to edit**: Per CONVENTIONS § Changelogs — root for repo-wide fixes (use date-based `## YYYY-MM-DD`); plugin changelog for that plugin only (version blocks if used). **One heading per type per section**: append to existing `### Fixed` if present.
+
+**Root**: Add entry under `### Fixed` in `## YYYY-MM-DD` (commit date). **Plugin**: Add under `### Fixed` in `## [Unreleased]`. Reference the archive summary only:
 
 ```markdown
 ### Fixed
-- Brief description of the bug fix
-  - Plan: [task-name](_archive/fix-{bug_name}/plans/tasks/{task-name}.md)
-  - Task: [task-name](_archive/fix-{bug_name}/tasks/{task-name}.md)
+- **fix-{bug_name}** — Details: [fix-{bug_name}.md](_archive/fix-{bug_name}/fix-{bug_name}.md)
+  - Brief description or task bullets
 ```
 
 ### Step 4.2: Update Documentation

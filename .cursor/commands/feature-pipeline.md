@@ -20,7 +20,7 @@ When committing:
    - Format: `<type>(<scope>): <brief description>`
    - Optional body: goal-focused bullet points, each under 100 characters
    - Type and scope are provided per-phase below; for implementation tasks the implementer infers them from the changes
-   - **Changelog**: Entries reference the feature and the archive summary file (`{archive_dir}/{feature_name}/{feature_name}.md`); each task is a brief bullet (with optional sub-bullets for major parts). Keep the changelog brief; full detail lives in the archived file. Do not link to task/plan files (they are removed during clean-up).
+   - **Changelog**: Update the changelog(s) for the affected scope (see `@.cursor/CONVENTIONS.md` § Changelogs). **Root** `CHANGELOG.md`: repo-wide changes only (scripts, CI, docs, multi-plugin); use **date-based** headings `## YYYY-MM-DD` (commit date); add or append under that date. **Plugin** `taps/{name}/CHANGELOG.md` or `loaders/{name}/CHANGELOG.md`: that plugin’s changes only. Entries reference the feature and archive summary (`{archive_dir}/{feature_name}/{feature_name}.md`); each task is a brief bullet (optional sub-bullets). Under each date (root) or version (plugin), use at most one heading per change type (`### Added`, `### Changed`, etc.) — append bullets under the existing heading; do not add a second heading of the same type in the same section.
 5. **Execute the commit**: `git commit -m "<message>"`
 
 ## Instructions
