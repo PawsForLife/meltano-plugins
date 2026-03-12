@@ -13,6 +13,7 @@
   - Update documentation: README and AI context use `target_gcs`; root and plugin CHANGELOGs add migration note.
 - **target-gcs migration (normalise-plugin-source-folders):** Package/namespace renamed from `gcs_target` to `target_gcs`. Users: update `meltano.yml` namespace to `target_gcs` and re-run `meltano install`; verification commands use `mypy target_gcs`.
 - **target-gcs** — Add `_close_handle_and_clear_state()` helper in `GCSSink`; use it in `_process_record_partition_by_field` for partition change and key-change paths to remove duplicated flush/close/clear-key logic (refactor, behaviour unchanged).
+- **root-pre-commit-and-install archive** — Update failure-behaviour and root install.sh description to match implementation: root install runs all plugin installs, prints succeeded/failed summary, exits non-zero if any failed (no longer "stop on first failure").
 
 ### Fixed
 
@@ -31,7 +32,7 @@
 
 - **root-pre-commit-and-install** — Details: [root-pre-commit-and-install.md](_archive/root-pre-commit-and-install/root-pre-commit-and-install.md)
   - Add `scripts/run_plugin_checks.sh`: discover plugins via `list_packages.py`, run ruff (check + format --check) and mypy per plugin using each plugin's `.venv`; optional pytest when `RUN_PYTEST=1`; exit on first failure; mypy package name from path with fallback map.
-  - Add root `install.sh`: discover plugins via `list_packages.py`, run each plugin's `./install.sh` (stop on first failure); install pre-commit via pip if missing; run `pre-commit install` from repo root; exit non-zero on any failure.
+  - Add root `install.sh`: discover plugins via `list_packages.py`, run each plugin's `./install.sh` for all plugins (do not stop on first failure), print succeeded/failed summary, exit non-zero if any failed; install pre-commit via pip if missing; run `pre-commit install` from repo root.
   - Add root `.pre-commit-config.yaml`: single local hook (plugin-checks) invoking `scripts/run_plugin_checks.sh`; language system, pass_filenames false; runs when files under `taps/` or `loaders/` change.
   - Documentation: README Development section (root `./install.sh`, pre-commit install, `pre-commit run --all-files`); docs/monorepo root-level tooling (install.sh and pre-commit discovery via list_packages.py); AI_CONTEXT_QUICK_REFERENCE Repo root commands and removal of "No repo-wide install.sh".
 - **target-gcs-handle-decimal-in-records** — Details: [target-gcs-handle-decimal-in-records.md](_archive/target-gcs-handle-decimal-in-records/target-gcs-handle-decimal-in-records.md)
