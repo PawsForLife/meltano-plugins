@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "restful-api-tap"
-version = "1.6.0"
+version = "1.6.1"
 description = "`restful-api-tap` is a Singer tap for REST APIs, built with the Meltano SDK for Singer Taps (Pet Circle variant)."
 readme = "README.md"
 license = "Apache-2.0"
