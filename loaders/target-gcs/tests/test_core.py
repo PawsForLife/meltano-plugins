@@ -3,9 +3,10 @@
 Uses sample config file contents for target configuration.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from singer_sdk.testing import get_target_test_class
+from singer_sdk.testing.factory import BaseTestClass
 
 from target_gcs.target import GCSTarget
 
@@ -13,13 +14,14 @@ from target_gcs.target import GCSTarget
 SAMPLE_CONFIG: Dict[str, Any] = {"bucket_name": "test-bucket"}
 
 # Run standard built-in target tests from the SDK (class-based; pytest discovers test methods).
-StandardTargetTests = get_target_test_class(
-    target_class=GCSTarget,
-    config=SAMPLE_CONFIG,
+StandardTargetTests = cast(
+    type[BaseTestClass],
+    get_target_test_class(target_class=GCSTarget, config=SAMPLE_CONFIG),
 )
 
 
-class TestGCSTarget(StandardTargetTests):
+# Mypy does not accept variables as base classes; cast above documents the type.
+class TestGCSTarget(StandardTargetTests):  # type: ignore[valid-type,misc]
     """Standard Target Tests for target-gcs."""
 
 
