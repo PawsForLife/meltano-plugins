@@ -21,11 +21,18 @@ def build_sink(
     date_fn: Callable[[], datetime] | None = None,
 ):
     """Build a sink for the target using the given config (config file contents).
-    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests."""
+    Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests.
+    When partition_date_field is set, schema includes that field (string type) so sink init validation passes."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
     config = {**default_config, **config}
+    partition_field = config.get("partition_date_field")
+    schema = (
+        {"properties": {partition_field: {"type": "string"}}}
+        if partition_field
+        else {"properties": {}}
+    )
     kwargs = {}
     if time_fn is not None:
         kwargs["time_fn"] = time_fn
@@ -34,7 +41,7 @@ def build_sink(
     return GCSSink(
         GCSTarget(config=config),
         "my_stream",
-        {"properties": {}},
+        schema,
         key_properties=config,
         **kwargs,
     )

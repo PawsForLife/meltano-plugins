@@ -13,7 +13,11 @@ from dateutil.parser import ParserError
 from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
-from .helpers import _json_default, get_partition_path_from_record
+from .helpers import (
+    _json_default,
+    get_partition_path_from_record,
+    validate_partition_date_field_schema,
+)
 
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
@@ -60,6 +64,12 @@ class GCSSink(RecordSink):
         if self.config.get("partition_date_field"):
             # Current partition path when partition-by-field is on; None when cleared or not yet set.
             self._current_partition_path: str | None = None
+            # Validate partition field exists in stream schema and is date-parseable; raises ValueError if not.
+            validate_partition_date_field_schema(
+                self.stream_name,
+                self.config["partition_date_field"],
+                self.schema,
+            )
 
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when partition_date_field is set.

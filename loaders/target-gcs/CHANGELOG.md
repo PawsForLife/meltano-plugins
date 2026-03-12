@@ -8,6 +8,7 @@
   - Add unit tests for validate_partition_date_field_schema.
   - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
   - Add sink integration tests for partition_date_field validation (build_sink extended with optional schema/stream_name; tests for missing field, null-only, integer, valid string, unset; ValueError message asserts stream and field name).
+  - Call validate_partition_date_field_schema in GCSSink.__init__ when partition_date_field is set; misconfiguration (missing or non–date-parseable field) is caught at sink init.
 
 - **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
   - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
