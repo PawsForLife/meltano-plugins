@@ -63,10 +63,8 @@ jobs:
 
       - name: Mypy
         run: |
-          comp="${{ matrix.path }}"
-          comp="${comp##*/}"
-          mypy_pkg="${comp//-/_}"
-          uv run mypy "$mypy_pkg"
+          pkg=$(echo "${{ matrix.path }}" | sed 's|.*/||;s/-/_/g')
+          uv run mypy "$pkg"
 
       - name: Pytest
         run: uv run pytest

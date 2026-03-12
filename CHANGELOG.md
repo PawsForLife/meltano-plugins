@@ -15,6 +15,8 @@
 
 ### Fixed
 
+- **fix-mypy-standard-target-tests-base-class** — Details: [fix-mypy-standard-target-tests-base-class.md](_archive/fix-mypy-standard-target-tests-base-class/fix-mypy-standard-target-tests-base-class.md)
+  - In Plugin unit tests workflow, run mypy on the derived source package only (from `matrix.path`: last component, hyphens → underscores) instead of `.`, so test code is not type-checked and CI no longer fails on `StandardTargetTests` base class.
 - **fix-target-gcs-template-tests-config-validation** — Details: [fix-target-gcs-template-tests-config-validation.md](_archive/fix-target-gcs-template-tests-config-validation/fix-target-gcs-template-tests-config-validation.md)
   - Set `SAMPLE_CONFIG` in `loaders/target-gcs/tests/test_core.py` to `{"bucket_name": "test-bucket"}` so SDK template tests pass config validation.
 - **fix-github-output-eof-delimiter** — Details: [fix-github-output-eof-delimiter.md](_archive/fix-github-output-eof-delimiter/fix-github-output-eof-delimiter.md)
