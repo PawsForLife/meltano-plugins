@@ -24,6 +24,7 @@
 
 ### Changed
 
+- **AI context (target-gcs)** — Partition-date-field validation docs: document that the partition field must be in `schema["required"]`, that non-list `schema["required"]` is rejected, and that failures raise `ValueError` with stream name, field name, and reason.
 - **dateutils-partition-timestamps** — Add types-python-dateutil to dev dependencies for mypy.
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).
 

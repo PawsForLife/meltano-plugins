@@ -88,7 +88,7 @@ When `partition_date_field` is set, the sink uses one active write handle. On ea
 
 ### Partition-date-field validation (sink init)
 
-When `partition_date_field` is set, the sink validates at init that the field exists in the stream schema and has a date-parseable type. Validation runs in `GCSSink.__init__` after `super().__init__`, via the helper `validate_partition_date_field_schema` in `target_gcs.helpers.partition_schema`. The field must be present in `schema["properties"]`, must not be null-only, and must have a type that can be parsed to a date (e.g. `string`, with or without `date`/`date-time` format; nullable string allowed). On failure a `ValueError` is raised with the stream name, field name, and reason (e.g. not in schema, null-only, or non–date-parseable type).
+When `partition_date_field` is set, the sink validates at init that the field exists in the stream schema and has a date-parseable type. Validation runs in `GCSSink.__init__` after `super().__init__`, via the helper `validate_partition_date_field_schema` in `target_gcs.helpers.partition_schema`. The field must be present in `schema["properties"]`, must not be null-only, and must have a type that can be parsed to a date (e.g. `string`, with or without `date`/`date-time` format; nullable string allowed). The partition field must also be listed in `schema["required"]`; if `schema["required"]` is present but not a list, the validator raises an error. On failure a `ValueError` is raised with the stream name, field name, and reason (e.g. not in schema, must be required for the stream, non-list `required`, null-only, or non–date-parseable type).
 
 ---
 
