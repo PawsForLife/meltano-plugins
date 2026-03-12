@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-03-12
+
 ### Changed
 
 - Discovery: stream-level `is_sorted` now falls back to tap-level `is_sorted` when omitted on a stream, so tap-wide `is_sorted` is honored.

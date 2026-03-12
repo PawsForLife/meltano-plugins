@@ -1,8 +1,8 @@
 # Changelog
 
-<!--next-version-placeholder-->
-
 ## [Unreleased]
+
+## [2.0.0] - 2026-03-12
 
 ### Fixed
 

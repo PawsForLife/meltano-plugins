@@ -1,6 +1,6 @@
 [project]
 name = "target-gcs"
-version = "1.2.3"
+version = "2.0.0"
 description = "`target-gcs` is a Singer target for GCS, built with the Meltano SDK for Singer Targets."
 readme = "README.md"
 requires-python = ">=3.8,<4.0"
