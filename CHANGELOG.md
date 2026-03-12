@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **README Development section** — Document that push-time and local pre-commit checks run ruff, mypy, and pytest (pre-commit hook and wrapper already did; README now matches).
 - **Normalise plugin source folders** — Details: [normalise-plugin-source-folders.md](_archive/normalise-plugin-source-folders/normalise-plugin-source-folders.md)
   - Rename source package `gcs_target` to `target_gcs` in loaders/target-gcs (directory rename only; config and imports in later tasks).
   - Point plugin config to `target_gcs`: pyproject.toml (scripts entry point and wheel packages), meltano.yml (namespace), install.sh (mypy target).
