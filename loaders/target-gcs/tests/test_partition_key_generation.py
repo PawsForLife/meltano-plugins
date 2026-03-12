@@ -29,7 +29,10 @@ def build_sink(
     config = {**default_config, **config}
     partition_field = config.get("partition_date_field")
     schema = (
-        {"properties": {partition_field: {"type": "string"}}, "required": [partition_field]}
+        {
+            "properties": {partition_field: {"type": "string"}},
+            "required": [partition_field],
+        }
         if partition_field
         else {"properties": {}}
     )

@@ -112,7 +112,10 @@ def test_validate_partition_field_string_type_succeeds():
 
 def test_validate_partition_field_string_format_date_time_succeeds():
     """String with format date-time is valid when field is required; common datetime schema. No exception."""
-    schema = {"properties": {"x": {"type": "string", "format": "date-time"}}, "required": ["x"]}
+    schema = {
+        "properties": {"x": {"type": "string", "format": "date-time"}},
+        "required": ["x"],
+    }
     field_name = "x"
     validate_partition_date_field_schema(STREAM_NAME, field_name, schema)
 
