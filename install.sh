@@ -51,8 +51,8 @@ if ! command -v pre-commit &>/dev/null; then
 fi
 
 # Install only the pre-push hook (checks run on push, not on commit). Uninstall pre-commit hook if present.
+# Do not overwrite PRECOMMIT_FAILED here; preserve any failure state from pip install above.
 if command -v pre-commit &>/dev/null; then
-  PRECOMMIT_FAILED=0
   cd "$ROOT"
   pre-commit uninstall 2>/dev/null || true
   if ! pre-commit install --hook-type pre-push; then
