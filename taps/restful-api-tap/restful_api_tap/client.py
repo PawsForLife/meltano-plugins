@@ -5,7 +5,7 @@ and yield records (emitted as RECORD messages for the stream).
 """
 
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
 
 import requests
 from singer_sdk.streams import RESTStream
@@ -30,7 +30,7 @@ class RestApiStream(RESTStream):
     def _request(
         self,
         prepared_request: requests.PreparedRequest,
-        context: Optional[dict],
+        context: dict | None,
     ) -> requests.Response:
         """Send the request and validate the response.
 
@@ -60,7 +60,7 @@ class RestApiStream(RESTStream):
         self.validate_response(response)
         return response
 
-    def request_records(self, context: Optional[dict]) -> Iterator[dict]:
+    def request_records(self, context: dict | None) -> Iterator[dict]:
         """Request records with pagination; 404 on next-page is end-of-stream.
 
         Records are streamed (yielded one-by-one) and become RECORD messages
