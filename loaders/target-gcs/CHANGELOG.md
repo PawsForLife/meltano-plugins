@@ -9,9 +9,11 @@
   - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
   - Add TDD test that unparseable partition timestamp raises (no silent fallback); marked xfail until Task 05.
   - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
+  - Implement partition path dateutil parsing: string timestamps parsed with dateutil.parser.parse (no tzinfos); unparseable raises ParserError; unknown timezone surfaces UnknownTimezoneWarning; xfail removed from partition path tests.
 
 ### Changed
 
+- **dateutils-partition-timestamps** — Add types-python-dateutil to dev dependencies for mypy.
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).
 
 ### Breaking

@@ -1256,6 +1256,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "types-python-dateutil" },
     { name = "types-requests" },
 ]
 
@@ -1273,9 +1274,19 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "singer-sdk", specifier = ">=0.40.0" },
     { name = "smart-open", extras = ["gcs"], specifier = ">=6.0.0" },
+    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = ">=2.9.0" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.26.1" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "types-python-dateutil"
+version = "2.9.0.20260305"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/c7/025c624f347e10476b439a6619a95f1d200250ea88e7ccea6e09e48a7544/types_python_dateutil-2.9.0.20260305.tar.gz", hash = "sha256:389717c9f64d8f769f36d55a01873915b37e97e52ce21928198d210fbd393c8b", size = 16885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0a/77/8c0d1ec97f0d9707ad3d8fa270ab8964e7b31b076d2f641c94987395cc75/types_python_dateutil-2.9.0.20260305-py3-none-any.whl", hash = "sha256:a3be9ca444d38cadabd756cfbb29780d8b338ae2a3020e73c266a83cc3025dd7", size = 18419 },
+]
 
 [[package]]
 name = "types-requests"

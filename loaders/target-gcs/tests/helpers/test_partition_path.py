@@ -46,9 +46,6 @@ def test_partition_path_missing_field_uses_fallback():
     assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
-@pytest.mark.xfail(
-    reason="Requires Task 05: unparseable must raise; current code silently returns fallback."
-)
 def test_partition_path_unparseable_value_raises():
     """Unparseable string in partition_date_field raises; no silent fallback. WHAT: Unparseable value causes visible exception (ParserError or ValueError). WHY: No silent fallback per feature requirement."""
     with pytest.raises((ParserError, ValueError)):
@@ -72,9 +69,6 @@ def test_partition_path_custom_format():
     assert result == "day=11/month=03"
 
 
-@pytest.mark.xfail(
-    reason="Requires Task 05 dateutil parsing; current code uses fromisoformat/strptime only."
-)
 def test_partition_path_slash_separated_date_yields_hive_path():
     """Slash-separated date string (dateutil-only) yields Hive path from parsed date. WHAT: Format 'YYYY/MM/DD' is parsed and path uses that date. WHY: After Task 05 dateutil will support this; current code falls back so we assert a different day (15) so test fails until then."""
     result = get_partition_path_from_record(
@@ -86,9 +80,6 @@ def test_partition_path_slash_separated_date_yields_hive_path():
     assert result == "year=2024/month=03/day=15"
 
 
-@pytest.mark.xfail(
-    reason="Requires Task 05 dateutil parsing; current code uses fromisoformat/strptime only."
-)
 def test_partition_path_rfc_style_datetime_yields_hive_path():
     """RFC-style datetime string (dateutil-only) yields Hive path from parsed date. WHAT: Format 'DD Mon YYYY HH:MM:SS' is parsed and path uses that date. WHY: Common in logs/APIs; dateutil will support it in Task 05; assert day 15 so test fails with current fallback."""
     result = get_partition_path_from_record(
@@ -100,9 +91,6 @@ def test_partition_path_rfc_style_datetime_yields_hive_path():
     assert result == "year=2024/month=03/day=15"
 
 
-@pytest.mark.xfail(
-    reason="Requires Task 05 dateutil parsing; current code uses fromisoformat/strptime only."
-)
 def test_partition_path_long_month_name_yields_hive_path():
     """Long month name date string (dateutil-only) yields Hive path from parsed date. WHAT: Format 'Month DD, YYYY' is parsed and path uses that date. WHY: Broader format support after Task 05; assert day 20 so test fails with current fallback."""
     result = get_partition_path_from_record(
@@ -119,9 +107,6 @@ def test_partition_path_long_month_name_yields_hive_path():
 _UNKNOWN_TZ_TRIGGER_STRING = "2024-03-11 12:00:00 FOO"
 
 
-@pytest.mark.xfail(
-    reason="UnknownTimezoneWarning handling not yet implemented (Task 05)."
-)
 def test_partition_path_unknown_timezone_surfaces_visibility():
     """Unsupported timezone in partition date string yields visible warning or error; no silent fallback. WHAT: String that triggers dateutil UnknownTimezoneWarning results in that warning being recorded or an exception raised. WHY: Feature requires unsupported timezone to be visible, not silently ignored."""
     with warnings.catch_warnings(record=True) as caught:
@@ -133,4 +118,6 @@ def test_partition_path_unknown_timezone_surfaces_visibility():
             fallback_date=FALLBACK_DATE,
         )
     unknown_tz_warnings = [w for w in caught if w.category is UnknownTimezoneWarning]
-    assert len(unknown_tz_warnings) >= 1, "UnknownTimezoneWarning must be surfaced for unsupported timezone"
+    assert len(unknown_tz_warnings) >= 1, (
+        "UnknownTimezoneWarning must be surfaced for unsupported timezone"
+    )
