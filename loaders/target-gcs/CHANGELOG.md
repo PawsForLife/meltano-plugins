@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
+  - Add unit tests for validate_partition_date_field_schema.
+
 - **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
   - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
   - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
