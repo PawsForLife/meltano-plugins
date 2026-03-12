@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-11 |
+| Version | 1.3 |
+| Last Updated | 2026-03-12 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
 | Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
 
@@ -74,7 +74,8 @@ meltano-plugins/
 │   ├── skills/
 │   └── commands/
 ├── scripts/                      # Repo-level scripts (e.g. list_packages)
-├── .github/workflows/            # CI (e.g. plugin-matrix)
+│   └── tests/                    # Tests for repo-level scripts
+├── .github/workflows/            # CI (e.g. plugin-matrix, script-tests)
 ├── README.md                     # Project summary, install, layout
 └── CHANGELOG.md
 ```

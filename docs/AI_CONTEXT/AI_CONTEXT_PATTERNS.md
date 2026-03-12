@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-11 |
+| Version | 1.3 |
+| Last Updated | 2026-03-12 |
 | Tags | patterns, conventions, TDD, models, DI, validation, testing, meltano, singer |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) |
 
@@ -24,9 +24,9 @@
 
 ## Type & Model Patterns
 
-- **Config and schema**: Use Singer SDK typing (`singer_sdk.typing` as `th`). Properties are defined with `th.Property(name, type, required=..., description=...)`. Complex or nested data is described via `th.ObjectType()`, `th.ArrayType()`, etc. No Pydantic/dataclass for config; validation is “load into SDK schema + fail fast.”
-- **Validation over re-checking**: Ingested data that must be parsed is loaded into a model (or SDK schema). If validation fails, do not use the data. Once valid, do not check validity again downstream.
-- **Typing in code**: Parameters and return types are annotated (e.g. `def parse_response(self, response: requests.Response) -> Iterable[dict]`). Optional and generic types from `typing` are used where appropriate.
+- **Config and schema**: Use Singer SDK typing (`singer_sdk.typing` as `th`). Properties are defined with `th.Property(name, type, required=..., description=...)`. Complex or nested data uses `th.ObjectType()`, `th.ArrayType()`, etc. No Pydantic/dataclass for config; validation is “load into SDK schema + fail fast.”
+- **Validation over re-checking**: Ingested data that must be parsed is loaded into a model (or SDK schema). If validation fails, do not use the data. Once valid, do **not** check validity again downstream.
+- **Typing in code**: Parameters and return types are annotated (e.g. `def parse_response(self, response: requests.Response) -> Iterable[dict]`). Use `typing` for Optional and generic types where appropriate.
 - **Stream/sink construction**: Tap builds stream instances with explicit kwargs from resolved config (e.g. in `tap.py`: `DynamicStream(tap=self, name=..., path=..., schema=..., authenticator=self._authenticator)`). No implicit global state for stream options.
 
 ---
@@ -34,9 +34,18 @@
 ## Error Handling & Logging
 
 - **Fatal vs non-fatal**: Initial request failures (e.g. 404 on first page) are fatal and surface via SDK (e.g. `FatalAPIError`). Next-page 404 is treated as end-of-stream in `restful_api_tap/client.py`: in `_request()`, when `response.status_code == 404` and `_is_next_page_request` is True, return without calling `validate_response(response)`; in `request_records()`, break the loop on 404 and stop yielding.
+
+  Example (`client.py`):
+
+  ```python
+  if response.status_code == 404 and getattr(self, "_is_next_page_request", False):
+      return response
+  self.validate_response(response)
+  ```
+
 - **Validation errors**: Invalid config or response shape raises (e.g. `ValueError` for unknown auth method or non-dict record). Schema inference requires dict records; otherwise `ValueError("Input must be a dict object.")`.
 - **Logging**: Use the SDK/stream `self.logger` for info/debug/error. No tests assert on log output (black-box testing). Log messages are descriptive (e.g. “Pagination stopped after N pages because no records were found”).
-- **Backoff**: Rate-limited APIs use config-driven backoff (`backoff_type`: `message`, `header`, or default). Streams can override `backoff_wait_generator` to return a generator that yields wait times from response message or header (e.g. `RestfulApiTap` streams).
+- **Backoff**: Rate-limited APIs use config-driven backoff (`backoff_type`: `message`, `header`, or default). Streams can override `backoff_wait_generator` to yield wait times from response message or header.
 
 ---
 
@@ -46,18 +55,34 @@
 - **Valid tests**: Every test must be able to fail (no tests that can only pass).
 - **Working tests**: If a test fails due to its own logic, fix the test; failing tests (except `@pytest.mark.xfail` / `@unittest.expectedFailure`) are regressions and must be resolved before the task is complete.
 - **Test layout**: Tests live under each plugin’s `tests/` (e.g. `taps/restful-api-tap/tests/`, `loaders/target-gcs/tests/`). Naming: `test_<module>.py` or `test_<feature>.py` (e.g. `test_tap.py`, `test_streams.py`, `test_404_end_of_stream.py`, `test_sinks.py`).
-- **Black-box**: Tests assert on observable behaviour (returned objects, emitted records, raised exceptions). They do not assert on “called_once”, log lines, or internal call counts. For external data changes, the mock (e.g. `requests_mock`) provides the changed response; for internal state, assert on returned or mutated objects.
-- **Exception tests**: Use `pytest.raises(ExpectedException)` to assert that a specific exception type is raised (e.g. `with pytest.raises(FatalAPIError): list(stream.get_records({}))`).
+- **Black-box**: Tests assert on observable behaviour (returned objects, emitted records, raised exceptions). They do **not** assert on “called_once”, log lines, or internal call counts. For external data changes, the mock (e.g. `requests_mock`) provides the changed response; for internal state, assert on returned or mutated objects.
+- **Exception tests**: Use `pytest.raises(ExpectedException)` to assert that a specific exception type is raised (e.g. `with pytest.raises(FatalAPIError): list(stream.get_records({}))`). See `taps/restful-api-tap/tests/test_404_end_of_stream.py::test_initial_request_404_raises_fatal_error`.
 - **Fixtures and helpers**: Shared config and API mocks are factored into helpers (e.g. `config()`, `setup_api()`, `json_resp()`, `build_sink()`) in test modules. Schema files under `tests/` (e.g. `tests/schema.json`) are used when discovery is bypassed.
 - **SDK standard tests**: Taps use `get_tap_test_class(RestfulApiTap, config=...)`; targets use `get_target_test_class(GCSTarget, config=...)` and a test class that subclasses the result (e.g. `class TestGCSTarget(StandardTargetTests)`).
-- **Regression gate**: Any failing test that is not explicitly marked as expected failure (`@pytest.mark.xfail`, `@unittest.expectedFailure`) is a regression and must be fixed before the task is complete.
+- **Regression gate**: Any failing test that is not explicitly marked as expected failure is a regression and must be fixed before the task is complete.
 
 ---
 
 ## Dependency Injection & Validation
 
-- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; `GCSSink` in `target_gcs/sinks.py` accepts optional `time_fn` and `date_fn` callables in `__init__` for deterministic key naming and partition fallback in tests (e.g. `build_sink(time_fn=..., date_fn=...)` in `loaders/target-gcs/tests/test_sinks.py`). GCS client is constructed from config context; tests patch `target_gcs.sinks.Client` to assert constructor args (e.g. no credentials path for ADC).
-- **Authenticator caching**: The tap caches the authenticator in `_authenticator` and reuses it across streams. OAuth refresh is handled inside the authenticator; `get_authenticator(self)` returns the cached instance or builds one via `select_authenticator(self)`.
+- **Non-deterministic and external deps**: Pass them in as parameters or constructor arguments. Do not hardcode `time`, file paths, or API clients inside business logic. Examples: authenticator is passed into `DynamicStream(..., authenticator=self._authenticator)`; `GCSSink` in `target_gcs/sinks.py` accepts optional `time_fn` and `date_fn` callables in `__init__` for deterministic key naming and partition fallback in tests.
+
+  Example (`target_gcs/sinks.py`):
+
+  ```python
+  def __init__(self, target, stream_name, schema, key_properties, *,
+      time_fn: Callable[[], float] | None = None,
+      date_fn: Callable[[], datetime] | None = None,
+      storage_client: Any | None = None,
+  ):
+      ...
+      self._time_fn = time_fn
+      self._date_fn = date_fn
+  ```
+
+  In tests (e.g. `loaders/target-gcs/tests/test_sinks.py`), use `build_sink(time_fn=..., date_fn=...)` so key names and partition paths are deterministic. GCS client is constructed from config context; tests patch `target_gcs.sinks.Client` to assert constructor args (e.g. no credentials path for ADC).
+
+- **Authenticator caching**: The tap caches the authenticator in `_authenticator` and reuses it across streams. OAuth refresh is handled inside the authenticator; `get_authenticator(self)` returns the cached instance or builds one via `select_authenticator(self)` in `auth.py`.
 - **Config resolution**: Tap merges top-level and stream-level config (e.g. `params = {**self.config.get("params", {}), **stream.get("params", {})}`). Required settings (e.g. `api_url`, `bucket_name`) are enforced by the config schema and runtime checks. Config is supplied via config file or Meltano-injected env.
 
 ---
@@ -108,7 +133,7 @@
 
 ### How do I run the test suite?
 
-- Per-plugin: from the plugin directory run `./install.sh` (creates venv, installs deps, runs tests) or activate the venv and run `pytest` (e.g. `cd taps/restful-api-tap && source .venv/bin/activate && pytest`). Use the project's test runner and linters as defined in each plugin's `pyproject.toml`; resolve style/type issues before considering the task complete.
+- Per-plugin: from the plugin directory run `./install.sh` (creates venv, installs deps, runs tests) or activate the venv and run `pytest` (e.g. `cd taps/restful-api-tap && source .venv/bin/activate && pytest`). Use the project’s test runner and linters as defined in each plugin’s `pyproject.toml`; resolve style/type issues before considering the task complete.
 
 ---
 
