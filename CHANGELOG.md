@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **typing-312-standards** — Updated Python type hints to 3.12 style (built-in generics and pipe unions) across tap, target, and scripts.
 - **python-3.12-minimum** — Repo standard and **target-gcs** now require Python 3.12 minimum. target-gcs `pyproject.toml` and tool config (ruff, mypy) updated; lockfile and code aligned to 3.12. restful-api-tap was already 3.12. Details: [_archive/python-3.12-minimum/python-3.12-minimum.md](_archive/python-3.12-minimum/python-3.12-minimum.md)
 
 ## 2025-03-12

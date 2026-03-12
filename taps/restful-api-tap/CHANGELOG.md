@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Updated type hints to Python 3.12 style (built-in generics and pipe unions).
+
 ## [1.6.0] - 2026-03-12
 
 ### Changed

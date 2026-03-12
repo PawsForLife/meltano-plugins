@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Updated type hints to Python 3.12 style (built-in generics and pipe unions).
+
 ### Breaking
 
 - **Python 3.12 minimum** — Minimum supported Python is now 3.12. Upgrade your environment before installing.
