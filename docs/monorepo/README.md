@@ -63,7 +63,7 @@ CI discovers packages via `scripts/list_packages.py` (directories with a `pyproj
 
 ## Root-level tooling
 
-The repository provides a root **install.sh** that discovers plugin directories via `scripts/list_packages.py` and runs each plugin's `install.sh`; it also installs pre-commit if missing and runs `pre-commit install`. Root **pre-commit** runs ruff, mypy (and optionally pytest) per plugin using that plugin's virtual environment; discovery uses the same `list_packages.py` as CI.
+The repository provides a root **install.sh** that discovers plugin directories via `scripts/list_packages.py` and runs each plugin's `install.sh` in order (exits on first failure); it also installs pre-commit if missing and runs `pre-commit install`. Root **pre-commit** runs ruff, mypy (and optionally pytest) per plugin using that plugin's virtual environment; discovery uses the same `list_packages.py` as CI.
 
 ## Version pinning
 

@@ -47,7 +47,7 @@ From the repository root:
 
 | Action | Command |
 |--------|---------|
-| Bootstrap all plugins and pre-push hook | `./install.sh` (runs each plugin's install.sh, installs pre-commit if missing, runs `pre-commit install --hook-type pre-push` only) |
+| Bootstrap all plugins and pre-push hook | `./install.sh` (runs each plugin's install.sh in order, exits on first failure; installs pre-commit if missing, runs `pre-commit install --hook-type pre-push` only) |
 | Install git hook (pre-push only) | `pre-commit install --hook-type pre-push` (run after root install.sh). Checks run on **push** only, not on commit. |
 | Run all hooks on all files | `pre-commit run --all-files` |
 
