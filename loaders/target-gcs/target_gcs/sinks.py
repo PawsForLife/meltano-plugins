@@ -22,6 +22,11 @@ from .helpers import (
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
 
+# Default key template when partition_date_field is unset.
+DEFAULT_KEY_NAMING_CONVENTION = "{stream}_{timestamp}.{format}"
+# Default key template when partition_date_field is set and key_naming_convention omitted.
+DEFAULT_KEY_NAMING_CONVENTION_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
+
 
 class GCSSink(RecordSink):
     """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When partition_date_field is set, the key is derived per record from that field; one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
@@ -71,14 +76,30 @@ class GCSSink(RecordSink):
                 self.schema,
             )
 
+    def _get_effective_key_template(self) -> str:
+        """Return the key template to use: user override, hive default, or non-partition default.
+
+        Rule: (1) If key_naming_convention is set and non-empty, return it. (2) Else if
+        partition_date_field is set and non-empty, return DEFAULT_KEY_NAMING_CONVENTION_HIVE.
+        (3) Else return DEFAULT_KEY_NAMING_CONVENTION.
+        """
+        user_template = (self.config.get("key_naming_convention") or "").strip()
+        if user_template:
+            return user_template
+        if (self.config.get("partition_date_field") or "").strip():
+            return DEFAULT_KEY_NAMING_CONVENTION_HIVE
+        return DEFAULT_KEY_NAMING_CONVENTION
+
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when partition_date_field is set.
 
-        Uses key_prefix and key_naming_convention with format_map: stream,
-        partition_date (= partition_path), timestamp (from _time_fn or time.time),
-        and chunk_index when chunking is enabled. Same normalization as key_name
-        (no double slashes, no leading slash). Callers pass a pre-resolved
-        partition_path (e.g. from get_partition_path_from_record).
+        Uses key_prefix and the effective key template (from _get_effective_key_template)
+        with format_map: stream, partition_date (= partition_path), hive (= partition_path,
+        alias for partition_date), timestamp (from _time_fn or time.time), and chunk_index
+        when chunking is enabled. If the template contains {format}, format_map includes
+        format=self.output_format. Same normalization as key_name (no double slashes,
+        no leading slash). Callers pass a pre-resolved partition_path (e.g. from
+        get_partition_path_from_record).
 
         Args:
             record: Record dict (unused; partition_path is pre-resolved).
@@ -91,19 +112,19 @@ class GCSSink(RecordSink):
             self._current_timestamp = round((self._time_fn or time.time)())
 
         extraction_timestamp = self._current_timestamp
-        base_key_name = self.config.get(
-            "key_naming_convention",
-            f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
-        )
+        base_key_name = self._get_effective_key_template()
         max_records = self.config.get("max_records_per_file", 0)
         format_map = defaultdict(
             str,
             stream=self.stream_name,
             partition_date=partition_path,
+            hive=partition_path,
             timestamp=extraction_timestamp,
         )
         if max_records and max_records > 0:
             format_map["chunk_index"] = self._chunk_index
+        if "{format}" in base_key_name:
+            format_map["format"] = self.output_format
         base = base_key_name.format_map(format_map)
         prefixed = (
             f"{self.config.get('key_prefix', '')}/{base}".replace("//", "/")
@@ -118,16 +139,13 @@ class GCSSink(RecordSink):
 
     @property
     def key_name(self) -> str:
-        """Return the key name. When partition_date_field is set, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When unset, recomputes from stream, date, timestamp and optionally chunk_index."""
+        """Return the key name. When partition_date_field is set, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When unset, computes key from the same effective template as _build_key_for_record (_get_effective_key_template), then format_map (stream, date, timestamp, format, and optionally chunk_index). Default when key_naming_convention is omitted is DEFAULT_KEY_NAMING_CONVENTION."""
         if self.config.get("partition_date_field"):
             return self._key_name
         if not self._key_name:
             # Time is injectable via time_fn for deterministic key assertions in tests.
             extraction_timestamp = round((self._time_fn or time.time)())
-            base_key_name = self.config.get(
-                "key_naming_convention",
-                f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
-            )
+            base_key_name = self._get_effective_key_template()
             prefixed_key_name = (
                 f"{self.config.get('key_prefix', '')}/{base_key_name}".replace(
                     "//", "/"
@@ -141,6 +159,7 @@ class GCSSink(RecordSink):
                 stream=self.stream_name,
                 date=date,
                 timestamp=extraction_timestamp,
+                format=self.output_format,
             )
             if max_records and max_records > 0:
                 format_map["chunk_index"] = self._chunk_index

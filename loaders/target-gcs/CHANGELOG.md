@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Hive default key path:** Add `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`, and `_get_effective_key_template()` in sinks.py; effective template resolution (user override → partition default → non-partition default). `_build_key_for_record` and `key_name` both use effective template and format map (tasks 06–07).
+
+### Changed
+
+- **Hive default key path:** When `partition_date_field` is set and `key_naming_convention` is omitted, the default key template is now `{stream}/{partition_date}/{timestamp}.jsonl`; when unset, default remains `{stream}_{timestamp}.jsonl`. Added `{hive}` as an alias for `{partition_date}` in key templates when partition-by-field is enabled.
+- **Hive default key path (task 08):** README config table documents conditional default for `key_naming_convention` (hive-style when `partition_date_field` set and omitted, flat when unset). Hive section documents default key shape `{stream}/{partition_date}/{timestamp}.jsonl` and that `{hive}` is an alias for `{partition_date}`. Optional: schema description for `key_naming_convention` in target.py; meltano.yml comment that example pattern is the default when `partition_date_field` is set.
+- **Hive default key path (task 07):** `key_name` property now uses `_get_effective_key_template()` when `partition_date_field` is unset and `_key_name` is empty; format_map includes `format=self.output_format` so the default template `{stream}_{timestamp}.{format}` resolves. Docstring updated to state that the default when `key_naming_convention` is omitted is `DEFAULT_KEY_NAMING_CONVENTION`.
+- **Hive default key path (task 06):** `_build_key_for_record` now uses `_get_effective_key_template()` for the base key; format map includes `hive=partition_path` (alias for `partition_date`) and `format` when the template contains `{format}`; docstring updated. Hive default and `{hive}` alias tests no longer xfail.
+- **Tests:** Regression test for default key when `partition_date_field` and `key_naming_convention` are omitted (ensures non-partition default `{stream}_{timestamp}.jsonl` is preserved).
+- **Tests:** Add test that when `partition_date_field` is set and `key_naming_convention` is omitted, key uses hive default pattern `{stream}/{partition_date}/{timestamp}.jsonl`; xfail removed after task 06.
+- **Tests:** Add test that when both `partition_date_field` and `key_naming_convention` are set, built key follows the user template (e.g. `{stream}/dt={partition_date}/{timestamp}.jsonl`); regression guard so user config is never overridden by hive default.
+- **Tests:** Add test that `{hive}` in key_naming_convention expands to the same partition segment as `{partition_date}`; xfail removed after task 06 (hive in format map).
+
 ## [3.0.0] - 2026-03-12
 
 ### Added

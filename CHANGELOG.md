@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-03-13
+
+### Added
+
+- **target-gcs-hive-default-key-path** — Archive summary: [target-gcs-hive-default-key-path.md](_archive/target-gcs-hive-default-key-path/target-gcs-hive-default-key-path.md)
+
 ## 2026-03-12
 
 ### Added

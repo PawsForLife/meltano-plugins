@@ -9,7 +9,11 @@ from unittest.mock import MagicMock, patch
 import orjson
 import pytest
 
-from target_gcs.sinks import GCSSink
+from target_gcs.sinks import (
+    DEFAULT_KEY_NAMING_CONVENTION,
+    DEFAULT_KEY_NAMING_CONVENTION_HIVE,
+    GCSSink,
+)
 from target_gcs.target import GCSTarget
 
 
@@ -108,6 +112,31 @@ def test_sink_accepts_date_fn_and_stores_it():
     subject = build_sink(date_fn=lambda: fixed_date)
     assert subject._date_fn is not None
     assert subject._date_fn() == fixed_date
+
+
+def test_get_effective_key_template_returns_user_template_when_set():
+    """WHAT: _get_effective_key_template returns key_naming_convention when set and non-empty.
+    WHY: User override must take precedence over partition or default template."""
+    subject = build_sink({"key_naming_convention": "custom/{stream}/dt={partition_date}.jsonl"})
+    assert subject._get_effective_key_template() == "custom/{stream}/dt={partition_date}.jsonl"
+
+
+def test_get_effective_key_template_returns_hive_default_when_partition_set_and_no_user_template():
+    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION_HIVE when partition_date_field is set and key_naming_convention omitted.
+    WHY: Hive-style default must apply when partitioning by date and user did not set a template."""
+    schema_with_partition = {"properties": {"created_at": {"type": "string"}}, "required": ["created_at"]}
+    subject = build_sink(
+        config={"partition_date_field": "created_at"},
+        schema=schema_with_partition,
+    )
+    assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION_HIVE
+
+
+def test_get_effective_key_template_returns_non_partition_default_when_neither_set():
+    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION when neither key_naming_convention nor partition_date_field is set.
+    WHY: Non-partition default must apply when not using partition-by-field."""
+    subject = build_sink()
+    assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION
 
 
 def test_config_schema_has_no_credentials_file():

@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.3 |
-| Last Updated | 2026-03-12 |
+| Version | 1.4 |
+| Last Updated | 2026-03-13 |
 | Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink, RecordSink |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, env), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (typing, testing), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (target, destination, streams, Sink, config file, SCHEMA/RECORD/STATE), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md) (tap component) |
 
@@ -39,7 +39,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 - **Config schema** (`config_jsonschema`): Declared with `singer_sdk.typing`:
   - `bucket_name` (string, **required**): GCS bucket name.
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
-  - `key_naming_convention` (string, optional): Template for the object key. When omitted, effective default is `{stream_name}_{timestamp}.jsonl`.
+  - `key_naming_convention` (string, optional): Template for the object key. When omitted, the effective default is conditional: if `partition_date_field` is set, default is `{stream}/{partition_date}/{timestamp}.jsonl`; if unset, default is `{stream}_{timestamp}.jsonl`.
   - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. When chunking is enabled, the key token `{chunk_index}` (0-based) is available and `{timestamp}` is refreshed per chunk.
   - `partition_date_field` (string, optional): Record property name used for the partition path; when set, partition-by-field is enabled (e.g. `created_at`, `updated_at`).
   - `partition_date_format` (string, optional): strftime format for partition path segments; default in code is Hive-style (e.g. `year=%Y/month=%m/day=%d`).
@@ -58,6 +58,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
   - `{stream}` — stream name.
   - `{date}` — `datetime.today().strftime(config.get("date_format", "%Y-%m-%d"))`; used when partition-by-field is off.
   - `{partition_date}` — partition path per record (e.g. `year=2024/month=03/day=11`); only when `partition_date_field` is set.
+  - `{hive}` — alias for `{partition_date}` when partition-by-field is on.
   - `{timestamp}` — Unix time at key resolution (refreshed at start of each chunk when chunking is enabled).
   - `{chunk_index}` — 0-based chunk index; only when `max_records_per_file` is set and > 0.
 - **GCS handle** (`gcs_write_handle` property): Opens via `smart_open.open("gs://{bucket}/{key_name}", "wb", transport_params={"client": client})`. Client is `storage_client` if provided, else `Client()` (ADC only).
@@ -113,7 +114,7 @@ When `partition_date_field` is set, the sink validates at init that the field ex
 }
 ```
 
-Key name defaults to `{stream_name}_{unix_timestamp}.jsonl` (with optional `key_prefix` if set).
+Key name defaults to `{stream}_{timestamp}.jsonl` when `partition_date_field` is unset; when `partition_date_field` is set and `key_naming_convention` is omitted, default is `{stream}/{partition_date}/{timestamp}.jsonl` (with optional `key_prefix` if set).
 
 ### Full sample config (Meltano / file)
 
