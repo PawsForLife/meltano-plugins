@@ -73,7 +73,7 @@ class RestApiStream(RESTStream):
         request remains fatal (validate_response raises).
         """
         paginator = self.get_new_paginator() or self._get_single_page_paginator()
-        decorated_request = self.request_decorator(self._request)
+        decorated_request = self.request_decorator(self._request)  # type: ignore[arg-type]
         pages = 0
 
         with self.get_http_request_counter() as request_counter:
