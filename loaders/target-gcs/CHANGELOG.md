@@ -6,6 +6,7 @@
 
 - **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
   - Add unit tests for validate_partition_date_field_schema.
+  - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
 
 - **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
   - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
