@@ -10,6 +10,7 @@
 
 ### Changed
 
+- **AI context (target-gcs)** — Partition path helper docs: describe fast-path for date/datetime (formatted directly with partition_date_format; no fallback); only missing/None/non-string non-date use fallback; keep dateutil/ParserError/UnknownTimezoneWarning notes; reference helper implementation and GCSSink usage.
 - **AI context** — Quick reference table: target-gcs Python constraint updated to `>=3.12,<4.0` to match `loaders/target-gcs/pyproject.toml`.
 - **typing-312-standards** — Updated Python type hints to 3.12 style (built-in generics and pipe unions) across tap, target, and scripts.
 - **python-3.12-minimum** — Repo standard and **target-gcs** now require Python 3.12 minimum. target-gcs `pyproject.toml` and tool config (ruff, mypy) updated; lockfile and code aligned to 3.12. restful-api-tap was already 3.12. Details: [_archive/python-3.12-minimum/python-3.12-minimum.md](_archive/python-3.12-minimum/python-3.12-minimum.md)
