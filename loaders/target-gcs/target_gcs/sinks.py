@@ -65,15 +65,18 @@ class GCSSink(RecordSink):
         self._storage_client: Any | None = storage_client
 
         if self.config.get("hive_partitioned"):
-            # Current partition path when Hive partitioning is on; None when cleared or not yet set.
-            self._current_partition_path: str | None = None
-            x_partition_fields = self.schema.get("x-partition-fields")
-            if isinstance(x_partition_fields, list) and len(x_partition_fields) > 0:
-                validate_partition_fields_schema(
-                    self.stream_name,
-                    self.schema,
-                    x_partition_fields,
-                )
+            self._init_hive_partitioning()
+
+    def _init_hive_partitioning(self) -> None:
+        """Initialize Hive partitioning state and validate partition fields schema when x-partition-fields is present. Assumes hive_partitioned is true; caller must only invoke when config has hive_partitioned enabled."""
+        self._current_partition_path: str | None = None
+        x_partition_fields = self.schema.get("x-partition-fields")
+        if isinstance(x_partition_fields, list) and len(x_partition_fields) > 0:
+            validate_partition_fields_schema(
+                self.stream_name,
+                self.schema,
+                x_partition_fields,
+            )
 
     def _get_effective_key_template(self) -> str:
         """Return the key template to use: user override, hive default, or non-partition default.
@@ -103,6 +106,34 @@ class GCSSink(RecordSink):
         """
         prefix = self.config.get("key_prefix", "") or ""
         return f"{prefix}/{base}".replace("//", "/").lstrip("/")
+
+    def _compute_non_hive_key(self) -> str:
+        """Compute and cache the non-hive object key from template, timestamp, date, and optional chunk_index.
+
+        Uses _get_effective_key_template, injectable time/date, format_map (stream, date,
+        timestamp, format, and chunk_index when max_records_per_file is set), then
+        _apply_key_prefix_and_normalize. Assigns the result to _key_name.
+
+        Returns:
+            The computed key string (and assigns it to _key_name).
+        """
+        base_key_name = self._get_effective_key_template()
+        extraction_timestamp = round((self._time_fn or time.time)())
+        run_date = self._date_fn() if self._date_fn else datetime.today()
+        date = run_date.strftime(self.config.get("date_format", "%Y-%m-%d"))
+        max_records = self.config.get("max_records_per_file", 0)
+        format_map = defaultdict(
+            str,
+            stream=self.stream_name,
+            date=date,
+            timestamp=extraction_timestamp,
+            format=self.output_format,
+        )
+        if max_records and max_records > 0:
+            format_map["chunk_index"] = self._chunk_index
+        base = base_key_name.format_map(format_map)
+        self._key_name = self._apply_key_prefix_and_normalize(base)
+        return self._key_name
 
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when hive_partitioned is true.
@@ -154,27 +185,7 @@ class GCSSink(RecordSink):
         if self.config.get("hive_partitioned"):
             return self._key_name
         if not self._key_name:
-            # Time is injectable via time_fn for deterministic key assertions in tests.
-            extraction_timestamp = round((self._time_fn or time.time)())
-            base_key_name = self._get_effective_key_template()
-            prefixed_key_name = (
-                f"{self.config.get('key_prefix', '')}/{base_key_name}".replace(
-                    "//", "/"
-                )
-            ).lstrip("/")
-            run_date = self._date_fn() if self._date_fn else datetime.today()
-            date = run_date.strftime(self.config.get("date_format", "%Y-%m-%d"))
-            max_records = self.config.get("max_records_per_file", 0)
-            format_map = defaultdict(
-                str,
-                stream=self.stream_name,
-                date=date,
-                timestamp=extraction_timestamp,
-                format=self.output_format,
-            )
-            if max_records and max_records > 0:
-                format_map["chunk_index"] = self._chunk_index
-            self._key_name = prefixed_key_name.format_map(format_map)
+            return self._compute_non_hive_key()
         return self._key_name
 
     @property
@@ -215,6 +226,12 @@ class GCSSink(RecordSink):
         self._key_name = ""
         self._current_timestamp = None
 
+    def _maybe_rotate_if_at_limit(self) -> None:
+        """Rotate to a new chunk when max_records_per_file is set and the current file has reached that limit. No-op when max_records_per_file is 0 or missing."""
+        max_records = self.config.get("max_records_per_file", 0)
+        if max_records > 0 and self._records_written_in_current_file >= max_records:
+            self._rotate_to_new_chunk()
+
     def _write_record_as_jsonl(self, record: dict) -> None:
         """Write a single record as a JSONL line to the current GCS write handle.
 
@@ -240,15 +257,10 @@ class GCSSink(RecordSink):
         writes the record via gcs_write_handle; increments _records_written_in_current_file
         when chunking is enabled.
         """
-        max_records = self.config.get("max_records_per_file", 0)
-        if (
-            max_records
-            and max_records > 0
-            and self._records_written_in_current_file >= max_records
-        ):
-            self._rotate_to_new_chunk()
+        self._maybe_rotate_if_at_limit()
         self._write_record_as_jsonl(record)
-        if max_records and max_records > 0:
+        max_records = self.config.get("max_records_per_file", 0)
+        if max_records > 0:
             self._records_written_in_current_file += 1
 
     def _process_record_hive_partitioned(self, record: dict, context: dict) -> None:
@@ -277,13 +289,7 @@ class GCSSink(RecordSink):
             self._current_partition_path = partition_path
             self._chunk_index = 0
             self._records_written_in_current_file = 0
-        max_records = self.config.get("max_records_per_file", 0)
-        if (
-            max_records
-            and max_records > 0
-            and self._records_written_in_current_file >= max_records
-        ):
-            self._rotate_to_new_chunk()
+        self._maybe_rotate_if_at_limit()
         key = self._build_key_for_record(record, partition_path)
         if self._gcs_write_handle is None or self._key_name != key:
             self._close_handle_and_clear_state()
@@ -294,6 +300,7 @@ class GCSSink(RecordSink):
                 transport_params={"client": self.storage_client},
             )
         self._write_record_as_jsonl(record)
+        max_records = self.config.get("max_records_per_file", 0)
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
 

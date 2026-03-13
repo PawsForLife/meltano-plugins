@@ -2,8 +2,8 @@
 
 ## Feature: target-gcs-dedup-split-logic
 
-**Pipeline State:** Phase 1–4 Complete; Phase 5–6 Not started.
-**Task Completion Status:** Task 01-unify-partition-date-format-constant completed, tests passing. Task 02-add-flush-and-close-handle completed, tests passing. Task 03-add-apply-key-prefix-and-normalize completed, tests passing. Task 04-add-write-record-as-jsonl completed, tests passing.
+**Pipeline State:** Phase 1–5 in progress; Phase 6 Not started.
+**Task Completion Status:** Task 01–04 completed, tests passing. Task 05-add-maybe-rotate-if-at-limit completed. Task 06-add-compute-non-hive-key completed (Phase 5): `_compute_non_hive_key()` added, `key_name` non-hive branch refactored to use it; full target-gcs pytest 107 passed.
 **Task count:** 9.
 **Execution Order:** 01-unify-partition-date-format-constant → 02-add-flush-and-close-handle → 03-add-apply-key-prefix-and-normalize → 04-add-write-record-as-jsonl → 05-add-maybe-rotate-if-at-limit → 06-add-compute-non-hive-key → 07-add-init-hive-partitioning → 08-add-assert-field-required-and-non-null → 09-update-docstrings-and-ai-context.
 **Ordered task file names:** 01-unify-partition-date-format-constant.md, 02-add-flush-and-close-handle.md, 03-add-apply-key-prefix-and-normalize.md, 04-add-write-record-as-jsonl.md, 05-add-maybe-rotate-if-at-limit.md, 06-add-compute-non-hive-key.md, 07-add-init-hive-partitioning.md, 08-add-assert-field-required-and-non-null.md, 09-update-docstrings-and-ai-context.md.
