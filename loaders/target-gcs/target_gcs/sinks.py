@@ -29,7 +29,7 @@ DEFAULT_KEY_NAMING_CONVENTION_HIVE = "{stream}/{partition_date}/{timestamp}.{for
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When hive_partitioned is true, the key is derived per record from x-partition-fields (or fallback date when absent); one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
+    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When hive_partitioned is true, the key is derived per record from x-partition-fields (or extraction date when absent); one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
 
     max_size = 1000  # Max records to write in one batch
 
@@ -60,9 +60,9 @@ class GCSSink(RecordSink):
             None  # Cached at handle open; used for key building.
         )
         self._time_fn: Callable[[], float] | None = time_fn
-        # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
+        # Optional run-date callable for partition extraction date and tests; default None → use datetime.today where needed.
         self._date_fn: Callable[[], datetime] | None = date_fn
-        self.fallback = self._date_fn() if self._date_fn else datetime.today()
+        self._extraction_date = self._date_fn() if self._date_fn else datetime.today()
 
         self._storage_client: Any | None = storage_client
 
@@ -234,7 +234,7 @@ class GCSSink(RecordSink):
         """Process one record when hive_partitioned is true (schema-driven Hive path).
 
         Assumes hive_partitioned is true. Partition path comes from
-        get_partition_path_from_schema_and_record(schema, record, fallback,
+        get_partition_path_from_schema_and_record(schema, record, extraction_date,
         partition_date_format=DEFAULT_PARTITION_DATE_FORMAT). On partition change closes
         handle and clears key/partition state and resets chunk index; rotates within
         partition when at max_records_per_file; builds key via _build_key_for_record;
@@ -245,7 +245,7 @@ class GCSSink(RecordSink):
             partition_path = get_partition_path_from_schema_and_record(
                 self.schema,
                 record,
-                self.fallback,
+                extraction_date=self._extraction_date,
                 partition_date_format=DEFAULT_PARTITION_DATE_FORMAT,
             )
         except ParserError:
@@ -286,7 +286,7 @@ class GCSSink(RecordSink):
         """Process one record (RECORD message payload).
 
         Dispatches by hive_partitioned: when true, partition-by-schema path
-        (per-record partition from x-partition-fields or fallback date, handle
+        (per-record partition from x-partition-fields or extraction date, handle
         lifecycle on partition/key change); when false, single-file or chunked path
         (one key/handle per stream per run, optional rotation by max_records_per_file).
         """

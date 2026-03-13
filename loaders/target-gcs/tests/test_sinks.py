@@ -441,19 +441,6 @@ def test_sink_init_hive_partitioned_invalid_x_partition_fields_raises_value_erro
     assert "not in schema" in msg or "required" in msg.lower()
 
 
-def test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds():
-    """Sink init with hive_partitioned true and valid x-partition-fields (field in properties and required, non-null) constructs without exception.
-    WHAT: Valid schema with x-partition-fields allows sink construction. WHY: Regression guard for init validation only when schema is valid."""
-    config = {"hive_partitioned": True}
-    schema = {
-        "x-partition-fields": ["a"],
-        "properties": {"a": {"type": "string"}},
-        "required": ["a"],
-    }
-    sink = build_sink(config=config, schema=schema)
-    assert sink.stream_name == "my_stream"
-
-
 def test_hive_partitioned_set_field_missing_raises_value_error():
     """hive_partitioned true with x-partition-fields listing a field missing from schema must raise ValueError at sink init."""
     config = {"hive_partitioned": True}
@@ -537,9 +524,9 @@ def test_hive_partitioned_false_key_has_no_record_driven_partition_segments():
     )
 
 
-def test_hive_partitioned_true_no_x_partition_fields_key_contains_fallback_date():
-    """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the fallback date segment from date_fn.
-    WHAT: Key contains year=.../month=.../day=... from date_fn. WHY: Fallback path when schema has no partition fields."""
+def test_hive_partitioned_true_no_x_partition_fields_key_contains_extraction_date():
+    """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the extraction date segment from date_fn.
+    WHAT: Key contains year=.../month=.../day=... from date_fn. WHY: Extraction date path when schema has no partition fields."""
     with (
         patch("target_gcs.sinks.Client"),
         patch(
@@ -555,7 +542,7 @@ def test_hive_partitioned_true_no_x_partition_fields_key_contains_fallback_date(
         sink.process_record({"id": 1, "name": "any"}, {})
     key = _key_from_open_call(mock_open.call_args)
     assert "year=2024" in key and "month=03" in key and "day=11" in key, (
-        "key must contain fallback date segment from date_fn when hive_partitioned true and no x-partition-fields"
+        "key must contain extraction date segment from date_fn when hive_partitioned true and no x-partition-fields"
     )
 
 

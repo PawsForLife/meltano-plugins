@@ -10,8 +10,8 @@ from dateutil.parser import ParserError as DateutilParserError
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
 
-# Fixed fallback date for deterministic partition resolution tests (no datetime.today() in tests).
-FALLBACK_DATE = datetime(2024, 3, 11)
+# Fixed extraction date for deterministic partition resolution tests (no datetime.today() in tests).
+EXTRACTION_DATE = datetime(2024, 3, 11)
 DEFAULT_HIVE_FORMAT = "year=%Y/month=%m/day=%d"
 
 
@@ -89,7 +89,7 @@ def test_build_key_for_record_differs_by_partition_path():
         },
         schema=schema,
         time_fn=lambda: fixed_ts,
-        date_fn=lambda: FALLBACK_DATE,
+        date_fn=lambda: EXTRACTION_DATE,
     )
     key_a = sink._build_key_for_record({"id": 1}, "year=2024/month=01/day=01")
     key_b = sink._build_key_for_record({"id": 2}, "year=2024/month=02/day=01")
@@ -134,7 +134,7 @@ def test_build_key_for_record_uses_hive_default_when_hive_partitioned_set_no_key
         config={"hive_partitioned": True},
         schema=schema,
         time_fn=lambda: fixed_ts,
-        date_fn=lambda: FALLBACK_DATE,
+        date_fn=lambda: EXTRACTION_DATE,
     )
     record = {"id": 1, "dt": "2024-03-11"}
     key = sink._build_key_for_record(record, partition_path)
@@ -166,7 +166,7 @@ def test_build_key_for_record_uses_user_template_when_key_naming_convention_set(
         },
         schema=schema,
         time_fn=lambda: fixed_ts,
-        date_fn=lambda: FALLBACK_DATE,
+        date_fn=lambda: EXTRACTION_DATE,
     )
     record = {"id": 1, "dt": "2024-03-11"}
     key = sink._build_key_for_record(record, partition_path)
@@ -213,10 +213,10 @@ def test_build_key_for_record_hive_token_expands_like_partition_date():
     )
 
 
-def test_build_key_for_record_uses_fallback_when_partition_path_from_fallback():
-    """When partition_path comes from fallback (e.g. missing x-partition-fields), key contains that fallback date segment. WHAT: No partition fields does not crash; path uses fallback. WHY: Robustness."""
+def test_build_key_for_record_uses_extraction_date_when_partition_path_from_extraction_date():
+    """When partition_path comes from extraction date (e.g. missing x-partition-fields), key contains that extraction date segment. WHAT: No partition fields does not crash; path uses extraction date. WHY: Robustness."""
     fixed_ts = 22222.0
-    fallback_path = FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+    extraction_date_path = EXTRACTION_DATE.strftime(DEFAULT_HIVE_FORMAT)
     schema = {"properties": {}}
     sink = build_sink(
         config={
@@ -225,10 +225,10 @@ def test_build_key_for_record_uses_fallback_when_partition_path_from_fallback():
         },
         schema=schema,
         time_fn=lambda: fixed_ts,
-        date_fn=lambda: FALLBACK_DATE,
+        date_fn=lambda: EXTRACTION_DATE,
     )
-    key = sink._build_key_for_record({"other": "value"}, fallback_path)
-    assert fallback_path in key
+    key = sink._build_key_for_record({"other": "value"}, extraction_date_path)
+    assert extraction_date_path in key
     assert "year=2024" in key and "month=03" in key and "day=11" in key
 
 
@@ -306,7 +306,7 @@ def test_chunking_with_partition_rotation_within_partition():
             },
             schema=schema,
             time_fn=time_fn,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         partition_value = "2024-03-11"
         for i in range(3):
@@ -346,7 +346,7 @@ def test_partition_change_then_return_creates_three_distinct_keys():
             },
             schema=schema,
             time_fn=time_fn,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         sink.process_record({"dt": "2024-03-10", "id": 1}, {})
         sink.process_record({"dt": "2024-03-11", "id": 2}, {})
@@ -382,7 +382,7 @@ def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
             },
             schema=schema,
             time_fn=lambda: fixed_ts,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         record = {"id": 1, "created_at": "2024/03/11"}
         sink.process_record(record, {})
@@ -419,7 +419,7 @@ def test_sink_uses_literal_segment_when_partition_field_unparseable():
             },
             schema=schema,
             time_fn=lambda: 12345.0,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         record = {"id": 1, "created_at": "not-a-date"}
         sink.process_record(record, {})
@@ -427,27 +427,6 @@ def test_sink_uses_literal_segment_when_partition_field_unparseable():
     assert "created_at=not-a-date" in key, (
         "unparseable value must appear as key=value literal in key path"
     )
-
-
-def test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date():
-    """hive_partitioned true with schema that has no x-partition-fields produces key containing fallback date segment.
-    WHAT: Path is fallback date (year=.../month=.../day=...) from date_fn. WHY: Fallback path when schema has no partition fields."""
-    schema = {"properties": {}}
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open,
-    ):
-        sink = build_sink(
-            config={"hive_partitioned": True},
-            schema=schema,
-            time_fn=lambda: 44444.0,
-            date_fn=lambda: FALLBACK_DATE,
-        )
-        sink.process_record({"id": 1}, {})
-    key = _key_from_open_call(mock_open.call_args)
-    assert "year=2024" in key and "month=03" in key and "day=11" in key
 
 
 def test_multiple_streams_different_x_partition_fields_order_keys_differ():
@@ -475,7 +454,7 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
             schema=schema_a,
             stream_name="stream_a",
             time_fn=lambda: 50000.0,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         sink_a.process_record(record, {})
     key_a = _key_from_open_call(mock_open_a.call_args)
@@ -490,7 +469,7 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
             schema=schema_b,
             stream_name="stream_b",
             time_fn=lambda: 50000.0,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         sink_b.process_record(record, {})
     key_b = _key_from_open_call(mock_open_b.call_args)
@@ -522,7 +501,7 @@ def test_sink_raises_parser_error_when_partition_field_date_format_unparseable()
             config={"hive_partitioned": True},
             schema=schema,
             time_fn=lambda: 12345.0,
-            date_fn=lambda: FALLBACK_DATE,
+            date_fn=lambda: EXTRACTION_DATE,
         )
         with pytest.raises(DateutilParserError):
             sink.process_record({"id": 1, "dt": "not-a-date"}, {})

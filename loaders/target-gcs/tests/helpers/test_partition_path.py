@@ -7,42 +7,42 @@ from dateutil.parser import ParserError
 
 from target_gcs.helpers.partition_path import get_partition_path_from_schema_and_record
 
-# Fixed fallback date for deterministic partition resolution tests (no datetime.today() in tests).
-FALLBACK_DATE = datetime(2024, 3, 11)
+# Fixed extraction date for deterministic partition resolution tests (no datetime.today() in tests).
+EXTRACTION_DATE = datetime(2024, 3, 11)
 DEFAULT_HIVE_FORMAT = "year=%Y/month=%m/day=%d"
 
 
 def test_get_partition_path_from_schema_and_record_importable_from_helpers():
-    """Public API: get_partition_path_from_schema_and_record is importable from target_gcs.helpers and returns a non-empty path. WHAT: Import from helpers and call with empty schema/record and fallback_date; result is fallback path. WHY: Ensures the symbol is exported and callable from the public API."""
+    """Public API: get_partition_path_from_schema_and_record is importable from target_gcs.helpers and returns a non-empty path. WHAT: Import from helpers and call with empty schema/record and extraction_date; result is extraction date path. WHY: Ensures the symbol is exported and callable from the public API."""
     from target_gcs.helpers import get_partition_path_from_schema_and_record
 
     result = get_partition_path_from_schema_and_record(
         schema={},
         record={},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert isinstance(result, str)
     assert len(result) > 0
 
 
-def test_schema_and_record_no_x_partition_fields_uses_fallback():
-    """No x-partition-fields in schema yields fallback_date formatted path. WHAT: When schema has no key or empty schema, path is fallback_date.strftime(partition_date_format). WHY: Ensures predictable path when partitioning is not schema-driven."""
+def test_schema_and_record_no_x_partition_fields_uses_extraction_date():
+    """No x-partition-fields in schema yields extraction_date formatted path. WHAT: When schema has no key or empty schema, path is extraction_date.strftime(partition_date_format). WHY: Ensures predictable path when partitioning is not schema-driven."""
     result = get_partition_path_from_schema_and_record(
         schema={},
         record={"any": "value"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
-    assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+    assert result == EXTRACTION_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
-def test_schema_and_record_empty_x_partition_fields_uses_fallback():
-    """Empty x-partition-fields list yields same as no key (fallback path). WHAT: schema with x-partition-fields: [] returns fallback_date formatted. WHY: Empty list is treated as "no partition fields" per plan."""
+def test_schema_and_record_empty_x_partition_fields_uses_extraction_date():
+    """Empty x-partition-fields list yields same as no key (extraction date path). WHAT: schema with x-partition-fields: [] returns extraction_date formatted. WHY: Empty list is treated as "no partition fields" per plan."""
     result = get_partition_path_from_schema_and_record(
         schema={"x-partition-fields": []},
         record={"region": "eu"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
-    assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+    assert result == EXTRACTION_DATE.strftime(DEFAULT_HIVE_FORMAT)
 
 
 def test_schema_and_record_single_date_field_datetime():
@@ -54,7 +54,7 @@ def test_schema_and_record_single_date_field_datetime():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"dt": datetime(2024, 3, 11)},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "year=2024/month=03/day=11"
 
@@ -68,7 +68,7 @@ def test_schema_and_record_single_date_field_string_iso():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"dt": "2024-03-11"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "year=2024/month=03/day=11"
 
@@ -82,7 +82,7 @@ def test_schema_and_record_single_literal_field():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"region": "eu"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "region=eu"
 
@@ -99,7 +99,7 @@ def test_schema_and_record_enum_then_date_order():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"region": "eu", "dt": datetime(2024, 3, 11)},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "region=eu/year=2024/month=03/day=11"
 
@@ -116,7 +116,7 @@ def test_schema_and_record_date_then_enum_order():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"region": "eu", "dt": datetime(2024, 3, 11)},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "year=2024/month=03/day=11/region=eu"
 
@@ -130,7 +130,7 @@ def test_schema_and_record_literal_with_slash_sanitized():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"region": "a/b"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "region=a_b"
 
@@ -145,7 +145,7 @@ def test_schema_and_record_unparseable_date_raises_parser_error():
         get_partition_path_from_schema_and_record(
             schema=schema,
             record={"dt": "not-a-date"},
-            fallback_date=FALLBACK_DATE,
+            extraction_date=EXTRACTION_DATE,
         )
 
 
@@ -158,7 +158,7 @@ def test_schema_and_record_no_format_datetime_still_date_segment():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"dt": datetime(2024, 3, 11)},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "year=2024/month=03/day=11"
 
@@ -172,6 +172,6 @@ def test_schema_and_record_no_format_parseable_string_literal_segment():
     result = get_partition_path_from_schema_and_record(
         schema=schema,
         record={"dt": "2024/03/11"},
-        fallback_date=FALLBACK_DATE,
+        extraction_date=EXTRACTION_DATE,
     )
     assert result == "dt=2024_03_11"
