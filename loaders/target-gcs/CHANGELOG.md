@@ -13,6 +13,8 @@
 
 ### Added
 
+- **target-gcs-extraction-patterns** — Base path pattern for extraction-pattern refactor. Details: [_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md](../../_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md) (when archived in Phase 6).
+  - Task 01: Add `target_gcs.paths.base` with `BasePathPattern` ABC (constructor, key prefix/template helpers, stubs for write/rotation/flush/chunk-format); constants `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; tests in `test_paths_base.py` (key prefix normalize, effective key template, minimal concrete subclass).
 - **hive-partition-key-value-paths** — Partition path literal segments as Hive-standard `key=value` (e.g. `region=eu`).
   - Unit tests expect key=value literal segments in partition path (TDD red phase); implementation in task 02.
   - Emit literal segments as `field_name=value` (Hive standard) in `get_partition_path_from_schema_and_record`; docstring updated.
