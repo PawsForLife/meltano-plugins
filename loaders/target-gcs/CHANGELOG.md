@@ -16,6 +16,7 @@
 - **target-gcs-extraction-patterns** — Base path pattern for extraction-pattern refactor. Details: [_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md](../../_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md) (when archived in Phase 6).
   - Task 01: Add `target_gcs.paths.base` with `BasePathPattern` ABC (constructor, key prefix/template helpers, stubs for write/rotation/flush/chunk-format); constants `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; tests in `test_paths_base.py` (key prefix normalize, effective key template, minimal concrete subclass).
   - Task 02: Implement `write_record_as_jsonl` (orjson + _json_default), `flush_and_close_handle` (hasattr flush), `maybe_rotate_if_at_limit`, `get_chunk_format_map` (stream, date, timestamp, format, chunk_index when chunking); tests for write, flush, rotation under/at limit, format map, chunk index in key.
+  - Task 03: Implement SimplePath in paths/simple.py (single path per stream, one handle, rotation at max_records_per_file; key via base helpers, process_record/close/current_key); tests in test_simple_path.py.
 - **hive-partition-key-value-paths** — Partition path literal segments as Hive-standard `key=value` (e.g. `region=eu`).
   - Unit tests expect key=value literal segments in partition path (TDD red phase); implementation in task 02.
   - Emit literal segments as `field_name=value` (Hive standard) in `get_partition_path_from_schema_and_record`; docstring updated.
