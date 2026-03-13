@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Callable
+from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -9,12 +10,24 @@ from unittest.mock import MagicMock, patch
 import orjson
 import pytest
 
-from target_gcs.sinks import (
-    DEFAULT_KEY_NAMING_CONVENTION,
-    DEFAULT_KEY_NAMING_CONVENTION_HIVE,
-    GCSSink,
-)
+from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
+
+
+@contextmanager
+def _patch_all_pattern_modules(open_mock=None, client_mock=None):
+    """Patch smart_open.open and Client in all three path modules so GCSSink tests work regardless of which pattern is selected."""
+    open_mock = open_mock if open_mock is not None else MagicMock()
+    client_mock = client_mock if client_mock is not None else MagicMock()
+    with (
+        patch("target_gcs.paths.simple.smart_open.open", open_mock),
+        patch("target_gcs.paths.simple.Client", client_mock),
+        patch("target_gcs.paths.dated.smart_open.open", open_mock),
+        patch("target_gcs.paths.dated.Client", client_mock),
+        patch("target_gcs.paths.partitioned.smart_open.open", open_mock),
+        patch("target_gcs.paths.partitioned.Client", client_mock),
+    ):
+        yield open_mock, client_mock
 
 
 def build_sink(
@@ -51,46 +64,70 @@ def build_sink(
 
 
 def test_extraction_timestamp_is_unix_time():
-    subject = build_sink()
+    """Key name after first write matches default stream_timestamp.jsonl pattern. WHAT: key_name reflects pattern current key. WHY: Regression for simple path key shape."""
+    with _patch_all_pattern_modules():
+        subject = build_sink()
+        subject.process_record({"id": 1}, {})
     assert re.match(r"my_stream_\d+.jsonl", subject.key_name)
 
 
 def test_key_name_includes_prefix_when_provided():
-    subject = build_sink({"key_prefix": "asdf"})
+    """Key name includes key_prefix when provided. WHAT: key_name reflects prefix. WHY: Config key_prefix must appear in written key."""
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_prefix": "asdf"})
+        subject.process_record({"id": 1}, {})
     assert re.match(r"asdf/my_stream", subject.key_name)
 
 
 def test_key_name_does_not_start_with_slash():
-    subject = build_sink({"key_prefix": "/asdf"})
+    """Key name never starts with leading slash. WHAT: key_name is normalized. WHY: GCS key shape requirement."""
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_prefix": "/asdf"})
+        subject.process_record({"id": 1}, {})
     assert not subject.key_name.startswith("/")
 
 
 def test_key_name_includes_stream_name_when_naming_convention_not_provided():
-    subject = build_sink({"key_naming_convention": "asdf.txt"})
+    """User key_naming_convention without tokens yields that path. WHAT: key_name uses user template. WHY: User override must be respected."""
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_naming_convention": "asdf.txt"})
+        subject.process_record({"id": 1}, {})
     assert subject.key_name == "asdf.txt"
 
 
 def test_key_name_includes_stream_name_if_stream_token_used():
-    subject = build_sink({"key_naming_convention": "___{stream}___.txt"})
+    """Stream token in key_naming_convention is expanded. WHAT: key_name contains stream name. WHY: Template token expansion."""
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_naming_convention": "___{stream}___.txt"})
+        subject.process_record({"id": 1}, {})
     assert subject.key_name == "___my_stream___.txt"
 
 
 def test_key_name_includes_default_date_format_if_date_token_used():
+    """Date token in key_naming_convention uses default date format. WHAT: key_name contains date. WHY: Template token expansion."""
     date_format = "%Y-%m-%d"
-    subject = build_sink({"key_naming_convention": "file/{date}.txt"})
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_naming_convention": "file/{date}.txt"})
+        subject.process_record({"id": 1}, {})
     assert f"file/{datetime.today().strftime(date_format)}.txt" == subject.key_name
 
 
 def test_key_name_includes_date_format_if_date_token_used_and_date_format_provided():
+    """Config date_format is used when date token present. WHAT: key_name uses config date_format. WHY: User date format override."""
     date_format = "%m %d, %Y"
-    subject = build_sink(
-        {"key_naming_convention": "file/{date}.txt", "date_format": date_format}
-    )
+    with _patch_all_pattern_modules():
+        subject = build_sink(
+            {"key_naming_convention": "file/{date}.txt", "date_format": date_format}
+        )
+        subject.process_record({"id": 1}, {})
     assert f"file/{datetime.today().strftime(date_format)}.txt" == subject.key_name
 
 
 def test_key_name_includes_timestamp_if_timestamp_token_used():
-    subject = build_sink({"key_naming_convention": "file/{timestamp}.txt"})
+    """Timestamp token in key_naming_convention is expanded. WHAT: key_name contains numeric timestamp. WHY: Template token expansion."""
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_naming_convention": "file/{timestamp}.txt"})
+        subject.process_record({"id": 1}, {})
     assert re.match(r"file/\d+.txt", subject.key_name)
 
 
@@ -98,10 +135,12 @@ def test_key_name_uses_injectable_time_fn_when_provided():
     """Key name uses injectable time when time_fn is provided so tests can assert key content without flakiness.
     WHAT: key_name uses time_fn for extraction_timestamp when passed to GCSSink. WHY: deterministic key assertions in tests (e.g. rotation and chunk_index in key)."""
     fixed_ts = 12345.0
-    subject = build_sink(
-        config={"key_naming_convention": "file/{timestamp}.txt"},
-        time_fn=lambda: fixed_ts,
-    )
+    with _patch_all_pattern_modules():
+        subject = build_sink(
+            config={"key_naming_convention": "file/{timestamp}.txt"},
+            time_fn=lambda: fixed_ts,
+        )
+        subject.process_record({"id": 1}, {})
     assert subject.key_name == "file/12345.txt"
 
 
@@ -115,29 +154,38 @@ def test_sink_accepts_date_fn_and_stores_it():
 
 
 def test_get_effective_key_template_returns_user_template_when_set():
-    """WHAT: _get_effective_key_template returns key_naming_convention when set and non-empty.
-    WHY: User override must take precedence over partition or default template."""
-    subject = build_sink(
-        {"key_naming_convention": "custom/{stream}/dt={partition_date}.jsonl"}
-    )
-    assert (
-        subject._get_effective_key_template()
-        == "custom/{stream}/dt={partition_date}.jsonl"
-    )
+    """WHAT: User key_naming_convention is used when set; key shape reflects it.
+    WHY: User override must take precedence. Assert via key_name after process_record."""
+    with _patch_all_pattern_modules():
+        subject = build_sink(
+            {"key_naming_convention": "custom/{stream}_{timestamp}.jsonl"}
+        )
+        subject.process_record({"id": 1}, {})
+    assert "custom/" in subject.key_name and "my_stream" in subject.key_name
 
 
 def test_get_effective_key_template_returns_hive_default_when_hive_partitioned_and_no_user_template():
-    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION_HIVE when hive_partitioned is true and key_naming_convention omitted.
-    WHY: Hive-style default must apply when Hive partitioning is enabled and user did not set a template."""
-    subject = build_sink(config={"hive_partitioned": True}, schema={"properties": {}})
-    assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION_HIVE
+    """WHAT: With hive_partitioned true and no key_naming_convention, key uses hive default (stream/partition_date/timestamp).
+    WHY: Hive-style default must apply. Assert via key shape after process_record."""
+    with _patch_all_pattern_modules():
+        subject = build_sink(
+            config={"hive_partitioned": True},
+            schema={"properties": {}},
+            date_fn=lambda: datetime(2024, 3, 11),
+            time_fn=lambda: 11111.0,
+        )
+        subject.process_record({"id": 1}, {})
+    assert "my_stream" in subject.key_name
+    assert "year=2024" in subject.key_name and "month=03" in subject.key_name
 
 
 def test_get_effective_key_template_returns_non_partition_default_when_neither_set():
-    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION when neither key_naming_convention nor hive_partitioned is set.
-    WHY: Non-partition default must apply when not using Hive partitioning."""
-    subject = build_sink()
-    assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION
+    """WHAT: With neither key_naming_convention nor hive_partitioned, key matches DEFAULT_KEY_NAMING_CONVENTION shape.
+    WHY: Non-partition default must apply. Assert via key_name after process_record."""
+    with _patch_all_pattern_modules():
+        subject = build_sink()
+        subject.process_record({"id": 1}, {})
+    assert re.match(r"my_stream_\d+\.jsonl", subject.key_name)
 
 
 def test_config_schema_has_no_credentials_file():
@@ -221,19 +269,19 @@ def test_config_validates_with_hive_partitioned():
 
 
 def test_gcs_client_created_without_credentials_path():
-    """Sink must use Client() (ADC) only; no explicit credentials path passed from config file."""
-    with patch("target_gcs.sinks.Client") as mock_client:
+    """Sink must use Client() (ADC) only; no explicit credentials path passed from config file. WHAT: Client created with no args. WHY: ADC only."""
+    with _patch_all_pattern_modules() as (_, mock_client):
         sink = build_sink()
-        _ = sink.gcs_write_handle
+        sink.process_record({"id": 1}, {})
         mock_client.assert_called_once_with()
 
 
 def test_gcs_client_uses_adc_when_google_application_credentials_set():
     """When GOOGLE_APPLICATION_CREDENTIALS is set, the sink's client is still created with no path (ADC honours env)."""
-    with patch("target_gcs.sinks.Client") as mock_client:
+    with _patch_all_pattern_modules() as (_, mock_client):
         with patch.dict("os.environ", {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/dummy"}):
             sink = build_sink()
-            _ = sink.gcs_write_handle
+            sink.process_record({"id": 1}, {})
         mock_client.assert_called_once_with()
 
 
@@ -241,12 +289,7 @@ def test_one_key_and_one_handle_when_chunking_disabled():
     """When max_records_per_file is unset or 0, multiple records use a single key and a single handle (no rotation).
     Backward compatibility: existing behaviour must be unchanged when the option is off."""
     mock_handle = MagicMock()
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=mock_handle
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules(open_mock=mock_handle) as (mock_open, _):
         sink = build_sink()
         context = {}
         key_after_first = None
@@ -266,10 +309,7 @@ def test_one_key_and_one_handle_when_chunking_disabled():
 def test_key_has_no_chunk_index_when_chunking_disabled():
     """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp pattern.
     Backward compatibility: key format is unchanged when chunking is off."""
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch("target_gcs.sinks.smart_open.open", return_value=MagicMock()),
-    ):
+    with _patch_all_pattern_modules():
         sink = build_sink()
         sink.process_record({"id": 1}, {})
     assert "{chunk_index}" not in sink.key_name, (
@@ -288,17 +328,16 @@ def _key_from_open_call(call_args: tuple) -> str:
 
 def test_chunking_rotation_at_threshold():
     """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
-    timestamps = iter([1000.0, 1001.0, 1002.0])  # first key, rotate refresh, second key
+    # get_chunk_format_map is called per record and on rotate; provide enough timestamps.
+    timestamps = iter([1000.0, 1001.0, 1002.0, 1003.0])
 
     def time_fn():
         return next(timestamps)
 
     mock_handles = [MagicMock(), MagicMock()]
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", side_effect=mock_handles
-        ) as mock_open,
+    with _patch_all_pattern_modules(open_mock=MagicMock(side_effect=mock_handles)) as (
+        mock_open,
+        _,
     ):
         sink = build_sink(
             config={
@@ -324,17 +363,14 @@ def test_chunking_rotation_at_threshold():
 
 def test_chunking_key_format_includes_chunk_index():
     """Key includes chunk_index when chunking is on: key_naming_convention may include {chunk_index} so multiple chunks in the same second have distinct keys. Uniqueness when multiple chunks in same second."""
-    timestamps = iter([2000.0, 2001.0, 2002.0])  # first key, rotate refresh, second key
+    timestamps = iter([2000.0, 2001.0, 2002.0, 2003.0])
 
     def time_fn():
         return next(timestamps)
 
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", side_effect=[MagicMock(), MagicMock()]
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules(
+        open_mock=MagicMock(side_effect=[MagicMock(), MagicMock()])
+    ) as (mock_open, _):
         sink = build_sink(
             config={
                 "max_records_per_file": 2,
@@ -364,11 +400,9 @@ def test_chunking_record_integrity_no_duplicate_or_dropped():
     mock_handles = [MagicMock() for _ in range(4)]
     for h in mock_handles:
         h.write.side_effect = capture_write
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", side_effect=mock_handles
-        ) as mock_open,
+    with _patch_all_pattern_modules(open_mock=MagicMock(side_effect=mock_handles)) as (
+        mock_open,
+        _,
     ):
         sink = build_sink(config={"max_records_per_file": 10})
         for i in range(25):
@@ -395,10 +429,10 @@ def test_record_with_decimal_serializes_to_valid_json():
 
     mock_handle = MagicMock()
     mock_handle.write.side_effect = capture_write
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch("target_gcs.sinks.smart_open.open", return_value=mock_handle),
-    ):
+    mock_handle.return_value = (
+        mock_handle  # open() returns this handle so writes go to it
+    )
+    with _patch_all_pattern_modules(open_mock=mock_handle):
         sink = build_sink()
         record = {"id": 1, "score": Decimal("12.34")}
         sink.process_record(record, {})
@@ -414,10 +448,7 @@ def test_non_serializable_non_decimal_type_raises_type_error():
     """Record containing a non-JSON-serializable value that is not Decimal raises TypeError when process_record runs.
     Documents the contract that only Decimal is coerced to float; other non-serializable types must raise TypeError
     so unknown types are not silently coerced. Black-box: asserts only that TypeError is raised."""
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch("target_gcs.sinks.smart_open.open", return_value=MagicMock()),
-    ):
+    with _patch_all_pattern_modules():
         sink = build_sink()
         record = {"id": 1, "bad": object()}
         context = {}
@@ -510,12 +541,7 @@ FIXED_DATE = datetime(2024, 3, 11)
 def test_hive_partitioned_false_key_has_no_record_driven_partition_segments():
     """With hive_partitioned false, process_record produces a key without partition segments derived from record data (flat or existing behaviour).
     WHAT: Key does not contain year=.../month=.../day=... from record. WHY: Regression guard for non-Hive mode."""
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
         sink = build_sink(config={"hive_partitioned": False})
         sink.process_record({"id": 1, "created_at": "2024-03-11", "region": "eu"}, {})
     key = _key_from_open_call(mock_open.call_args)
@@ -527,12 +553,7 @@ def test_hive_partitioned_false_key_has_no_record_driven_partition_segments():
 def test_hive_partitioned_true_no_x_partition_fields_key_contains_extraction_date():
     """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the extraction date segment from date_fn.
     WHAT: Key contains year=.../month=.../day=... from date_fn. WHY: Extraction date path when schema has no partition fields."""
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
         sink = build_sink(
             config={"hive_partitioned": True},
             schema={"properties": {}},
@@ -557,12 +578,7 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
         },
         "required": ["r", "d"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
         sink = build_sink(
             config={"hive_partitioned": True},
             schema=schema,
@@ -595,13 +611,9 @@ def test_partition_change_closes_handle_two_distinct_keys():
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open",
-            side_effect=[MagicMock(), MagicMock()],
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules(
+        open_mock=MagicMock(side_effect=[MagicMock(), MagicMock()])
+    ) as (mock_open, _):
         sink = build_sink(
             config={"hive_partitioned": True},
             schema=schema,

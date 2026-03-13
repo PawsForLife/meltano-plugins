@@ -19,6 +19,7 @@
   - Task 03: Implement SimplePath in paths/simple.py (single path per stream, one handle, rotation at max_records_per_file; key via base helpers, process_record/close/current_key); tests in test_simple_path.py.
   - Task 04: Implement DatedPath in paths/dated.py (hive-by-extraction-date; partition path from extraction_date via DEFAULT_PARTITION_DATE_FORMAT, one handle per run, rotation at limit); tests in test_dated_path.py.
   - Task 05: Implement PartitionedPath in paths/partitioned.py (schema-driven Hive: partition path per record from x-partition-fields via get_partition_path_from_schema_and_record; validate_partition_fields_schema at init; on partition change flush_and_close_handle and reset state; rotation at limit within partition; ParserError propagated); tests in test_partitioned_path.py.
+  - Task 06: Refactor GCSSink to select SimplePath, DatedPath, or PartitionedPath from config and schema in __init__; delegate process_record and close to pattern; key_name and storage_client delegate to pattern; remove inlined key/handle logic; tests updated to patch path modules and assert via key_name/mock open.
 - **hive-partition-key-value-paths** — Partition path literal segments as Hive-standard `key=value` (e.g. `region=eu`).
   - Unit tests expect key=value literal segments in partition path (TDD red phase); implementation in task 02.
   - Emit literal segments as `field_name=value` (Hive standard) in `get_partition_path_from_schema_and_record`; docstring updated.

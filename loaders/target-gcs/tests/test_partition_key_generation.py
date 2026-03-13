@@ -1,6 +1,7 @@
 """Tests for _build_key_for_record and partition/chunking behaviour."""
 
 from collections.abc import Callable
+from contextlib import contextmanager
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,23 @@ from dateutil.parser import ParserError as DateutilParserError
 
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
+
+
+@contextmanager
+def _patch_all_pattern_modules(open_mock=None, client_mock=None):
+    """Patch smart_open.open and Client in all three path modules for GCSSink tests."""
+    open_mock = open_mock if open_mock is not None else MagicMock()
+    client_mock = client_mock if client_mock is not None else MagicMock()
+    with (
+        patch("target_gcs.paths.simple.smart_open.open", open_mock),
+        patch("target_gcs.paths.simple.Client", client_mock),
+        patch("target_gcs.paths.dated.smart_open.open", open_mock),
+        patch("target_gcs.paths.dated.Client", client_mock),
+        patch("target_gcs.paths.partitioned.smart_open.open", open_mock),
+        patch("target_gcs.paths.partitioned.Client", client_mock),
+    ):
+        yield open_mock, client_mock
+
 
 # Fixed extraction date for deterministic partition resolution tests (no datetime.today() in tests).
 EXTRACTION_DATE = datetime(2024, 3, 11)
@@ -62,120 +80,131 @@ def _key_from_open_call(call_args: tuple) -> str:
 
 
 def test_sink_has_current_partition_path_when_hive_partitioned_set():
-    """Sink has _current_partition_path when hive_partitioned is true. WHAT: Partition state exists when feature enabled.
-    WHY: Handle lifecycle relies on this state."""
+    """With hive_partitioned and x-partition-fields, process_record produces a key containing the partition path. WHAT: Partition path appears in key.
+    WHY: Black-box guard for partition state; key shape reflects partition. Schema has no format for dt so path is literal dt=value."""
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    subject = build_sink(config={"hive_partitioned": True}, schema=schema)
-    assert hasattr(subject, "_current_partition_path")
-    assert subject._current_partition_path is None
+    with _patch_all_pattern_modules():
+        subject = build_sink(
+            config={"hive_partitioned": True},
+            schema=schema,
+            date_fn=lambda: EXTRACTION_DATE,
+            time_fn=lambda: 99999.0,
+        )
+        subject.process_record({"id": 1, "dt": "2024-01-01"}, {})
+    assert "dt=2024-01-01" in subject.key_name
 
 
 def test_build_key_for_record_differs_by_partition_path():
-    """Different partition paths yield different keys. WHAT: _build_key_for_record uses partition_path in the key so records in different partitions get distinct keys. WHY: Core partition-by-field behaviour."""
+    """Different partition paths yield different keys. WHAT: Keys differ when partition path differs. WHY: Core partition-by-field behaviour. Schema has no format so path is literal dt=value."""
     fixed_ts = 99999.0
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={
-            "hive_partitioned": True,
-            "key_naming_convention": "{stream}/{partition_date}_{timestamp}.jsonl",
-        },
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-        date_fn=lambda: EXTRACTION_DATE,
-    )
-    key_a = sink._build_key_for_record({"id": 1}, "year=2024/month=01/day=01")
-    key_b = sink._build_key_for_record({"id": 2}, "year=2024/month=02/day=01")
+    with _patch_all_pattern_modules() as (mock_open, _):
+        sink = build_sink(
+            config={
+                "hive_partitioned": True,
+                "key_naming_convention": "{stream}/{partition_date}_{timestamp}.jsonl",
+            },
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"id": 1, "dt": "2024-01-01"}, {})
+        key_a = sink.key_name
+        sink.process_record({"id": 2, "dt": "2024-02-01"}, {})
+        key_b = sink.key_name
     assert key_a != key_b
-    assert "year=2024/month=01/day=01" in key_a
-    assert "year=2024/month=02/day=01" in key_b
+    assert "dt=2024-01-01" in key_a
+    assert "dt=2024-02-01" in key_b
 
 
 def test_build_key_for_record_includes_hive_style_partition_path():
-    """Key contains the Hive-style partition path segment. WHAT: Key format is Hive-compatible for BigQuery/Spark discovery. WHY: Downstream consumers expect path like year=YYYY/month=MM/day=DD."""
+    """Key contains the partition path segment. WHAT: Key includes partition path from record. WHY: Path drives object location. Schema has no format so path is literal dt=value."""
     fixed_ts = 11111.0
-    hive_path = "year=2024/month=03/day=11"
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={
-            "hive_partitioned": True,
-            "key_naming_convention": "data/{partition_date}/{stream}_{timestamp}.jsonl",
-        },
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-    )
-    key = sink._build_key_for_record({"id": 1}, hive_path)
-    assert hive_path in key
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={
+                "hive_partitioned": True,
+                "key_naming_convention": "data/{partition_date}/{stream}_{timestamp}.jsonl",
+            },
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"id": 1, "dt": "2024-03-11"}, {})
+    key = sink.key_name
+    assert "dt=2024-03-11" in key
     assert "11111" in key
 
 
 def test_build_key_for_record_uses_hive_default_when_hive_partitioned_set_no_key_naming_convention():
-    """When hive_partitioned is true and key_naming_convention is omitted, key uses hive default pattern stream/partition_date/timestamp.jsonl.
-    WHAT: Effective default is {stream}/{partition_date}/{timestamp}.jsonl so downstream (BigQuery, Spark) can discover partitions. WHY: Regression guard for conditional default."""
+    """When hive_partitioned is true and key_naming_convention is omitted, key uses default pattern stream/partition_date/timestamp.jsonl.
+    WHAT: Default layout includes partition path. WHY: Regression guard. Schema has no format so partition path is literal dt=value."""
     fixed_ts = 77777.0
-    partition_path = "year=2024/month=03/day=11"
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={"hive_partitioned": True},
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-        date_fn=lambda: EXTRACTION_DATE,
-    )
-    record = {"id": 1, "dt": "2024-03-11"}
-    key = sink._build_key_for_record(record, partition_path)
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"id": 1, "dt": "2024-03-11"}, {})
+    key = sink.key_name
     assert "my_stream" in key, "key must contain stream name"
-    assert partition_path in key, "key must contain partition path segment"
+    assert "dt=2024-03-11" in key, "key must contain partition path segment"
     assert "77777" in key, "key must contain deterministic timestamp"
     assert key.endswith(".jsonl"), "key must end with .jsonl"
     flat_default = "my_stream_77777.jsonl"
     assert key != flat_default, "key must not be flat form {stream}_{timestamp}.jsonl"
-    assert "/" in key, "key must use hive layout stream/partition_path/timestamp.jsonl"
+    assert "/" in key, "key must use layout stream/partition_path/timestamp.jsonl"
 
 
 def test_build_key_for_record_uses_user_template_when_key_naming_convention_set():
     """When both hive_partitioned and key_naming_convention are set, built key follows the user template.
-    WHAT: Sink must use the user's key_naming_convention and never override it with the internal hive default.
-    WHY: Regression test so implementation never prefers hive default when key_naming_convention is provided."""
+    WHAT: Sink must use the user's key_naming_convention. WHY: Regression test. Use schema with format so partition_date is Hive date path."""
     fixed_ts = 88888.0
     partition_path = "year=2024/month=03/day=11"
     user_template = "{stream}/dt={partition_date}/{timestamp}.jsonl"
     schema = {
         "x-partition-fields": ["dt"],
-        "properties": {"dt": {"type": "string"}},
+        "properties": {"dt": {"type": "string", "format": "date-time"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={
-            "hive_partitioned": True,
-            "key_naming_convention": user_template,
-        },
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-        date_fn=lambda: EXTRACTION_DATE,
-    )
-    record = {"id": 1, "dt": "2024-03-11"}
-    key = sink._build_key_for_record(record, partition_path)
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={
+                "hive_partitioned": True,
+                "key_naming_convention": user_template,
+            },
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"id": 1, "dt": "2024-03-11T00:00:00"}, {})
+    key = sink.key_name
     assert "my_stream/" in key, "key must contain stream prefix from user template"
     assert "dt=year=2024" in key, (
-        "key must contain user segment dt=... (not internal default without dt=)"
+        "key must contain user segment dt=... with Hive partition path"
     )
-    assert partition_path in key or "dt=year=2024/month=03/day=11" in key, (
-        "key must contain full partition path in user format"
+    assert partition_path in key or "year=2024" in key, (
+        "key must contain partition path in user format"
     )
     assert "88888" in key, "key must contain deterministic timestamp"
     assert key.endswith(".jsonl"), "key must end with .jsonl"
@@ -186,25 +215,26 @@ def test_build_key_for_record_uses_user_template_when_key_naming_convention_set(
 
 def test_build_key_for_record_hive_token_expands_like_partition_date():
     """When key_naming_convention uses {hive}, the key contains the same partition segment as when using {partition_date}.
-    WHAT: {hive} is an alias for the partition path so keys like stream/{hive}/timestamp.jsonl match stream/{partition_date}/timestamp.jsonl.
-    WHY: Regression guard for {hive} alias in format map."""
+    WHAT: {hive} is an alias for the partition path. WHY: Regression guard for {hive} alias. Schema has no format so path is literal."""
     fixed_ts = 12345.0
-    partition_path = "year=2024/month=03/day=11"
+    partition_path = "dt=2024-03-11"  # literal when schema has no format
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={
-            "hive_partitioned": True,
-            "key_naming_convention": "{stream}/{hive}/{timestamp}.jsonl",
-        },
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-    )
-    record = {"id": 1, "dt": "2024-03-11"}
-    key = sink._build_key_for_record(record, partition_path)
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={
+                "hive_partitioned": True,
+                "key_naming_convention": "{stream}/{hive}/{timestamp}.jsonl",
+            },
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"id": 1, "dt": "2024-03-11"}, {})
+    key = sink.key_name
     assert partition_path in key, (
         "key must contain partition path segment (hive expands like partition_date)"
     )
@@ -218,16 +248,18 @@ def test_build_key_for_record_uses_extraction_date_when_partition_path_from_extr
     fixed_ts = 22222.0
     extraction_date_path = EXTRACTION_DATE.strftime(DEFAULT_HIVE_FORMAT)
     schema = {"properties": {}}
-    sink = build_sink(
-        config={
-            "hive_partitioned": True,
-            "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
-        },
-        schema=schema,
-        time_fn=lambda: fixed_ts,
-        date_fn=lambda: EXTRACTION_DATE,
-    )
-    key = sink._build_key_for_record({"other": "value"}, extraction_date_path)
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={
+                "hive_partitioned": True,
+                "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
+            },
+            schema=schema,
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: EXTRACTION_DATE,
+        )
+        sink.process_record({"other": "value"}, {})
+    key = sink.key_name
     assert extraction_date_path in key
     assert "year=2024" in key and "month=03" in key and "day=11" in key
 
@@ -237,7 +269,9 @@ def test_default_key_when_hive_partitioned_and_key_naming_convention_omitted():
     WHAT: key_name uses non-partition default pattern with no partition path. WHY: Regression gate so conditional-default
     change does not alter behaviour when hive_partitioned is unset."""
     fixed_ts = 12345.0
-    subject = build_sink(config={}, time_fn=lambda: fixed_ts)
+    with _patch_all_pattern_modules():
+        subject = build_sink(config={}, time_fn=lambda: fixed_ts)
+        subject.process_record({"id": 1}, {})
     assert subject.config.get("hive_partitioned") is not True
     assert subject.config.get("key_naming_convention") in (None, "")
     expected_key = "my_stream_12345.jsonl"
@@ -247,7 +281,9 @@ def test_default_key_when_hive_partitioned_and_key_naming_convention_omitted():
 def test_key_name_unchanged_when_hive_partitioned_unset():
     """With hive_partitioned unset, key_name uses run date and single-key semantics. WHAT: No behaviour change when option unset. WHY: Backward compatibility."""
     date_format = "%Y-%m-%d"
-    subject = build_sink({"key_naming_convention": "file/{date}.txt"})
+    with _patch_all_pattern_modules():
+        subject = build_sink({"key_naming_convention": "file/{date}.txt"})
+        subject.process_record({"id": 1}, {})
     assert subject.config.get("hive_partitioned") is not True
     assert f"file/{datetime.today().strftime(date_format)}.txt" == subject.key_name
 
@@ -257,31 +293,26 @@ def test_backward_compat_key_name_unchanged_when_hive_partitioned_unset():
     fixed_date = datetime(2024, 3, 11)
     date_format = "%Y-%m-%d"
     expected_date_str = fixed_date.strftime(date_format)
-    subject = build_sink(
-        config={"key_naming_convention": "file/{date}.txt"},
-        date_fn=lambda: fixed_date,
-    )
-    assert subject.config.get("hive_partitioned") is not True
-    assert subject.key_name == f"file/{expected_date_str}.txt"
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
+        subject = build_sink(
+            config={"key_naming_convention": "file/{date}.txt"},
+            date_fn=lambda: fixed_date,
+        )
+        assert subject.config.get("hive_partitioned") is not True
         context = {}
         for i in range(3):
             subject.process_record(
                 {"id": i, "created_at": "2024-01-01", "x": i}, context
             )
         keys_opened = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert subject.key_name == f"file/{expected_date_str}.txt"
     assert mock_open.call_count == 1
     assert keys_opened[0] == f"file/{expected_date_str}.txt"
 
 
 def test_chunking_with_partition_rotation_within_partition():
     """Chunk rotation within same partition produces two keys with same partition path. WHAT: With hive_partitioned and max_records_per_file=2, three records in same partition yield two files (chunk 0 and 1), both under same partition path. WHY: Chunking interaction with partition-by-field."""
-    timestamps = iter([3000.0, 3000.0, 3001.0])
+    timestamps = iter([3000.0, 3000.0, 3001.0, 3002.0])
 
     def time_fn():
         return next(timestamps)
@@ -292,11 +323,9 @@ def test_chunking_with_partition_rotation_within_partition():
         "required": ["dt"],
     }
     mock_handles = [MagicMock(), MagicMock()]
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", side_effect=mock_handles
-        ) as mock_open,
+    with _patch_all_pattern_modules(open_mock=MagicMock(side_effect=mock_handles)) as (
+        mock_open,
+        _,
     ):
         sink = build_sink(
             config={
@@ -332,13 +361,9 @@ def test_partition_change_then_return_creates_three_distinct_keys():
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open",
-            side_effect=[MagicMock(), MagicMock(), MagicMock()],
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules(
+        open_mock=MagicMock(side_effect=[MagicMock(), MagicMock(), MagicMock()])
+    ) as (mock_open, _):
         sink = build_sink(
             config={
                 "hive_partitioned": True,
@@ -368,13 +393,7 @@ def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
         "properties": {"created_at": {"type": "string"}},
         "required": ["created_at"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open",
-            return_value=MagicMock(),
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
         sink = build_sink(
             config={
                 "hive_partitioned": True,
@@ -405,13 +424,7 @@ def test_sink_uses_literal_segment_when_partition_field_unparseable():
         "properties": {"created_at": {"type": "string"}},
         "required": ["created_at"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open",
-            return_value=MagicMock(),
-        ) as mock_open,
-    ):
+    with _patch_all_pattern_modules() as (mock_open, _):
         sink = build_sink(
             config={
                 "hive_partitioned": True,
@@ -443,12 +456,7 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
         "required": ["dt", "region"],
     }
     record = {"id": 1, "region": "eu", "dt": "2024-03-11"}
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open_a,
-    ):
+    with _patch_all_pattern_modules() as (mock_open_a, _):
         sink_a = build_sink(
             config={"hive_partitioned": True},
             schema=schema_a,
@@ -458,12 +466,7 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
         )
         sink_a.process_record(record, {})
     key_a = _key_from_open_call(mock_open_a.call_args)
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch(
-            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
-        ) as mock_open_b,
-    ):
+    with _patch_all_pattern_modules() as (mock_open_b, _):
         sink_b = build_sink(
             config={"hive_partitioned": True},
             schema=schema_b,
@@ -493,10 +496,7 @@ def test_sink_raises_parser_error_when_partition_field_date_format_unparseable()
         "properties": {"dt": {"type": "string", "format": "date-time"}},
         "required": ["dt"],
     }
-    with (
-        patch("target_gcs.sinks.Client"),
-        patch("target_gcs.sinks.smart_open.open", return_value=MagicMock()),
-    ):
+    with _patch_all_pattern_modules():
         sink = build_sink(
             config={"hive_partitioned": True},
             schema=schema,
