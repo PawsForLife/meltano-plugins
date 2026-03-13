@@ -114,9 +114,7 @@ def test_partitioned_path_keys_contain_partition_segments_from_record():
             time_fn=lambda: fixed_ts,
             date_fn=lambda: fixed_dt,
         )
-        subject.process_record(
-            {"id": 1, "region": "eu", "dt": "2024-03-11"}, {}
-        )
+        subject.process_record({"id": 1, "region": "eu", "dt": "2024-03-11"}, {})
     key = _key_from_open_call(mock_open.call_args)
     assert "region=eu" in key
     assert "dt=2024-03-11" in key
@@ -214,7 +212,11 @@ def test_partitioned_path_rotation_at_limit_within_partition():
         side_effect=mock_handles,
     ) as mock_open:
         subject = build_partitioned_sink(
-            config={"bucket_name": "test-bucket", "hive_partitioned": True, "max_records_per_file": 2},
+            config={
+                "bucket_name": "test-bucket",
+                "hive_partitioned": True,
+                "max_records_per_file": 2,
+            },
             schema=schema,
             time_fn=time_fn,
             date_fn=lambda: datetime(2024, 3, 11),

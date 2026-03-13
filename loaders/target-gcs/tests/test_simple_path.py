@@ -129,9 +129,7 @@ def test_simple_path_close_flushes_and_closes_handle():
     """WHAT: After processing records, close() flushes and closes the handle so no further write is possible (or close is idempotent).
     WHY: Lifecycle must release resources; tests verify via mock handle close called."""
     mock_handle = MagicMock()
-    with patch(
-        "target_gcs.paths.simple.smart_open.open", return_value=mock_handle
-    ):
+    with patch("target_gcs.paths.simple.smart_open.open", return_value=mock_handle):
         subject = _build_simple_path(
             time_fn=lambda: 1.0,
             date_fn=lambda: datetime(2024, 1, 1),

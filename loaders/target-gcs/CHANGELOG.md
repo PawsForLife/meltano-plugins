@@ -37,6 +37,7 @@
 
 ### Changed
 
+- **target-gcs-extraction-patterns (task 08)** — GCSSink now delegates to extraction patterns (SimplePath, DatedPath, PartitionedPath); behaviour and key shapes unchanged; no new required config or env vars.
 - **target-gcs-dedup-split-logic** — Unify partition date format constant: single source for `DEFAULT_PARTITION_DATE_FORMAT` in `partition_path.py`; sinks import it; removed local constant from sinks.py.
   - Add `_flush_and_close_handle` on GCSSink; refactor `_rotate_to_new_chunk` and `_close_handle_and_clear_state` to use it.
   - Add `_apply_key_prefix_and_normalize(base)` on GCSSink; refactor `_build_key_for_record` to use it (prefix + normalize logic centralized).

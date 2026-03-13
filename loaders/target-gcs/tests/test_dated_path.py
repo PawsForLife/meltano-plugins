@@ -130,9 +130,7 @@ def test_dated_path_close_flushes_and_closes_handle():
     """WHAT: After processing records, close() flushes and closes the handle (observable via mock).
     WHY: Lifecycle must call flush_and_close_handle on close."""
     mock_handle = MagicMock()
-    with patch(
-        "target_gcs.paths.dated.smart_open.open", return_value=mock_handle
-    ):
+    with patch("target_gcs.paths.dated.smart_open.open", return_value=mock_handle):
         subject = build_dated_sink(
             time_fn=lambda: 1.0,
             date_fn=lambda: datetime(2024, 1, 1),

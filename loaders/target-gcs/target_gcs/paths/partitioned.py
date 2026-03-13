@@ -47,9 +47,7 @@ class PartitionedPath(BasePathPattern):
     ) -> None:
         x_partition_fields = schema.get("x-partition-fields")
         if isinstance(x_partition_fields, list) and len(x_partition_fields) > 0:
-            validate_partition_fields_schema(
-                stream_name, schema, x_partition_fields
-            )
+            validate_partition_fields_schema(stream_name, schema, x_partition_fields)
         self._current_partition_path: str | None = None
         super().__init__(
             target=target,
