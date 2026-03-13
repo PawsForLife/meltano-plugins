@@ -314,7 +314,8 @@ def test_chunking_with_partition_rotation_within_partition():
     assert mock_open.call_count == 2
     keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
     assert keys[0] != keys[1]
-    partition_segment = "year=2024/month=03/day=11"
+    # Schema has no format for dt; string "2024-03-11" is literal segment (no string date inference).
+    partition_segment = "2024-03-11"
     assert partition_segment in keys[0], "first key must contain partition path"
     assert partition_segment in keys[1], "second key must contain same partition path"
 
@@ -356,9 +357,6 @@ def test_partition_change_then_return_creates_three_distinct_keys():
     assert keys[2] != keys[0], "third key (A') must differ from first (A); no reopen"
 
 
-@pytest.mark.xfail(
-    reason="Implementation in task 03: string date inference removed; will pass after partition_path.py updated."
-)
 def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
     """No format → literal segment even for dateutil-parseable string.
     WHAT: Schema has no format for partition field; record value is dateutil-parseable string
@@ -495,10 +493,12 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
         sink_b.process_record(record, {})
     key_b = _key_from_open_call(mock_open_b.call_args)
     assert key_a != key_b
-    idx_eu_a, idx_date_a = key_a.index("eu"), key_a.index("year=2024")
-    idx_eu_b, idx_date_b = key_b.index("eu"), key_b.index("year=2024")
-    assert idx_eu_a < idx_date_a, "stream_a key must have region before date"
-    assert idx_date_b < idx_eu_b, "stream_b key must have date before region"
+    # Schema has no format for dt; string "2024-03-11" is literal segment (no string date inference).
+    literal_date = "2024-03-11"
+    idx_eu_a, idx_dt_a = key_a.index("eu"), key_a.index(literal_date)
+    idx_eu_b, idx_dt_b = key_b.index("eu"), key_b.index(literal_date)
+    assert idx_eu_a < idx_dt_a, "stream_a key must have region before date"
+    assert idx_dt_b < idx_eu_b, "stream_b key must have date before region"
 
 
 def test_sink_raises_parser_error_when_partition_field_date_format_unparseable():

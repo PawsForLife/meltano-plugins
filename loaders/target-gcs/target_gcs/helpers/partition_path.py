@@ -1,7 +1,6 @@
 from datetime import date, datetime
 
 from dateutil import parser as dateutil_parser
-from dateutil.parser import ParserError as DateutilParserError
 
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
 
@@ -16,11 +15,12 @@ def get_partition_path_from_schema_and_record(
     """Build partition path from stream schema (x-partition-fields) and record.
 
     When x-partition-fields is missing or empty, returns fallback_date formatted
-    with partition_date_format. Otherwise, for each field in order: if the value
-    is date-parseable (schema format date/date-time, or datetime/date, or
-    dateutil-parseable string), appends one Hive-style segment
-    (e.g. year=YYYY/month=MM/day=DD); else appends a path-safe literal
-    (slashes in str(value) replaced with underscore). Segments are joined with /.
+    with partition_date_format. Otherwise, for each field in order: string values
+    are parsed as dates only when the property schema has format "date" or
+    "date-time"; native datetime/date are always treated as date segments. When
+    format is absent and the value is a string, it is appended as a path-safe
+    literal (slashes replaced with underscore). No date inference from string
+    content. Segments are joined with /.
 
     Args:
         schema: Stream schema dict; may contain x-partition-fields list.
@@ -58,12 +58,6 @@ def get_partition_path_from_schema_and_record(
         elif isinstance(value, (datetime, date)):
             is_date = True
             date_value = value
-        elif isinstance(value, str):
-            try:
-                date_value = dateutil_parser.parse(value)
-                is_date = True
-            except DateutilParserError:
-                pass
 
         if is_date and date_value is not None:
             segments.append(date_value.strftime(partition_date_format))

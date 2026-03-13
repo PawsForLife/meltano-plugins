@@ -278,9 +278,6 @@ def test_schema_and_record_no_format_datetime_still_date_segment():
     assert result == "year=2024/month=03/day=11"
 
 
-@pytest.mark.xfail(
-    reason="Implementation in task 03: string date inference removed; will pass after partition_path.py updated."
-)
 def test_schema_and_record_no_format_parseable_string_literal_segment():
     """No format + dateutil-parseable string yields path-safe literal. WHAT: Partition field has no format; value is string '2024/03/11'; path is literal segment with slashes replaced. WHY: We must not infer date from string content when schema does not declare date/date-time format."""
     schema = {
