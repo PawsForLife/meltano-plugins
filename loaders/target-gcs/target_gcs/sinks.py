@@ -18,9 +18,7 @@ from .helpers import (
     get_partition_path_from_schema_and_record,
     validate_partition_fields_schema,
 )
-
-# Default Hive-style partition path format when partition_date_format is omitted by callers.
-DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+from .helpers.partition_path import DEFAULT_PARTITION_DATE_FORMAT
 
 # Default key template when hive_partitioned is false.
 DEFAULT_KEY_NAMING_CONVENTION = "{stream}_{timestamp}.{format}"

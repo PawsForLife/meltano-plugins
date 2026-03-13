@@ -25,6 +25,7 @@
 
 ### Changed
 
+- **target-gcs-dedup-split-logic** — Unify partition date format constant: single source for `DEFAULT_PARTITION_DATE_FORMAT` in `partition_path.py`; sinks import it; removed local constant from sinks.py.
 - **partition-path-extraction-date-clarity:** Parameter and naming clarity: `fallback_date` → `extraction_date` in `get_partition_path_from_schema_and_record`; sink attribute `self.fallback` → `self._extraction_date`. All "fallback" wording in partition-path context (docstrings, comments, test names) → "extraction date" so the no-partition-fields case is clearly the extraction date path, not a fallback. No behaviour change.
 - **hive-partition-key-value-paths:** Literal partition path segments are now Hive-standard `key=value` (e.g. `region=eu`, `country=UK`) instead of value-only. Improves compatibility with Athena, Glue, BigQuery external tables, and Spark. Existing object keys that used value-only literal segments are not migrated; new writes use key=value segments.
 - **hive-partition-format-only (breaking):** Partition path no longer infers dates from string values; only schema `format: "date"` or `"date-time"` (and native datetime/date) produce Hive date segments. Dateutil-parseable strings without that format now produce path-safe literal segments. See [hive-partition-format-only.md](../../_archive/hive-partition-format-only/hive-partition-format-only.md).
