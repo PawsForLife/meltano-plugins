@@ -59,3 +59,5 @@ Task plan created: 09-helpers-cleanup at plans/tasks/09-helpers-cleanup.md
 Task plan created: 10-documentation at plans/tasks/10-documentation.md
 
 Task 01-update-constants completed, tests passing
+
+Task 02-fix-date-as-partition completed, tests passing

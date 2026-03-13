@@ -5,6 +5,7 @@
 ### Fixed
 
 - **target-gcs:** Define `max_records` in `_process_record_hive_partitioned` so chunked record count increment runs correctly (regression from rotate refactor).
+- **target-gcs:** `date_as_partition` in `_partitioned/string_functions.py` now returns the formatted date string instead of `None` (split-path-filename task 02).
 
 ### Removed
 
@@ -39,6 +40,7 @@
 
 - **split-path-filename** — Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md)
   - Task 01: Add `PATH_SIMPLE`, `PATH_DATED`, `PATH_PARTITIONED`, `FILENAME_TEMPLATE`; remove `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; update `paths/__init__.py` exports.
+  - Task 02: Fix `date_as_partition` to return formatted date string; add unit tests in `tests/unit/paths/_partitioned/test_string_functions.py`.
 - **restructure-target-gcs-tests** — Details: [restructure-target-gcs-tests.md](../../_archive/restructure-target-gcs-tests/restructure-target-gcs-tests.md).
   - Task 01: Rename test files to match source modules (test_core→test_target, test_simple_path→test_paths_simple, test_dated_path→test_paths_dated, test_partitioned_path→test_paths_partitioned).
 - **target-gcs-extraction-patterns (task 08)** — GCSSink now delegates to extraction patterns (SimplePath, DatedPath, PartitionedPath); behaviour and key shapes unchanged; no new required config or env vars.
