@@ -1,4 +1,4 @@
-"""Tests for get_partition_path_from_record: partition path resolution from record date field."""
+"""Tests for partition path helpers: get_partition_path_from_record and get_partition_path_from_schema_and_record."""
 
 import warnings
 from datetime import datetime
@@ -7,6 +7,7 @@ import pytest
 from dateutil.parser import ParserError, UnknownTimezoneWarning
 
 from target_gcs.helpers import get_partition_path_from_record
+from target_gcs.helpers.partition_path import get_partition_path_from_schema_and_record
 
 # Fixed fallback date for deterministic partition resolution tests (no datetime.today() in tests).
 FALLBACK_DATE = datetime(2024, 3, 11)
@@ -121,3 +122,130 @@ def test_partition_path_unknown_timezone_surfaces_visibility():
     assert len(unknown_tz_warnings) >= 1, (
         "UnknownTimezoneWarning must be surfaced for unsupported timezone"
     )
+
+
+# --- get_partition_path_from_schema_and_record ---
+
+
+def test_schema_and_record_no_x_partition_fields_uses_fallback():
+    """No x-partition-fields in schema yields fallback_date formatted path. WHAT: When schema has no key or empty schema, path is fallback_date.strftime(partition_date_format). WHY: Ensures predictable path when partitioning is not schema-driven."""
+    result = get_partition_path_from_schema_and_record(
+        schema={},
+        record={"any": "value"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+
+
+def test_schema_and_record_empty_x_partition_fields_uses_fallback():
+    """Empty x-partition-fields list yields same as no key (fallback path). WHAT: schema with x-partition-fields: [] returns fallback_date formatted. WHY: Empty list is treated as "no partition fields" per plan."""
+    result = get_partition_path_from_schema_and_record(
+        schema={"x-partition-fields": []},
+        record={"region": "eu"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == FALLBACK_DATE.strftime(DEFAULT_HIVE_FORMAT)
+
+
+def test_schema_and_record_single_date_field_datetime():
+    """Single date field with datetime value yields one Hive date segment. WHAT: x-partition-fields [dt], properties dt format date-time, record dt=datetime → year=2024/month=03/day=11. WHY: Core date-segment behaviour from native datetime."""
+    schema = {
+        "properties": {"dt": {"type": "string", "format": "date-time"}},
+        "x-partition-fields": ["dt"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"dt": datetime(2024, 3, 11)},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "year=2024/month=03/day=11"
+
+
+def test_schema_and_record_single_date_field_string_iso():
+    """Single date field with ISO date string yields same Hive segment. WHAT: record dt='2024-03-11', format 'date' → year=2024/month=03/day=11. WHY: String dates must be parsed and formatted like datetime."""
+    schema = {
+        "properties": {"dt": {"type": "string", "format": "date"}},
+        "x-partition-fields": ["dt"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"dt": "2024-03-11"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "year=2024/month=03/day=11"
+
+
+def test_schema_and_record_single_literal_field():
+    """Single literal (non-date) field yields one path segment. WHAT: x-partition-fields [region], record region='eu', no date format → 'eu'. WHY: Literal partition keys (e.g. region) produce path-safe folder names."""
+    schema = {
+        "properties": {"region": {"type": "string"}},
+        "x-partition-fields": ["region"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"region": "eu"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "eu"
+
+
+def test_schema_and_record_enum_then_date_order():
+    """Two fields (enum then date) produce path in array order. WHAT: region then dt → 'eu/year=2024/month=03/day=11'. WHY: Path order must follow x-partition-fields array order."""
+    schema = {
+        "properties": {
+            "region": {"type": "string"},
+            "dt": {"type": "string", "format": "date-time"},
+        },
+        "x-partition-fields": ["region", "dt"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"region": "eu", "dt": datetime(2024, 3, 11)},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "eu/year=2024/month=03/day=11"
+
+
+def test_schema_and_record_date_then_enum_order():
+    """Two fields (date then enum) produce path in array order. WHAT: dt then region → 'year=2024/month=03/day=11/eu'. WHY: Path order must follow x-partition-fields array order."""
+    schema = {
+        "properties": {
+            "dt": {"type": "string", "format": "date-time"},
+            "region": {"type": "string"},
+        },
+        "x-partition-fields": ["dt", "region"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"region": "eu", "dt": datetime(2024, 3, 11)},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "year=2024/month=03/day=11/eu"
+
+
+def test_schema_and_record_literal_with_slash_sanitized():
+    """Literal value containing slash is path-sanitized (e.g. slash → underscore). WHAT: record region='a/b' yields segment 'a_b'. WHY: Embedded slashes would break path structure."""
+    schema = {
+        "properties": {"region": {"type": "string"}},
+        "x-partition-fields": ["region"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"region": "a/b"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "a_b"
+
+
+def test_schema_and_record_unparseable_date_raises_parser_error():
+    """Unparseable date string when schema suggests date raises ParserError. WHAT: record dt='not-a-date', format date/date-time → ParserError from dateutil. WHY: No silent fallback; caller must handle invalid data."""
+    schema = {
+        "properties": {"dt": {"type": "string", "format": "date"}},
+        "x-partition-fields": ["dt"],
+    }
+    with pytest.raises(ParserError):
+        get_partition_path_from_schema_and_record(
+            schema=schema,
+            record={"dt": "not-a-date"},
+            fallback_date=FALLBACK_DATE,
+        )

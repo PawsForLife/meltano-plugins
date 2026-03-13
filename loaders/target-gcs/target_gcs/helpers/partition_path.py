@@ -1,6 +1,76 @@
 from datetime import date, datetime
 
 from dateutil import parser as dateutil_parser
+from dateutil.parser import ParserError as DateutilParserError
+
+DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+
+
+def get_partition_path_from_schema_and_record(
+    schema: dict,
+    record: dict,
+    fallback_date: datetime,
+    *,
+    partition_date_format: str = DEFAULT_PARTITION_DATE_FORMAT,
+) -> str:
+    """Build partition path from stream schema (x-partition-fields) and record.
+
+    When x-partition-fields is missing or empty, returns fallback_date formatted
+    with partition_date_format. Otherwise, for each field in order: if the value
+    is date-parseable (schema format date/date-time, or datetime/date, or
+    dateutil-parseable string), appends one Hive-style segment
+    (e.g. year=YYYY/month=MM/day=DD); else appends a path-safe literal
+    (slashes in str(value) replaced with underscore). Segments are joined with /.
+
+    Args:
+        schema: Stream schema dict; may contain x-partition-fields list.
+        record: Record dict with field values.
+        fallback_date: Date used when x-partition-fields is missing or empty.
+        partition_date_format: strftime format for date segments (keyword-only).
+
+    Returns:
+        Partition path string (e.g. "eu/year=2024/month=03/day=11").
+
+    Raises:
+        ParserError: From dateutil when a string is parsed as date and fails.
+    """
+    partition_fields = schema.get("x-partition-fields")
+    if not (isinstance(partition_fields, list) and len(partition_fields) > 0):
+        return fallback_date.strftime(partition_date_format)
+
+    properties = schema.get("properties") or {}
+    segments: list[str] = []
+
+    for field in partition_fields:
+        value = record.get(field)
+        prop_schema = properties.get(field) or {}
+        fmt = prop_schema.get("format") if isinstance(prop_schema, dict) else None
+
+        is_date = False
+        date_value: datetime | date | None = None
+
+        if fmt in ("date", "date-time"):
+            is_date = True
+            if isinstance(value, (datetime, date)):
+                date_value = value
+            elif isinstance(value, str):
+                date_value = dateutil_parser.parse(value)
+        elif isinstance(value, (datetime, date)):
+            is_date = True
+            date_value = value
+        elif isinstance(value, str):
+            try:
+                date_value = dateutil_parser.parse(value)
+                is_date = True
+            except DateutilParserError:
+                pass
+
+        if is_date and date_value is not None:
+            segments.append(date_value.strftime(partition_date_format))
+        else:
+            segments.append(str(value).replace("/", "_"))
+
+    return "/".join(segments)
 
 
 def get_partition_path_from_record(
