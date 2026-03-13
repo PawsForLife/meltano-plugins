@@ -28,3 +28,4 @@
 - Task 04-config-schema completed, tests passing
 - Task 05-sink-init-validation completed, tests passing
 - Task 06-sink-record-processing completed, tests passing. Task 05 had already switched path resolution to get_partition_path_from_schema_and_record with DEFAULT_PARTITION_DATE_FORMAT; task 06 renamed the method to _process_record_hive_partitioned and updated docstring/call site.
+- Task 07-sink-process-record-dispatch completed (no code change). Task 05/06 already had process_record dispatch on self.config.get("hive_partitioned"): when true call _process_record_hive_partitioned, else _process_record_single_or_chunked; docstring already describes dispatch by hive_partitioned with no partition_date_field reference. Confirmed in sinks.py lines 285–296; full target-gcs test suite (109 tests) passes.
