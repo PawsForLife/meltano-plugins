@@ -29,7 +29,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 ### `get_partition_path_from_schema_and_record` (`target_gcs.helpers.partition_path`)
 
 - **Signature**: `get_partition_path_from_schema_and_record(schema, record, fallback_date, *, partition_date_format) -> str`
-- **Role**: Build partition path from stream schema `x-partition-fields` and record. Path order = array order. Date-parseable values → `year=.../month=.../day=...` segment; other values → literal folder (path-unsafe chars e.g. `/` replaced). Used by `GCSSink` when `hive_partitioned` is true. Exported from `target_gcs.helpers`. Unparseable date strings raise `ParserError`. Fallback date used when field missing or empty.
+- **Role**: Build partition path from stream schema `x-partition-fields` and record. Path order = array order. **Date-parseable** is determined only by the field's schema having `format: "date"` or `"date-time"`; string values are never parsed as dates without that format. Native `datetime`/`date` values are always treated as date segments. When format is absent, values are emitted as literal segments (path-safe: `str(value).replace("/", "_")`). Date-parseable → `year=.../month=.../day=...`; other → literal folder. Used by `GCSSink` when `hive_partitioned` is true. Exported from `target_gcs.helpers`. Unparseable date strings (when format is date/date-time) raise `ParserError`. Fallback date used when field missing or empty.
 - **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style).
 
 ### GCSTarget (`target_gcs.target`)
@@ -84,7 +84,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 
 ## Hive partitioning behaviour
 
-When `hive_partitioned` is true, the sink uses one active write handle. On each record it resolves the partition path via `get_partition_path_from_schema_and_record` from the stream schema `x-partition-fields` and the record (or fallback date when `x-partition-fields` is absent or empty). Path order = array order; date-parseable values → `year=.../month=.../day=...`; other values → literal folder (path-unsafe chars replaced). Unparseable date strings raise `ParserError`. When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition.
+When `hive_partitioned` is true, the sink uses one active write handle. On each record it resolves the partition path via `get_partition_path_from_schema_and_record` from the stream schema `x-partition-fields` and the record (or fallback date when `x-partition-fields` is absent or empty). Path order = array order. **Date-parseable** is determined only by schema `format: "date"` or `"date-time"` for that field; there is no inference from value type or dateutil-parseable string when format is not set. Native `datetime`/`date` are still processed as date segments. Date-parseable values → `year=.../month=.../day=...`; other values → literal folder (path-unsafe chars replaced). Unparseable date strings (when format is date/date-time) raise `ParserError`. When the partition path changes, the sink closes the handle and clears key/partition state; when the same partition "returns" later, the next write gets a new key (new file). Chunking (`max_records_per_file`) rotates within the current partition.
 
 ### Partition fields validation (sink init)
 
