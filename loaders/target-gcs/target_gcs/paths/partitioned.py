@@ -1,9 +1,9 @@
 """Partitioned path pattern: Hive path from schema x-partition-fields.
 
-Partition path is resolved per record via get_partition_path_from_schema_and_record;
-validation at init via validate_partition_fields_schema; on partition change the
-handle is closed and state reset; when a partition returns a new file is created;
-rotation at limit within partition; ParserError from unparseable date is propagated.
+Partition path is resolved per record via hive_path(record); validation at init via
+validate_partition_fields_schema; on partition change the handle is closed and state
+reset; when a partition returns a new file is created; rotation at limit within
+partition; ParserError from unparseable date is propagated.
 """
 
 from __future__ import annotations
@@ -13,11 +13,7 @@ from typing import Any
 import smart_open
 
 from target_gcs.constants import PATH_PARTITIONED
-from target_gcs.helpers import (
-    get_partition_path_from_schema_and_record,
-    validate_partition_fields_schema,
-)
-from target_gcs.helpers.partition_path import DEFAULT_PARTITION_DATE_FORMAT
+from target_gcs.helpers import validate_partition_fields_schema
 from target_gcs.paths.base import BasePathPattern
 
 from ._partitioned import get_hive_path_generator
@@ -26,10 +22,10 @@ from ._partitioned import get_hive_path_generator
 class PartitionedPath(BasePathPattern):
     """Hive path from schema x-partition-fields; validation at init; handle lifecycle on partition change (timestamp-only).
 
-    Partition path is resolved per record from x-partition-fields via
-    get_partition_path_from_schema_and_record. On partition change the handle is
-    closed and state reset; when the same partition is seen again a new file is
-    created. One handle at a time; rotation at limit within partition.
+    Partition path is resolved per record from x-partition-fields via hive_path(record).
+    On partition change the handle is closed and state reset; when the same partition
+    is seen again a new file is created. One handle at a time; rotation at limit within
+    partition.
     """
 
     def __init__(
@@ -76,29 +72,22 @@ class PartitionedPath(BasePathPattern):
 
         return "/".join(hive_path_elements)
 
-    def record_path(self, partition_path: str) -> str:
-        """Build object key for the given partition path: stream + partition_date + timestamp."""
-        path = PATH_PARTITIONED.format(
-            stream=self.stream_name, hive_path=partition_path
-        )
-        filename = self.filename_for_current_file()
-        return self.full_key(path, filename)
+    def path_for_record(self, record: dict[str, Any]) -> str:
+        """Return path for the given record using hive_path(record)."""
+        hive_path_str = self.hive_path(record)
+        return PATH_PARTITIONED.format(stream=self.stream_name, hive_path=hive_path_str)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
-        """Resolve partition path, handle partition change (close + reset), rotate if at limit, open handle if needed, write record. Re-raises ParserError from get_partition_path_from_schema_and_record."""
-        partition_path = get_partition_path_from_schema_and_record(
-            self.schema,
-            record,
-            self._extraction_date,
-            partition_date_format=DEFAULT_PARTITION_DATE_FORMAT,
-        )
-        if partition_path != self._current_partition_path:
+        """Resolve path via path_for_record, handle partition change (close + reset), rotate if at limit, open handle if needed, write record. Re-raises ParserError from hive_path."""
+        path = self.path_for_record(record)
+        if path != self._current_partition_path:
             self.flush_and_close_handle()
-            self._current_partition_path = partition_path
+            self._current_partition_path = path
             self._records_written_in_current_file = 0
             self._key_name = ""
         self.maybe_rotate_if_at_limit()
-        key = self.record_path(partition_path)
+        filename = self.filename_for_current_file()
+        key = self.full_key(path, filename)
         self._key_name = key
         if self._current_handle is None:
             uri = f"gs://{self.bucket_name}/{key}"
