@@ -14,13 +14,9 @@ from io import FileIO
 from typing import Any
 
 import orjson
+from google.cloud.storage import Client
 
 from target_gcs.helpers import _json_default
-
-# Default key template when hive_partitioned is false.
-DEFAULT_KEY_NAMING_CONVENTION = "{stream}_{timestamp}.{format}"
-# Default key template when hive_partitioned is true and key_naming_convention omitted.
-DEFAULT_KEY_NAMING_CONVENTION_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
 
 
 class BasePathPattern(abc.ABC):
@@ -31,12 +27,11 @@ class BasePathPattern(abc.ABC):
     helpers (fully implemented in a later task).
     """
 
+    max_size = 1000
+
     def __init__(
         self,
-        target: Any,
         stream_name: str,
-        schema: dict[str, Any],
-        key_properties: list[str],
         config: dict[str, Any],
         *,
         time_fn: Callable[[], float] | None = None,
@@ -44,10 +39,7 @@ class BasePathPattern(abc.ABC):
         storage_client: Any | None = None,
         extraction_date: datetime | None = None,
     ) -> None:
-        self.target = target
         self.stream_name = stream_name
-        self.schema = schema
-        self.key_properties = key_properties
         self.config = config
         self._time_fn = time_fn
         self._date_fn = date_fn
@@ -61,6 +53,13 @@ class BasePathPattern(abc.ABC):
         self._records_written_in_current_file: int = 0
         self._current_timestamp: int | None = None
         self.bucket_name: str = config.get("bucket_name", "") or ""
+
+    @property
+    def storage_client(self) -> Client:
+        """Resolved storage client; creates default Client when not injected."""
+        if self._storage_client is None:
+            self._storage_client = Client()
+        return self._storage_client
 
     def apply_key_prefix_and_normalize(self, base: str) -> str:
         """Apply config key_prefix to the base path and normalize slashes.
@@ -77,24 +76,16 @@ class BasePathPattern(abc.ABC):
         prefix = self.config.get("key_prefix", "") or ""
         return f"{prefix}/{base}".replace("//", "/").lstrip("/")
 
-    def get_effective_key_template(self) -> str:
-        """Return the key template to use: user override, hive default, or non-partition default.
-
-        Rule: (1) If key_naming_convention is set and non-empty, return it. (2) Else if
-        hive_partitioned is true, return DEFAULT_KEY_NAMING_CONVENTION_HIVE. (3) Else
-        return DEFAULT_KEY_NAMING_CONVENTION.
-        """
-        user_template = (self.config.get("key_naming_convention") or "").strip()
-        if user_template:
-            return user_template
-        if self.config.get("hive_partitioned"):
-            return DEFAULT_KEY_NAMING_CONVENTION_HIVE
-        return DEFAULT_KEY_NAMING_CONVENTION
-
     @property
     def current_key(self) -> str:
         """Current object key (e.g. after a write); empty until set by subclass."""
         return self._key_name
+
+    @property
+    @abc.abstractmethod
+    def key_template(self) -> str:
+        """Template string for generating path key"""
+        ...
 
     @abc.abstractmethod
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:

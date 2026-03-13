@@ -20,12 +20,6 @@ class GCSTarget(Target):
         th.Property("bucket_name", th.StringType, required=True),
         th.Property("key_prefix", th.StringType, required=False),
         th.Property(
-            "key_naming_convention",
-            th.StringType,
-            required=False,
-            description="Template for object keys. When hive_partitioned is set and this is omitted, default is {stream}/{partition_date}/{timestamp}.jsonl.",
-        ),
-        th.Property(
             "max_records_per_file",
             th.IntegerType,
             required=False,

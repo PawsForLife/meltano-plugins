@@ -17,6 +17,8 @@ alwaysApply: true
 - Regression Gate: Failing tests not explicitly marked as expected failures (`@pytest.mark.xfail`, `@unittest.expectedFailure`) are regressions. Regressions **must** be resolved before a task is considered complete.
 - Test structure and scoping:
     - One test file per source module: each test file corresponds to the module under test for clear coverage, ownership, and navigation.
+    - Test file naming: the test file name **must** match the pattern `test_{file-name}.py` (the source module’s basename only; folder path has no relevance). Example: source `paths/simple.py` → test file `test_simple.py`.
+    - Test path: the path within the source directory **must** be mirrored under `tests/unit/`. Example: source `target_gcs/paths/simple.py` → test `tests/unit/paths/test_simple.py`. The `tests/unit/` subfolder separates tests from the base test folder, allows a global `conftest.py` for universal fixtures, and a `files/` folder for complex JSON (or other) test data.
     - Unit tests stay in-scope: unit tests focus on the behaviour of a single module; they do not mix integration concerns.
     - Integration tests stay thin: integration tests show that the integrating code wires behaviour correctly and applies the right logic; they trust callees and do not re-validate logic already covered by unit tests.
     - Avoid duplication and mixing: do not duplicate unit-level validation in integration tests; do not mix unit and integration concerns in the same test file or test case.

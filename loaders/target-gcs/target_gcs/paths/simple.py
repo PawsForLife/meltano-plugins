@@ -5,28 +5,24 @@ from __future__ import annotations
 from typing import Any
 
 import smart_open
-from google.cloud.storage import Client
 
 from target_gcs.paths.base import BasePathPattern
 
+# Fallback when key_naming_convention is not in config (removed in task 03).
+_DEFAULT_KEY_TEMPLATE = "{stream}_{timestamp}.{format}"
+
 
 class SimplePath(BasePathPattern):
-    """Non–hive-partitioned pattern: one path per stream, one handle, rotation at max_records_per_file with -{idx} in the key."""
-
-    max_size = 1000
+    """Non-hive-partitioned pattern: one path per stream, one handle, rotation at max_records_per_file with -{idx} in the key."""
 
     @property
-    def storage_client(self) -> Client:
-        """Resolved storage client; creates default Client when not injected."""
-        if self._storage_client is None:
-            self._storage_client = Client()
-        return self._storage_client
+    def key_template(self) -> str:
+        return str(self.config.get("key_naming_convention", _DEFAULT_KEY_TEMPLATE))
 
     def _build_key(self) -> str:
         """Build current object key from template and format map (stream, date, timestamp, format, optional chunk_index)."""
-        template = self.get_effective_key_template()
         fmt = self.get_chunk_format_map()
-        base = template.format(**fmt)
+        base = self.key_template.format(**fmt)
         return self.apply_key_prefix_and_normalize(base)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:

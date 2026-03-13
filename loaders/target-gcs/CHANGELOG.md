@@ -9,6 +9,7 @@
 
 ### Removed
 
+- **split-path-filename (task 03):** `key_naming_convention` removed from config; key shape is now fixed by internal constants. Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md).
 - **target-gcs-function-name-alignment:** Removed dead helper `get_partition_path_from_record` and its tests; sink uses only `get_partition_path_from_schema_and_record` (x-partition-fields). Dropped export from `target_gcs.helpers`. See [_archive/target-gcs-function-name-alignment](../../_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md).
 - **Tests:** Removed two redundant tests: duplicate "valid hive schema constructs" in test_sinks (`test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds`; kept `test_hive_partitioned_valid_schema_constructs_successfully`) and duplicate "fallback date in key when no x-partition-fields" in test_partition_key_generation (`test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date`; coverage retained in test_sinks).
 
@@ -41,6 +42,7 @@
 - **split-path-filename** — Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md)
   - Task 01: Add `PATH_SIMPLE`, `PATH_DATED`, `PATH_PARTITIONED`, `FILENAME_TEMPLATE`; remove `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; update `paths/__init__.py` exports.
   - Task 02: Fix `date_as_partition` to return formatted date string; add unit tests in `tests/unit/paths/_partitioned/test_string_functions.py`.
+  - Task 03: Remove `key_naming_convention` from config schema and meltano.yml; path modules use internal fallback templates.
 - **restructure-target-gcs-tests** — Details: [restructure-target-gcs-tests.md](../../_archive/restructure-target-gcs-tests/restructure-target-gcs-tests.md).
   - Task 01: Rename test files to match source modules (test_core→test_target, test_simple_path→test_paths_simple, test_dated_path→test_paths_dated, test_partitioned_path→test_paths_partitioned).
 - **target-gcs-extraction-patterns (task 08)** — GCSSink now delegates to extraction patterns (SimplePath, DatedPath, PartitionedPath); behaviour and key shapes unchanged; no new required config or env vars.

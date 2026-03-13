@@ -1,7 +1,9 @@
 """Tests for PartitionedPath: init validation, partition path from record, handle lifecycle on partition change, rotation at limit, ParserError propagation, current_key.
 
-Black-box: assert on key segments, handle close/open behaviour, and exception type only.
+Black-box: assert on key segments, handle close/open behaviour (via keys), and exception type only.
 """
+
+from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -23,10 +25,9 @@ def build_partitioned_sink(
     schema: dict[str, Any] | None = None,
     extraction_date: datetime | None = None,
 ) -> PartitionedPath:
-    """Build PartitionedPath with given config and injectables. Default schema has non-empty x-partition-fields and matching properties/required."""
+    """Build PartitionedPath with given config and injectables."""
     cfg = config or {}
-    default = {"bucket_name": "test-bucket", "hive_partitioned": True}
-    merged = {**default, **cfg}
+    merged = {**{"bucket_name": "test-bucket", "hive_partitioned": True}, **cfg}
     default_schema = {
         "x-partition-fields": ["region", "dt"],
         "properties": {
@@ -35,10 +36,13 @@ def build_partitioned_sink(
         },
         "required": ["region", "dt"],
     }
+    sch = schema if schema is not None else default_schema
+    partition_fields = sch.get("x-partition-fields") or []
     return PartitionedPath(
         stream_name=stream_name,
-        schema=schema if schema is not None else default_schema,
+        schema=sch,
         config=merged,
+        partition_fields=partition_fields,
         time_fn=time_fn,
         date_fn=date_fn,
         storage_client=storage_client,
@@ -55,7 +59,7 @@ def _key_from_open_call(call_args: tuple) -> str:
 # --- Validation at init ---
 
 
-def test_partitioned_path_init_invalid_schema_raises():
+def test_partitioned_path_init_invalid_schema_raises() -> None:
     """WHAT: Building PartitionedPath with schema where a partition field is not in properties raises ValueError.
     WHY: Init validation rejects invalid x-partition-fields before any write."""
     schema = {
@@ -71,7 +75,7 @@ def test_partitioned_path_init_invalid_schema_raises():
     assert "not in schema" in msg or "not in" in msg.lower()
 
 
-def test_partitioned_path_init_field_not_required_raises():
+def test_partitioned_path_init_field_not_required_raises() -> None:
     """WHAT: Building PartitionedPath with partition field not in schema required raises ValueError.
     WHY: All partition fields must be required so every record has values."""
     schema = {
@@ -87,7 +91,7 @@ def test_partitioned_path_init_field_not_required_raises():
     assert "must be required" in msg
 
 
-def test_partitioned_path_init_valid_schema_constructs():
+def test_partitioned_path_init_valid_schema_constructs() -> None:
     """WHAT: Building PartitionedPath with valid x-partition-fields and matching properties/required succeeds; sink has stream_name and config.
     WHY: Happy path init when schema is valid."""
     subject = build_partitioned_sink()
@@ -99,7 +103,7 @@ def test_partitioned_path_init_valid_schema_constructs():
 # --- Partition path from record ---
 
 
-def test_partitioned_path_keys_contain_partition_segments_from_record():
+def test_partitioned_path_keys_contain_partition_segments_from_record() -> None:
     """WHAT: Processing records with different partition field values yields keys containing correct partition path segments (e.g. region=eu, dt=...).
     WHY: Record-driven partition path must appear correctly in keys."""
     fixed_ts = 11111.0
@@ -124,14 +128,10 @@ def test_partitioned_path_keys_contain_partition_segments_from_record():
 # --- Handle lifecycle on partition change ---
 
 
-def test_partitioned_path_partition_change_closes_handle_and_opens_new_key():
+def test_partitioned_path_partition_change_closes_handle_and_opens_new_key() -> None:
     """WHAT: Processing record in partition A then in partition B closes the handle and opens a new key for B.
     WHY: Partition change must close current handle and write to new partition path."""
     timestamps = iter([4000.0, 4001.0])
-
-    def time_fn() -> float:
-        return next(timestamps)
-
     schema = {
         "x-partition-fields": ["region"],
         "properties": {"region": {"type": "string"}},
@@ -144,7 +144,7 @@ def test_partitioned_path_partition_change_closes_handle_and_opens_new_key():
     ) as mock_open:
         subject = build_partitioned_sink(
             schema=schema,
-            time_fn=time_fn,
+            time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         subject.process_record({"id": 1, "region": "eu"}, {})
@@ -156,14 +156,10 @@ def test_partitioned_path_partition_change_closes_handle_and_opens_new_key():
     assert keys[0] != keys[1]
 
 
-def test_partitioned_path_partition_return_creates_new_file():
+def test_partitioned_path_partition_return_creates_new_file() -> None:
     """WHAT: Processing A then B then A produces three distinct keys; third key is a new file for A, not reopen of first.
     WHY: When partition returns we create a new key, not reopen the old file."""
     timestamps = iter([4000.0, 4001.0, 4002.0])
-
-    def time_fn() -> float:
-        return next(timestamps)
-
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
@@ -175,7 +171,7 @@ def test_partitioned_path_partition_return_creates_new_file():
     ) as mock_open:
         subject = build_partitioned_sink(
             schema=schema,
-            time_fn=time_fn,
+            time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         subject.process_record({"id": 1, "dt": "2024-03-10"}, {})
@@ -183,22 +179,17 @@ def test_partitioned_path_partition_return_creates_new_file():
         subject.process_record({"id": 3, "dt": "2024-03-10"}, {})
     assert mock_open.call_count == 3
     keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
-    assert len(keys) == len(set(keys)), "all three keys must be distinct"
-    assert keys[2] != keys[0], "third key (A') must differ from first (A); no reopen"
+    assert len(keys) == len(set(keys))
+    assert keys[2] != keys[0]
 
 
 # --- Rotation at limit within partition ---
 
 
-def test_partitioned_path_rotation_at_limit_within_partition():
+def test_partitioned_path_rotation_at_limit_within_partition() -> None:
     """WHAT: With max_records_per_file=2 and same partition, multiple records yield keys with chunk index and correct open count.
     WHY: Chunking within a single partition must match base rotation behaviour."""
-    # time_fn is used by get_chunk_format_map (per record) and by maybe_rotate_if_at_limit (on rotate); provide enough values.
     timestamps = iter([3000.0, 3000.0, 3001.0, 3001.0])
-
-    def time_fn() -> float:
-        return next(timestamps)
-
     schema = {
         "x-partition-fields": ["region"],
         "properties": {"region": {"type": "string"}},
@@ -216,7 +207,7 @@ def test_partitioned_path_rotation_at_limit_within_partition():
                 "max_records_per_file": 2,
             },
             schema=schema,
-            time_fn=time_fn,
+            time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         for i in range(3):
@@ -230,7 +221,7 @@ def test_partitioned_path_rotation_at_limit_within_partition():
 # --- ParserError propagation ---
 
 
-def test_partitioned_path_parser_error_when_date_format_unparseable():
+def test_partitioned_path_parser_error_when_date_format_unparseable() -> None:
     """WHAT: Record with partition field that has format date-time and unparseable string value raises ParserError.
     WHY: Unparseable partition dates must surface to caller; do not swallow."""
     schema = {
@@ -253,14 +244,14 @@ def test_partitioned_path_parser_error_when_date_format_unparseable():
 # --- Current key ---
 
 
-def test_partitioned_path_current_key_empty_before_first_write():
+def test_partitioned_path_current_key_empty_before_first_write() -> None:
     """WHAT: Before calling process_record, current_key is empty (or as specified by base contract).
     WHY: Property contract for GCSSink.key_name delegation after task 06."""
     subject = build_partitioned_sink()
     assert subject.current_key == ""
 
 
-def test_partitioned_path_current_key_equals_key_after_write():
+def test_partitioned_path_current_key_equals_key_after_write() -> None:
     """WHAT: After processing one record, current_key equals the key that was used for the write.
     WHY: key_name delegation will work after task 06."""
     fixed_ts = 55555.0

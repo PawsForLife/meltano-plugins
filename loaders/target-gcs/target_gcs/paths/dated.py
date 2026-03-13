@@ -5,10 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import smart_open
-from google.cloud.storage import Client
 
 from target_gcs.helpers.partition_path import DEFAULT_PARTITION_DATE_FORMAT
 from target_gcs.paths.base import BasePathPattern
+
+# Fallback when key_naming_convention is not in config (removed in task 03).
+_DEFAULT_KEY_TEMPLATE_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
 
 
 class DatedPath(BasePathPattern):
@@ -19,14 +21,9 @@ class DatedPath(BasePathPattern):
     semantics as SimplePath.
     """
 
-    max_size = 1000
-
     def __init__(
         self,
-        target: Any,
         stream_name: str,
-        schema: dict[str, Any],
-        key_properties: list[str],
         config: dict[str, Any],
         *,
         time_fn: Any = None,
@@ -35,10 +32,7 @@ class DatedPath(BasePathPattern):
         extraction_date: Any = None,
     ) -> None:
         super().__init__(
-            target=target,
             stream_name=stream_name,
-            schema=schema,
-            key_properties=key_properties,
             config=config,
             time_fn=time_fn,
             date_fn=date_fn,
@@ -50,18 +44,16 @@ class DatedPath(BasePathPattern):
         )
 
     @property
-    def storage_client(self) -> Client:
-        """Resolved storage client; creates default Client when not injected."""
-        if self._storage_client is None:
-            self._storage_client = Client()
-        return self._storage_client
+    def key_template(self) -> str:
+        return str(
+            self.config.get("key_naming_convention", _DEFAULT_KEY_TEMPLATE_HIVE)
+        )
 
     def _build_key(self) -> str:
         """Build current object key: stream + partition_date + timestamp + optional chunk_index."""
-        template = self.get_effective_key_template()
         fmt = self.get_chunk_format_map()
         fmt["partition_date"] = self._partition_path
-        base = template.format(**fmt)
+        base = self.key_template.format(**fmt)
         return self.apply_key_prefix_and_normalize(base)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:

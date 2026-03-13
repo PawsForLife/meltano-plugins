@@ -46,17 +46,13 @@ class GCSSink(RecordSink):
             isinstance(x_partition_fields, list) and len(x_partition_fields) > 0
         )
         schema = dict(self.schema)
-        key_props = list(self.key_properties) if self.key_properties else []
         config = dict(self.config)
         if not hive:
-            self._extraction_pattern: BasePathPattern = cast(
+            self._extraction_pattern = cast(
                 BasePathPattern,
                 SimplePath(
-                    self._target_ref,
-                    self.stream_name,
-                    schema,
-                    key_props,
-                    config,
+                    stream_name=self.stream_name,
+                    config=config,
                     time_fn=self._time_fn,
                     date_fn=self._date_fn,
                     storage_client=self._storage_client,
@@ -67,11 +63,10 @@ class GCSSink(RecordSink):
             self._extraction_pattern = cast(
                 BasePathPattern,
                 PartitionedPath(
-                    self._target_ref,
-                    self.stream_name,
-                    schema,
-                    key_props,
-                    config,
+                    stream_name=self.stream_name,
+                    schema=schema,
+                    config=config,
+                    partition_fields=cast(list[str], x_partition_fields),
                     time_fn=self._time_fn,
                     date_fn=self._date_fn,
                     storage_client=self._storage_client,
@@ -82,11 +77,8 @@ class GCSSink(RecordSink):
             self._extraction_pattern = cast(
                 BasePathPattern,
                 DatedPath(
-                    self._target_ref,
-                    self.stream_name,
-                    schema,
-                    key_props,
-                    config,
+                    stream_name=self.stream_name,
+                    config=config,
                     time_fn=self._time_fn,
                     date_fn=self._date_fn,
                     storage_client=self._storage_client,
@@ -96,7 +88,7 @@ class GCSSink(RecordSink):
 
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload). Delegates to the selected extraction pattern."""
-        self._extraction_pattern.process_record(record, context)
+        self._extraction_pattern.process_record(record=record, context=context)
 
     def close(self) -> None:
         """Flush and close the pattern's write handle. Called on sink drain/teardown."""

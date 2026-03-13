@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Any
 
 import smart_open
-from google.cloud.storage import Client
 
 from target_gcs.helpers import (
     get_partition_path_from_schema_and_record,
@@ -19,6 +18,11 @@ from target_gcs.helpers import (
 )
 from target_gcs.helpers.partition_path import DEFAULT_PARTITION_DATE_FORMAT
 from target_gcs.paths.base import BasePathPattern
+
+from ._partitioned import get_hive_path_generator
+
+# Fallback when key_naming_convention is not in config (removed in task 03).
+_DEFAULT_KEY_TEMPLATE_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
 
 
 class PartitionedPath(BasePathPattern):
@@ -30,30 +34,33 @@ class PartitionedPath(BasePathPattern):
     created. One handle at a time; rotation at limit within partition.
     """
 
-    max_size = 1000
-
     def __init__(
         self,
-        target: Any,
         stream_name: str,
         schema: dict[str, Any],
-        key_properties: list[str],
         config: dict[str, Any],
+        partition_fields: list[str],
         *,
         time_fn: Any = None,
         date_fn: Any = None,
         storage_client: Any = None,
         extraction_date: Any = None,
     ) -> None:
-        x_partition_fields = schema.get("x-partition-fields")
-        if isinstance(x_partition_fields, list) and len(x_partition_fields) > 0:
-            validate_partition_fields_schema(stream_name, schema, x_partition_fields)
+
+        # Validate the Partition Fields
+        validate_partition_fields_schema(
+            stream_name=stream_name, schema=schema, partition_fields=partition_fields
+        )
+
+        self.hive_path_generator = get_hive_path_generator(
+            partition_fields=partition_fields, schema=schema
+        )
+
+        self.schema = schema
+        self.partition_fields = partition_fields
         self._current_partition_path: str | None = None
         super().__init__(
-            target=target,
             stream_name=stream_name,
-            schema=schema,
-            key_properties=key_properties,
             config=config,
             time_fn=time_fn,
             date_fn=date_fn,
@@ -62,19 +69,26 @@ class PartitionedPath(BasePathPattern):
         )
 
     @property
-    def storage_client(self) -> Client:
-        """Resolved storage client; creates default Client when not injected."""
-        if self._storage_client is None:
-            self._storage_client = Client()
-        return self._storage_client
+    def key_template(self) -> str:
+        return str(
+            self.config.get("key_naming_convention", _DEFAULT_KEY_TEMPLATE_HIVE)
+        )
 
-    def _build_key(self, partition_path: str) -> str:
+    def hive_path(self, record: dict[str, Any]) -> str:
+        hive_path_elements = []
+        for field_name, generator in self.hive_path_generator:
+            val = record.get(field_name)
+            hive_path_elements.append(
+                generator(field_name, val if val is not None else "")
+            )
+
+        return "/".join(hive_path_elements)
+
+    def record_path(self, partition_path: str) -> str:
         """Build object key for the given partition path: stream + partition_date + timestamp + optional chunk_index."""
-        template = self.get_effective_key_template()
         fmt = self.get_chunk_format_map()
         fmt["partition_date"] = partition_path
-        fmt["hive"] = partition_path
-        base = template.format(**fmt)
+        base = self.key_template.format(**fmt)
         return self.apply_key_prefix_and_normalize(base)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
@@ -92,7 +106,7 @@ class PartitionedPath(BasePathPattern):
             self._records_written_in_current_file = 0
             self._key_name = ""
         self.maybe_rotate_if_at_limit()
-        key = self._build_key(partition_path)
+        key = self.record_path(partition_path)
         self._key_name = key
         if self._current_handle is None:
             uri = f"gs://{self.bucket_name}/{key}"

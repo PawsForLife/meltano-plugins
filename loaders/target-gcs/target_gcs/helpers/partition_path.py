@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from dateutil import parser as dateutil_parser
 
-DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT
 
 
 def get_partition_path_from_schema_and_record(

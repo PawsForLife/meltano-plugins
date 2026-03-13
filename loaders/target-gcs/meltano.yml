@@ -13,14 +13,11 @@ plugins:
         - name: bucket_name
         - name: date_format
         - name: key_prefix
-        - name: key_naming_convention
         - name: max_records_per_file
         - name: hive_partitioned
       config:
         bucket_name: your-gcs-bucket
         date_format: "%Y-%m-%d"
         key_prefix: output
-        # Default when hive_partitioned is true and key_naming_convention is omitted.
-        key_naming_convention: "{stream}/{partition_date}/{timestamp}.jsonl"
         max_records_per_file: 1000
         hive_partitioned: false

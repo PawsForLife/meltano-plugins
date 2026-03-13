@@ -38,7 +38,7 @@ Ensure `{features_dir}/{feature_name}/plans/tasks/` exists. Create a single plan
 
 1. **Overview**: What this task accomplishes within the feature
 2. **Files to Create/Modify**: List all files with specific changes
-3. **Test Strategy**: Which tests to write first (TDD), in what order
+3. **Test Strategy**: Which tests to write first (TDD), in what order. Specify test file paths per `@.cursor/CONVENTIONS.md`: under `tests/unit/` mirroring source path, filename `test_{source-basename}.py`.
 4. **Implementation Order**: Step-by-step sequence for this task
 5. **Validation Steps**: How to verify the task is complete
 6. **Documentation Updates**: What docs need updating for this task
