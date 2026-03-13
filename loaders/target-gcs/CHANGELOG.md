@@ -6,6 +6,7 @@
 
 - **hive-partition-key-value-paths** — Partition path literal segments as Hive-standard `key=value` (e.g. `region=eu`).
   - Unit tests expect key=value literal segments in partition path (TDD red phase); implementation in task 02.
+  - Emit literal segments as `field_name=value` (Hive standard) in `get_partition_path_from_schema_and_record`; docstring updated.
 - **hive-partition-format-only** — Details: [hive-partition-format-only.md](../../_archive/hive-partition-format-only/hive-partition-format-only.md)
   - Unit tests for format-only partition path: no format + datetime still date segment; no format + parseable string → literal (xfail until implementation).
   - Integration test updated: no format + parseable string → key contains literal segment (xfail until implementation).

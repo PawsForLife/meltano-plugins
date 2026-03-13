@@ -19,8 +19,9 @@ def get_partition_path_from_schema_and_record(
     are parsed as dates only when the property schema has format "date" or
     "date-time"; native datetime/date are always treated as date segments. When
     format is absent and the value is a string, it is appended as a path-safe
-    literal (slashes replaced with underscore). No date inference from string
-    content. Segments are joined with /.
+    literal in Hive standard form: literal segments are emitted as
+    field_name=value (slashes in value replaced with underscore). No date
+    inference from string content. Segments are joined with /.
 
     Args:
         schema: Stream schema dict; may contain x-partition-fields list.
@@ -29,7 +30,7 @@ def get_partition_path_from_schema_and_record(
         partition_date_format: strftime format for date segments (keyword-only).
 
     Returns:
-        Partition path string (e.g. "eu/year=2024/month=03/day=11").
+        Partition path string (e.g. "region=eu/year=2024/month=03/day=11").
 
     Raises:
         ParserError: From dateutil when a string is parsed as date and fails.
@@ -62,7 +63,7 @@ def get_partition_path_from_schema_and_record(
         if is_date and date_value is not None:
             segments.append(date_value.strftime(partition_date_format))
         else:
-            segments.append(str(value).replace("/", "_"))
+            segments.append(f"{field}={str(value).replace('/', '_')}")
 
     return "/".join(segments)
 
