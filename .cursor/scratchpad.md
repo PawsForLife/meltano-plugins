@@ -25,3 +25,4 @@
 - Task 01-validator-tests-and-impl completed, tests passing
 - Task 02-path-builder-tests-and-impl completed, tests passing
 - Task 03-helper-exports completed, tests passing
+- Task 04-config-schema completed, tests passing

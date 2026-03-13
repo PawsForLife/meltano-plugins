@@ -23,7 +23,7 @@ class GCSTarget(Target):
             "key_naming_convention",
             th.StringType,
             required=False,
-            description="Template for object keys. When partition_date_field is set and this is omitted, default is {stream}/{partition_date}/{timestamp}.jsonl.",
+            description="Template for object keys. When hive_partitioned is set and this is omitted, default is {stream}/{partition_date}/{timestamp}.jsonl.",
         ),
         th.Property(
             "max_records_per_file",
@@ -32,16 +32,11 @@ class GCSTarget(Target):
             description="Maximum records per GCS object; 0 or unset = no chunking.",
         ),
         th.Property(
-            "partition_date_field",
-            th.StringType,
+            "hive_partitioned",
+            th.BooleanType,
             required=False,
-            description="Record property name for partition path (e.g. created_at, updated_at). When set, partition-by-field is enabled.",
-        ),
-        th.Property(
-            "partition_date_format",
-            th.StringType,
-            required=False,
-            description="strftime-style format for Hive path segment. Default in code: year=%Y/month=%m/day=%d.",
+            default=False,
+            description="When true, enable Hive partitioning from stream schema (x-partition-fields) or current date.",
         ),
     ).to_dict()
     default_sink_class = GCSSink

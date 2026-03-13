@@ -185,43 +185,46 @@ def test_config_validates_without_max_records_per_file():
     )
 
 
-def test_config_schema_includes_partition_date_field():
-    """Schema exposes partition_date_field so config can enable partition-by-record-date; config contract for record field name."""
+def test_config_schema_includes_hive_partitioned():
+    """Config schema exposes hive_partitioned (boolean, optional) so users can enable Hive-style partitioning from stream schema or current date."""
     schema = GCSTarget.config_jsonschema
     properties = schema.get("properties") or {}
-    assert "partition_date_field" in properties
-    prop = properties["partition_date_field"]
+    assert "hive_partitioned" in properties
+    prop = properties["hive_partitioned"]
     type_val = prop.get("type")
-    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
+    assert type_val == "boolean" or (
+        isinstance(type_val, list) and "boolean" in type_val
+    )
     required = schema.get("required") or []
-    assert "partition_date_field" not in required
+    assert "hive_partitioned" not in required
+    assert prop.get("default") is False
 
 
-def test_config_schema_includes_partition_date_format():
-    """Schema exposes partition_date_format so config can set strftime format for Hive path segment; config contract for format."""
+def test_config_schema_omits_partition_date_field():
+    """Config schema must not expose partition_date_field; replaced by hive_partitioned in schema-driven Hive partitioning."""
     schema = GCSTarget.config_jsonschema
     properties = schema.get("properties") or {}
-    assert "partition_date_format" in properties
-    prop = properties["partition_date_format"]
-    type_val = prop.get("type")
-    assert type_val == "string" or (isinstance(type_val, list) and "string" in type_val)
-    required = schema.get("required") or []
-    assert "partition_date_format" not in required
+    assert "partition_date_field" not in properties
 
 
-def test_config_validates_with_partition_date_field():
-    """Config including partition_date_field (and optionally partition_date_format) is valid; target instantiates without validation error. Backward compatibility and new usage."""
-    config = {"bucket_name": "b", "partition_date_field": "created_at"}
-    target = GCSTarget(config=config)
-    assert target.config["partition_date_field"] == "created_at"
-    config_with_format = {
-        "bucket_name": "b",
-        "partition_date_field": "x",
-        "partition_date_format": "year=%Y/month=%m",
-    }
-    target_with_format = GCSTarget(config=config_with_format)
-    assert target_with_format.config["partition_date_field"] == "x"
-    assert target_with_format.config["partition_date_format"] == "year=%Y/month=%m"
+def test_config_schema_omits_partition_date_format():
+    """Config schema must not expose partition_date_format; format is internal when using hive_partitioned."""
+    schema = GCSTarget.config_jsonschema
+    properties = schema.get("properties") or {}
+    assert "partition_date_format" not in properties
+
+
+def test_config_validates_with_hive_partitioned():
+    """Config with hive_partitioned true or false is valid; target instantiates and exposes the value (or default false)."""
+    config_true = {"bucket_name": "b", "hive_partitioned": True}
+    target_true = GCSTarget(config=config_true)
+    assert target_true.config["hive_partitioned"] is True
+    config_false = {"bucket_name": "b", "hive_partitioned": False}
+    target_false = GCSTarget(config=config_false)
+    assert target_false.config["hive_partitioned"] is False
+    config_omitted = {"bucket_name": "b"}
+    target_omitted = GCSTarget(config=config_omitted)
+    assert target_omitted.config.get("hive_partitioned") is False
 
 
 def test_gcs_client_created_without_credentials_path():
