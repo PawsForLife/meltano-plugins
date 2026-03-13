@@ -14,6 +14,34 @@ from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
 
 
+def test_public_api_imports_succeed():
+    """WHAT: Public API imports for sinks and paths resolve without circular import or missing exports.
+    WHY: Smoke test so from target_gcs.sinks import GCSSink and from target_gcs.paths import pattern classes and constants remain valid."""
+    from target_gcs.paths import (
+        DEFAULT_KEY_NAMING_CONVENTION,
+        DEFAULT_KEY_NAMING_CONVENTION_HIVE,
+        BasePathPattern,
+        DatedPath,
+        PartitionedPath,
+        PathType,
+        SimplePath,
+    )
+
+    assert GCSSink is not None
+    assert issubclass(SimplePath, BasePathPattern)
+    assert issubclass(DatedPath, BasePathPattern)
+    assert issubclass(PartitionedPath, BasePathPattern)
+    assert (
+        isinstance(DEFAULT_KEY_NAMING_CONVENTION, str)
+        and len(DEFAULT_KEY_NAMING_CONVENTION) > 0
+    )
+    assert (
+        isinstance(DEFAULT_KEY_NAMING_CONVENTION_HIVE, str)
+        and len(DEFAULT_KEY_NAMING_CONVENTION_HIVE) > 0
+    )
+    assert PathType is not None
+
+
 @contextmanager
 def _patch_all_pattern_modules(open_mock=None, client_mock=None):
     """Patch smart_open.open and Client in all three path modules so GCSSink tests work regardless of which pattern is selected."""
