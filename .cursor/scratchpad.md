@@ -1,32 +1,5 @@
 # Pipeline Scratchpad
 
-## Feature: document-test-structure-intent
-
-**Pipeline State:** Phase 5 complete (all tasks implemented); Phase 6 Not started.
-**Task Completion Status:** 01-add-test-structure-rule completed; 02-update-patterns completed; 03-optional-conventions completed. All tests passing for docs-only changes (5 pre-existing failures in target-gcs tests unrelated to this feature).
-**Task count:** 3 (task 03 optional).
-**Tasks directory:** `_features/document-test-structure-intent/tasks/`.
-**Ordered task files:** `01-add-test-structure-rule.md`, `02-update-patterns.md`, `03-optional-conventions.md`.
-**Execution Order:** 01-add-test-structure-rule → 02-update-patterns → 03-optional-conventions (01 and 02 required; 03 optional).
-**Output directory:** `_features/document-test-structure-intent/planning/` — contains `impacted-systems.md`, `new-systems.md`, `possible-solutions.md`, `selected-solution.md`.
-**Plan location:** `_features/document-test-structure-intent/plans/master/` — overview.md, architecture.md, interfaces.md, implementation.md, testing.md, dependencies.md, documentation.md.
-**Task plan created:** 01-add-test-structure-rule at plans/tasks/01-add-test-structure-rule.md.
-**Task plan created:** 02-update-patterns at plans/tasks/02-update-patterns.md.
-**Task plan created:** 03-optional-conventions at plans/tasks/03-optional-conventions.md.
-
-**Key findings:**
-- **Impacted:** `.cursor/rules/development_practices.mdc` (primary — has TDD/black-box but no structure/scoping); `docs/AI_CONTEXT/AI_CONTEXT_PATTERNS.md` (test layout exists but lacks one-file-per-module, unit/integration boundaries, thin integration); CONVENTIONS and workflows optional.
-- **New content:** Four concepts — one test file per source module; unit tests in-scope (single module); integration tests thin (wire behaviour, trust callees, no re-validation); avoid duplication and mixing.
-- **Options considered:** Extend development_practices (A), new test-structure.mdc (B), CONVENTIONS only (C), development_practices + CONVENTIONS pointer (D).
-
-**Selected solution:** Internal docs only. Add a “Test structure and scoping” subsection to `.cursor/rules/development_practices.mdc` with the four bullets. Update `docs/AI_CONTEXT/AI_CONTEXT_PATTERNS.md` “Testing & TDD” / test layout to match. Optional: one-line pointer in CONVENTIONS. No new rule file; no code or test changes.
-
-**Phase 2 key decisions:**
-- **Single subsection in development_practices:** “Test structure and scoping” with four bullets; no new rule file.
-- **PATTERNS aligned:** AI_CONTEXT_PATTERNS.md “Testing & TDD” / test layout updated to match rule (one file per module, unit/integration, thin integration, no duplication/mixing).
-- **Optional CONVENTIONS:** One-line pointer to the rule for test layout; omit if discoverability from CONVENTIONS not needed.
-- **Verification:** Read updated rule and PATTERNS for consistency; no new automated tests.
-
 ---
 
 ## Feature: restructure-target-gcs-tests
