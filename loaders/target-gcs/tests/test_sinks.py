@@ -126,23 +126,16 @@ def test_get_effective_key_template_returns_user_template_when_set():
     )
 
 
-def test_get_effective_key_template_returns_hive_default_when_partition_set_and_no_user_template():
-    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION_HIVE when partition_date_field is set and key_naming_convention omitted.
-    WHY: Hive-style default must apply when partitioning by date and user did not set a template."""
-    schema_with_partition = {
-        "properties": {"created_at": {"type": "string"}},
-        "required": ["created_at"],
-    }
-    subject = build_sink(
-        config={"partition_date_field": "created_at"},
-        schema=schema_with_partition,
-    )
+def test_get_effective_key_template_returns_hive_default_when_hive_partitioned_and_no_user_template():
+    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION_HIVE when hive_partitioned is true and key_naming_convention omitted.
+    WHY: Hive-style default must apply when Hive partitioning is enabled and user did not set a template."""
+    subject = build_sink(config={"hive_partitioned": True}, schema={"properties": {}})
     assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION_HIVE
 
 
 def test_get_effective_key_template_returns_non_partition_default_when_neither_set():
-    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION when neither key_naming_convention nor partition_date_field is set.
-    WHY: Non-partition default must apply when not using partition-by-field."""
+    """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION when neither key_naming_convention nor hive_partitioned is set.
+    WHY: Non-partition default must apply when not using Hive partitioning."""
     subject = build_sink()
     assert subject._get_effective_key_template() == DEFAULT_KEY_NAMING_CONVENTION
 
@@ -432,52 +425,90 @@ def test_non_serializable_non_decimal_type_raises_type_error():
             sink.process_record(record, context)
 
 
-# --- Partition date field schema validation (sink integration) ---
+# --- Hive partition init validation (sink integration) ---
 
 
-def test_partition_date_field_set_field_missing_raises_value_error():
-    """partition_date_field set with field missing from schema must raise ValueError so users get a clear config error at sink init."""
-    config = {"partition_date_field": "dt"}
-    schema = {"properties": {"id": {}}}
+def test_sink_init_hive_partitioned_invalid_x_partition_fields_raises_value_error():
+    """Sink init with hive_partitioned true and x-partition-fields containing a field not in schema properties raises ValueError.
+    WHAT: Invalid x-partition-fields (e.g. 'missing' not in properties) is rejected at init. WHY: Fail fast so users get a clear config/schema error."""
+    config = {"hive_partitioned": True}
+    schema = {"x-partition-fields": ["missing"], "properties": {}, "required": []}
     with pytest.raises(ValueError) as exc_info:
         build_sink(config=config, schema=schema)
     msg = str(exc_info.value)
     assert "my_stream" in msg
-    assert "dt" in msg
+    assert "missing" in msg
+    assert "not in schema" in msg or "required" in msg.lower()
 
 
-def test_partition_date_field_set_field_null_only_raises_value_error():
-    """partition_date_field set with null-only type for the field must raise ValueError so the field is not usable for date parsing."""
-    config = {"partition_date_field": "dt"}
-    schema = {"properties": {"dt": {"type": "null"}}}
-    with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
-    msg = str(exc_info.value)
-    assert "my_stream" in msg
-    assert "dt" in msg
-
-
-def test_partition_date_field_set_field_integer_raises_value_error():
-    """partition_date_field set with integer type for the field must raise ValueError so only date-parseable types are allowed."""
-    config = {"partition_date_field": "dt"}
-    schema = {"properties": {"dt": {"type": "integer"}}}
-    with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
-    msg = str(exc_info.value)
-    assert "my_stream" in msg
-    assert "dt" in msg
-
-
-def test_partition_date_field_set_field_string_valid_constructs_successfully():
-    """partition_date_field set with string type and field required must allow sink construction; string is date-parseable."""
-    config = {"partition_date_field": "dt"}
-    schema = {"properties": {"dt": {"type": "string"}}, "required": ["dt"]}
+def test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds():
+    """Sink init with hive_partitioned true and valid x-partition-fields (field in properties and required, non-null) constructs without exception.
+    WHAT: Valid schema with x-partition-fields allows sink construction. WHY: Regression guard for init validation only when schema is valid."""
+    config = {"hive_partitioned": True}
+    schema = {
+        "x-partition-fields": ["a"],
+        "properties": {"a": {"type": "string"}},
+        "required": ["a"],
+    }
     sink = build_sink(config=config, schema=schema)
     assert sink.stream_name == "my_stream"
 
 
-def test_partition_date_field_unset_constructs_successfully():
-    """When partition_date_field is not set, sink must construct successfully with any schema; no regression when option is unset."""
+def test_hive_partitioned_set_field_missing_raises_value_error():
+    """hive_partitioned true with x-partition-fields listing a field missing from schema must raise ValueError at sink init."""
+    config = {"hive_partitioned": True}
+    schema = {"x-partition-fields": ["dt"], "properties": {"id": {}}, "required": []}
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_hive_partitioned_set_field_null_only_raises_value_error():
+    """hive_partitioned true with null-only type for a partition field must raise ValueError so the field is not usable."""
+    config = {"hive_partitioned": True}
+    schema = {
+        "x-partition-fields": ["dt"],
+        "properties": {"dt": {"type": "null"}},
+        "required": ["dt"],
+    }
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_hive_partitioned_set_field_not_required_raises_value_error():
+    """hive_partitioned true with partition field not in required must raise ValueError so partition keys are always present."""
+    config = {"hive_partitioned": True}
+    schema = {
+        "x-partition-fields": ["dt"],
+        "properties": {"dt": {"type": "string"}},
+        "required": [],
+    }
+    with pytest.raises(ValueError) as exc_info:
+        build_sink(config=config, schema=schema)
+    msg = str(exc_info.value)
+    assert "my_stream" in msg
+    assert "dt" in msg
+
+
+def test_hive_partitioned_valid_schema_constructs_successfully():
+    """hive_partitioned true with valid x-partition-fields (field in properties, required, non-null) allows sink construction."""
+    config = {"hive_partitioned": True}
+    schema = {
+        "x-partition-fields": ["dt"],
+        "properties": {"dt": {"type": "string"}},
+        "required": ["dt"],
+    }
+    sink = build_sink(config=config, schema=schema)
+    assert sink.stream_name == "my_stream"
+
+
+def test_hive_partitioned_unset_constructs_successfully():
+    """When hive_partitioned is false or unset, sink must construct successfully with any schema; no regression when option is unset."""
     config = {}
     schema = {"properties": {"id": {}}}
     sink = build_sink(config=config, schema=schema)

@@ -4,9 +4,6 @@ from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-from dateutil.parser import ParserError
-
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
 
@@ -22,20 +19,28 @@ def build_sink(
 ):
     """Build a sink for the target using the given config (config file contents).
     Optionally pass time_fn for deterministic key generation and date_fn for run-date in tests.
-    When partition_date_field is set, schema includes that field (string type) so sink init validation passes."""
+    When hive_partitioned is true, schema includes x-partition-fields (and matching properties/required) so sink init validation passes. Supports legacy config key partition_date_field for test compatibility (converted to hive_partitioned + schema)."""
     if config is None:
         config = {}
     default_config = {"bucket_name": "test-bucket"}
     config = {**default_config, **config}
     partition_field = config.get("partition_date_field")
-    schema = (
-        {
-            "properties": {partition_field: {"type": "string"}},
-            "required": [partition_field],
+    hive = config.get("hive_partitioned", False)
+    if hive or partition_field:
+        config = {
+            k: v
+            for k, v in config.items()
+            if k not in ("partition_date_field", "partition_date_format")
         }
-        if partition_field
-        else {"properties": {}}
-    )
+        config["hive_partitioned"] = True
+        field = partition_field or config.get("partition_field", "dt")
+        schema = {
+            "x-partition-fields": [field],
+            "properties": {field: {"type": "string"}},
+            "required": [field],
+        }
+    else:
+        schema = {"properties": {}}
     kwargs = {}
     if time_fn is not None:
         kwargs["time_fn"] = time_fn
@@ -341,24 +346,26 @@ def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
     )
 
 
-def test_sink_raises_parser_error_when_partition_field_unparseable():
-    """Unparseable partition field causes ParserError to propagate from the sink.
-    WHAT: Record with unparseable partition value (e.g. 'not-a-date') leads to exception;
-    observable outcome is exception, not silent write. WHY: Integration guarantee that
-    unparseable input fails visibly."""
+def test_sink_uses_literal_segment_when_partition_field_unparseable():
+    """Unparseable partition field is treated as a literal path segment (schema-and-record path builder).
+    WHAT: Record with unparseable partition value (e.g. 'not-a-date') is written as literal in the key path, not parsed as date; no exception. WHY: get_partition_path_from_schema_and_record uses unparseable strings as literal segments for flexibility."""
     with (
         patch("target_gcs.sinks.Client"),
-        patch("target_gcs.sinks.smart_open.open", return_value=MagicMock()),
+        patch(
+            "target_gcs.sinks.smart_open.open",
+            return_value=MagicMock(),
+        ) as mock_open,
     ):
         sink = build_sink(
             config={
-                "partition_date_field": "created_at",
-                "partition_date_format": DEFAULT_HIVE_FORMAT,
+                "hive_partitioned": True,
+                "partition_field": "created_at",
                 "key_naming_convention": "{partition_date}/{stream}_{timestamp}.jsonl",
             },
             time_fn=lambda: 12345.0,
             date_fn=lambda: FALLBACK_DATE,
         )
         record = {"id": 1, "created_at": "not-a-date"}
-        with pytest.raises(ParserError):
-            sink.process_record(record, {})
+        sink.process_record(record, {})
+    key = _key_from_open_call(mock_open.call_args)
+    assert "not-a-date" in key, "unparseable value must appear as literal in key path"

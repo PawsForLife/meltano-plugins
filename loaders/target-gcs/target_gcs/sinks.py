@@ -15,21 +15,21 @@ from singer_sdk.sinks import RecordSink
 
 from .helpers import (
     _json_default,
-    get_partition_path_from_record,
-    validate_partition_date_field_schema,
+    get_partition_path_from_schema_and_record,
+    validate_partition_fields_schema,
 )
 
 # Default Hive-style partition path format when partition_date_format is omitted by callers.
 DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
 
-# Default key template when partition_date_field is unset.
+# Default key template when hive_partitioned is false.
 DEFAULT_KEY_NAMING_CONVENTION = "{stream}_{timestamp}.{format}"
-# Default key template when partition_date_field is set and key_naming_convention omitted.
+# Default key template when hive_partitioned is true and key_naming_convention omitted.
 DEFAULT_KEY_NAMING_CONVENTION_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When partition_date_field is set, the key is derived per record from that field; one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
+    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When hive_partitioned is true, the key is derived per record from x-partition-fields (or fallback date when absent); one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
 
     max_size = 1000  # Max records to write in one batch
 
@@ -66,32 +66,33 @@ class GCSSink(RecordSink):
 
         self._storage_client: Any | None = storage_client
 
-        if self.config.get("partition_date_field"):
-            # Current partition path when partition-by-field is on; None when cleared or not yet set.
+        if self.config.get("hive_partitioned"):
+            # Current partition path when Hive partitioning is on; None when cleared or not yet set.
             self._current_partition_path: str | None = None
-            # Validate partition field exists in stream schema and is date-parseable; raises ValueError if not.
-            validate_partition_date_field_schema(
-                self.stream_name,
-                self.config["partition_date_field"],
-                self.schema,
-            )
+            x_partition_fields = self.schema.get("x-partition-fields")
+            if isinstance(x_partition_fields, list) and len(x_partition_fields) > 0:
+                validate_partition_fields_schema(
+                    self.stream_name,
+                    self.schema,
+                    x_partition_fields,
+                )
 
     def _get_effective_key_template(self) -> str:
         """Return the key template to use: user override, hive default, or non-partition default.
 
         Rule: (1) If key_naming_convention is set and non-empty, return it. (2) Else if
-        partition_date_field is set and non-empty, return DEFAULT_KEY_NAMING_CONVENTION_HIVE.
-        (3) Else return DEFAULT_KEY_NAMING_CONVENTION.
+        hive_partitioned is true, return DEFAULT_KEY_NAMING_CONVENTION_HIVE. (3) Else
+        return DEFAULT_KEY_NAMING_CONVENTION.
         """
         user_template = (self.config.get("key_naming_convention") or "").strip()
         if user_template:
             return user_template
-        if (self.config.get("partition_date_field") or "").strip():
+        if self.config.get("hive_partitioned"):
             return DEFAULT_KEY_NAMING_CONVENTION_HIVE
         return DEFAULT_KEY_NAMING_CONVENTION
 
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
-        """Build the object key for a single record when partition_date_field is set.
+        """Build the object key for a single record when hive_partitioned is true.
 
         Uses key_prefix and the effective key template (from _get_effective_key_template)
         with format_map: stream, partition_date (= partition_path), hive (= partition_path,
@@ -99,7 +100,7 @@ class GCSSink(RecordSink):
         when chunking is enabled. If the template contains {format}, format_map includes
         format=self.output_format. Same normalization as key_name (no double slashes,
         no leading slash). Callers pass a pre-resolved partition_path (e.g. from
-        get_partition_path_from_record).
+        get_partition_path_from_schema_and_record).
 
         Args:
             record: Record dict (unused; partition_path is pre-resolved).
@@ -139,8 +140,8 @@ class GCSSink(RecordSink):
 
     @property
     def key_name(self) -> str:
-        """Return the key name. When partition_date_field is set, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When unset, computes key from the same effective template as _build_key_for_record (_get_effective_key_template), then format_map (stream, date, timestamp, format, and optionally chunk_index). Default when key_naming_convention is omitted is DEFAULT_KEY_NAMING_CONVENTION."""
-        if self.config.get("partition_date_field"):
+        """Return the key name. When hive_partitioned is true, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When false, computes key from the same effective template as _build_key_for_record (_get_effective_key_template), then format_map (stream, date, timestamp, format, and optionally chunk_index). Default when key_naming_convention is omitted is DEFAULT_KEY_NAMING_CONVENTION."""
+        if self.config.get("hive_partitioned"):
             return self._key_name
         if not self._key_name:
             # Time is injectable via time_fn for deterministic key assertions in tests.
@@ -205,9 +206,9 @@ class GCSSink(RecordSink):
         self._current_timestamp = None
 
     def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
-        """Process one record when partition_date_field is unset (single-file or chunked by row limit).
+        """Process one record when hive_partitioned is false (single-file or chunked by row limit).
 
-        Assumes partition_date_field is unset. Rotates to a new chunk when
+        Assumes hive_partitioned is false. Rotates to a new chunk when
         max_records_per_file is set and record count has reached the limit;
         writes the record via gcs_write_handle; increments _records_written_in_current_file
         when chunking is enabled.
@@ -230,23 +231,20 @@ class GCSSink(RecordSink):
             self._records_written_in_current_file += 1
 
     def _process_record_partition_by_field(self, record: dict, context: dict) -> None:
-        """Process one record when partition_date_field is set (partition-by-field strategy).
+        """Process one record when hive_partitioned is true (partition-by-schema strategy).
 
-        Assumes partition_date_field is set. Resolves partition path from record;
-        on partition change closes handle and clears key/partition state and resets
-        chunk index; rotates within partition when at max_records_per_file; builds
-        key via _build_key_for_record; opens handle when none or key changed;
-        writes record and increments count when chunking.
+        Assumes hive_partitioned is true. Resolves partition path from schema and record
+        via get_partition_path_from_schema_and_record; on partition change closes handle
+        and clears key/partition state and resets chunk index; rotates within partition
+        when at max_records_per_file; builds key via _build_key_for_record; opens handle
+        when none or key changed; writes record and increments count when chunking.
         """
-        partition_date_format = (
-            self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT
-        )
         try:
-            partition_path = get_partition_path_from_record(
+            partition_path = get_partition_path_from_schema_and_record(
+                self.schema,
                 record,
-                self.config["partition_date_field"],
-                partition_date_format,
                 self.fallback,
+                partition_date_format=DEFAULT_PARTITION_DATE_FORMAT,
             )
         except ParserError:
             # Unparseable partition date string: re-raise so the run fails visibly.
@@ -285,13 +283,12 @@ class GCSSink(RecordSink):
     def process_record(self, record: dict, context: dict) -> None:
         """Process one record (RECORD message payload).
 
-        Dispatches by partition_date_field: when set, partition-by-field path
-        (per-record partition, handle lifecycle on partition/key change); when
-        unset, single-file or chunked path (one key/handle per stream per run,
-        optional rotation by max_records_per_file).
+        Dispatches by hive_partitioned: when true, partition-by-schema path
+        (per-record partition from x-partition-fields or fallback date, handle
+        lifecycle on partition/key change); when false, single-file or chunked path
+        (one key/handle per stream per run, optional rotation by max_records_per_file).
         """
-        partition_date_field = self.config.get("partition_date_field")
-        if partition_date_field:
+        if self.config.get("hive_partitioned"):
             self._process_record_partition_by_field(record, context)
         else:
             self._process_record_single_or_chunked(record, context)

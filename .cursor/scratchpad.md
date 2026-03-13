@@ -26,3 +26,4 @@
 - Task 02-path-builder-tests-and-impl completed, tests passing
 - Task 03-helper-exports completed, tests passing
 - Task 04-config-schema completed, tests passing
+- Task 05-sink-init-validation completed, tests passing
