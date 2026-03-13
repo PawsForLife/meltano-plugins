@@ -3,7 +3,7 @@
 ## Feature: hive-partition-key-value-paths
 
 **Pipeline State:** Phase 1–4 Complete, Phase 5–6 Not started.
-**Task Completion Status:** Task 01-unit-tests-partition-path completed (tests updated, failing as expected). Task 02-partition-path-implementation completed.
+**Task Completion Status:** Task 01-unit-tests-partition-path completed (tests updated, failing as expected). Task 02-partition-path-implementation completed. Task 03-integration-tests-key-generation completed.
 **Execution Order:** `01-unit-tests-partition-path.md`, `02-partition-path-implementation.md`, `03-integration-tests-key-generation.md`, `04-documentation.md`.
 **Task count:** 4.
 

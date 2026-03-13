@@ -314,8 +314,8 @@ def test_chunking_with_partition_rotation_within_partition():
     assert mock_open.call_count == 2
     keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
     assert keys[0] != keys[1]
-    # Schema has no format for dt; string "2024-03-11" is literal segment (no string date inference).
-    partition_segment = "2024-03-11"
+    # Schema has no format for dt; string "2024-03-11" is literal segment (key=value form).
+    partition_segment = "dt=2024-03-11"
     assert partition_segment in keys[0], "first key must contain partition path"
     assert partition_segment in keys[1], "second key must contain same partition path"
 
@@ -387,7 +387,7 @@ def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
         record = {"id": 1, "created_at": "2024/03/11"}
         sink.process_record(record, {})
     key = _key_from_open_call(mock_open.call_args)
-    expected_literal_segment = "2024_03_11"
+    expected_literal_segment = "created_at=2024_03_11"
     assert expected_literal_segment in key, (
         "key must contain path-safe literal segment when schema has no format"
     )
@@ -424,7 +424,9 @@ def test_sink_uses_literal_segment_when_partition_field_unparseable():
         record = {"id": 1, "created_at": "not-a-date"}
         sink.process_record(record, {})
     key = _key_from_open_call(mock_open.call_args)
-    assert "not-a-date" in key, "unparseable value must appear as literal in key path"
+    assert "created_at=not-a-date" in key, (
+        "unparseable value must appear as key=value literal in key path"
+    )
 
 
 def test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date():
@@ -493,12 +495,15 @@ def test_multiple_streams_different_x_partition_fields_order_keys_differ():
         sink_b.process_record(record, {})
     key_b = _key_from_open_call(mock_open_b.call_args)
     assert key_a != key_b
-    # Schema has no format for dt; string "2024-03-11" is literal segment (no string date inference).
-    literal_date = "2024-03-11"
-    idx_eu_a, idx_dt_a = key_a.index("eu"), key_a.index(literal_date)
-    idx_eu_b, idx_dt_b = key_b.index("eu"), key_b.index(literal_date)
-    assert idx_eu_a < idx_dt_a, "stream_a key must have region before date"
-    assert idx_dt_b < idx_eu_b, "stream_b key must have date before region"
+    # Schema has no format for dt; keys contain key=value segments (region=eu, dt=2024-03-11).
+    segment_region = "region=eu"
+    segment_dt = "dt=2024-03-11"
+    assert segment_region in key_a and segment_dt in key_a
+    assert segment_region in key_b and segment_dt in key_b
+    idx_region_a, idx_dt_a = key_a.index(segment_region), key_a.index(segment_dt)
+    idx_region_b, idx_dt_b = key_b.index(segment_region), key_b.index(segment_dt)
+    assert idx_region_a < idx_dt_a, "stream_a key must have region before date"
+    assert idx_dt_b < idx_region_b, "stream_b key must have date before region"
 
 
 def test_sink_raises_parser_error_when_partition_field_date_format_unparseable():

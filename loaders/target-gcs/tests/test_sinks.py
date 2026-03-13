@@ -587,11 +587,15 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
             {},
         )
     key = _key_from_open_call(mock_open.call_args)
-    assert "x" in key, "key must contain literal partition segment from record"
-    assert "year=2024/month=03/day=11" in key, "key must contain date partition segment"
-    idx_x = key.index("x")
+    literal_segment = "r=x"
+    date_segment = "year=2024/month=03/day=11"
+    assert literal_segment in key, (
+        "key must contain literal partition segment (key=value) from record"
+    )
+    assert date_segment in key, "key must contain date partition segment"
+    idx_literal = key.index(literal_segment)
     idx_date = key.index("year=2024")
-    assert idx_x < idx_date, (
+    assert idx_literal < idx_date, (
         "literal segment must appear before date segment in key order"
     )
 
