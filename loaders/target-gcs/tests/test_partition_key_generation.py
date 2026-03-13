@@ -356,11 +356,14 @@ def test_partition_change_then_return_creates_three_distinct_keys():
     assert keys[2] != keys[0], "third key (A') must differ from first (A); no reopen"
 
 
+@pytest.mark.xfail(
+    reason="Implementation in task 03: string date inference removed; will pass after partition_path.py updated."
+)
 def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
-    """Record with dateutil-parsable non-ISO partition value produces key with expected partition path.
-    WHAT: Sink uses helper output for dateutil-only formats; key passed to smart_open.open contains
-    the partition path segment (e.g. year=2024/month=03/day=11). WHY: Integration guarantee that
-    the full path from record → partition path → key is correct for non-ISO date strings."""
+    """No format → literal segment even for dateutil-parseable string.
+    WHAT: Schema has no format for partition field; record value is dateutil-parseable string
+    (e.g. '2024/03/11'); key must contain path-safe literal segment (2024_03_11), not Hive date segment.
+    WHY: We must not infer date from string content when schema does not declare date/date-time format."""
     fixed_ts = 55555.0
     schema = {
         "x-partition-fields": ["created_at"],
@@ -386,9 +389,13 @@ def test_sink_key_contains_partition_path_from_dateutil_parsable_format():
         record = {"id": 1, "created_at": "2024/03/11"}
         sink.process_record(record, {})
     key = _key_from_open_call(mock_open.call_args)
-    expected_segment = "year=2024/month=03/day=11"
-    assert expected_segment in key, (
-        "key must contain partition path from dateutil-parsed value"
+    expected_literal_segment = "2024_03_11"
+    assert expected_literal_segment in key, (
+        "key must contain path-safe literal segment when schema has no format"
+    )
+    hive_date_segment = "year=2024/month=03/day=11"
+    assert hive_date_segment not in key, (
+        "key must not contain Hive date segment when schema has no format (no string date inference)"
     )
 
 
