@@ -87,6 +87,63 @@ def test_extraction_timestamp_is_unix_time():
     assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/\d+\.jsonl", subject.key_name)
 
 
+def test_key_shape_matches_constants():
+    """Key format matches {prefix}/{stream}/{path}/{timestamp}.jsonl for each pattern (SimplePath, DatedPath, PartitionedPath).
+    WHAT: key_name structure aligns with PATH_SIMPLE, PATH_DATED, PATH_PARTITIONED and FILENAME_TEMPLATE constants.
+    WHY: Regression guard that sink delegates to patterns and key shape is fixed by constants (no key_naming_convention)."""
+    fixed_ts = 99999.0
+    fixed_date = datetime(2024, 3, 11)
+
+    def time_fn():
+        return fixed_ts
+
+    def date_fn():
+        return fixed_date
+
+    # SimplePath: stream/date/timestamp.jsonl
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={"hive_partitioned": False},
+            time_fn=time_fn,
+            date_fn=date_fn,
+        )
+        sink.process_record({"id": 1}, {})
+    assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/99999\.jsonl", sink.key_name), (
+        "SimplePath key must match stream/date/timestamp.jsonl"
+    )
+
+    # DatedPath: stream/year=X/month=Y/day=Z/timestamp.jsonl
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema={"properties": {}},
+            time_fn=time_fn,
+            date_fn=date_fn,
+        )
+        sink.process_record({"id": 1}, {})
+    assert re.match(
+        r"my_stream/year=\d+/month=\d+/day=\d+/99999\.jsonl", sink.key_name
+    ), "DatedPath key must match stream/hive_path/timestamp.jsonl"
+
+    # PartitionedPath: stream/field=value/.../timestamp.jsonl
+    schema = {
+        "x-partition-fields": ["r"],
+        "properties": {"r": {"type": "string"}},
+        "required": ["r"],
+    }
+    with _patch_all_pattern_modules():
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema=schema,
+            time_fn=time_fn,
+            date_fn=date_fn,
+        )
+        sink.process_record({"id": 1, "r": "x"}, {})
+    assert re.match(r"my_stream/r=x/99999\.jsonl", sink.key_name), (
+        "PartitionedPath key must match stream/hive_path/timestamp.jsonl"
+    )
+
+
 def test_key_name_includes_prefix_when_provided():
     """Key name includes key_prefix when provided. WHAT: key_name reflects prefix. WHY: Config key_prefix must appear in written key."""
     with _patch_all_pattern_modules():
