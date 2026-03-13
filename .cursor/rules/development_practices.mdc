@@ -15,3 +15,8 @@ alwaysApply: true
 - Working Tests: All tests **must** work; if a test is incorrect or fails due to its own logic, fix the test.
 - Valid Tests: All tests **must** be able to fail. You cannot have tests that can only pass
 - Regression Gate: Failing tests not explicitly marked as expected failures (`@pytest.mark.xfail`, `@unittest.expectedFailure`) are regressions. Regressions **must** be resolved before a task is considered complete.
+- Test structure and scoping:
+    - One test file per source module: each test file corresponds to the module under test for clear coverage, ownership, and navigation.
+    - Unit tests stay in-scope: unit tests focus on the behaviour of a single module; they do not mix integration concerns.
+    - Integration tests stay thin: integration tests show that the integrating code wires behaviour correctly and applies the right logic; they trust callees and do not re-validate logic already covered by unit tests.
+    - Avoid duplication and mixing: do not duplicate unit-level validation in integration tests; do not mix unit and integration concerns in the same test file or test case.

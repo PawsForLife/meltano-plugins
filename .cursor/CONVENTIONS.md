@@ -15,6 +15,7 @@ Path placeholders used by agents, commands, and workflows in this folder. Defaul
 ## Usage
 
 - In agents, commands, and workflows: use these placeholders (or the default paths) so paths stay consistent and overridable.
+- **Test layout**: One test file per source module; unit vs integration scope and thin integration tests per `.cursor/rules/development_practices.mdc`.
 - **Components/libraries**: use discovery-oriented language — e.g. "each major package or library in the repository", "affected component(s) as identified from the plan". Do not hardcode component names (e.g. `python_service/`, `src/`, `webview-ui/`). Discover components from repo layout (e.g. top-level packages or directories, or as documented in README). For Singer/Meltano projects: refer to data extractors as **taps**, data loaders as **targets**; use **source** (where data is extracted from) and **destination** (where data is loaded to); use **streams** for named data sets. See `docs/AI_CONTEXT/GLOSSARY_MELTANO_SINGER.md` when describing taps, targets, or pipelines.
 
 ## Git / Fork

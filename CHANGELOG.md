@@ -4,6 +4,10 @@
 
 ### Added
 
+- **document-test-structure-intent** — Document test structure and scoping in .cursor: one test file per source module, unit tests in-scope, integration tests thin, no duplication or mixing. Details: [document-test-structure-intent.md](_archive/document-test-structure-intent/document-test-structure-intent.md)
+  - Add "Test structure and scoping" to `.cursor/rules/development_practices.mdc`.
+  - Align `docs/AI_CONTEXT/AI_CONTEXT_PATTERNS.md` "Testing & TDD" / test layout with the rule.
+  - Add test layout pointer to `.cursor/CONVENTIONS.md`.
 - **target-gcs-dedup-split-logic** — Archive summary: [target-gcs-dedup-split-logic.md](_archive/target-gcs-dedup-split-logic/target-gcs-dedup-split-logic.md)
 - **target-gcs-function-name-alignment** — Archive summary: [target-gcs-function-name-alignment.md](_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md)
 - **hive-partition-key-value-paths** — Archive summary: [hive-partition-key-value-paths.md](_archive/hive-partition-key-value-paths/hive-partition-key-value-paths.md)
