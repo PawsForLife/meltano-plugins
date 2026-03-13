@@ -42,10 +42,9 @@ The target is configured via [Meltano](https://meltano.com/): settings and `conf
 | bucket_name           | TARGET_GCS_BUCKET_NAME               | string  | yes      | n/a           | The name of the GCS bucket                                                                                                                                                                                                                                                                       |
 | date_format           | TARGET_GCS_DATE_FORMAT               | string  | no       | %Y-%m-%d      | If `{date}` token is used in key_naming_convention, the date will be formatted with this format string                                                                                                                                                                                           |
 | key_prefix            | TARGET_GCS_KEY_PREFIX                | string  | no       | None          | A static prefix before the generated key names. If this and `key_naming_convention` are both provided, they will be combined.                                                                                                                                                                    |
-| key_naming_convention | TARGET_GCS_KEY_NAMING_CONVENTION     | string  | no       | Conditional: when `partition_date_field` is set and omitted → `{stream}/{partition_date}/{timestamp}.jsonl`; when unset and omitted → `{stream}_{timestamp}.jsonl` | Template for object keys. When omitted: if `partition_date_field` is set, default is `{stream}/{partition_date}/{timestamp}.jsonl` (hive-style); if unset, default is `{stream}_{timestamp}.jsonl`. Tokens: `date`, `stream`, `timestamp`. When `partition_date_field` is set, `{partition_date}` and `{hive}` (alias for `{partition_date}`) are available. When chunking is enabled (`max_records_per_file` > 0), `{chunk_index}` (0-based) is also available and `{timestamp}` is recomputed at the start of each new chunk. Date format uses [python date format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). |
+| key_naming_convention | TARGET_GCS_KEY_NAMING_CONVENTION     | string  | no       | Conditional: when `hive_partitioned` is true and omitted → `{stream}/{partition_date}/{timestamp}.jsonl`; when false/omitted and omitted → `{stream}_{timestamp}.jsonl` | Template for object keys. When omitted: if `hive_partitioned` is true, default is `{stream}/{partition_date}/{timestamp}.jsonl` (hive-style); if false or omitted, default is `{stream}_{timestamp}.jsonl`. Tokens: `date`, `stream`, `timestamp`. When `hive_partitioned` is true, `{partition_date}` and `{hive}` (alias for `{partition_date}`) are available. When chunking is enabled (`max_records_per_file` > 0), `{chunk_index}` (0-based) is also available and `{timestamp}` is recomputed at the start of each new chunk. Date format uses [python date format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). |
 | max_records_per_file  | TARGET_GCS_MAX_RECORDS_PER_FILE      | integer | no       | 0             | When set and greater than 0, the target rotates to a new GCS object after that many records per stream; when 0 or omitted, one file per stream per run (unchanged).                                                                                                                              |
-| partition_date_field  | TARGET_GCS_PARTITION_DATE_FIELD      | string  | no       | n/a           | Record property name used to build partition path (e.g. `created_at`, `updated_at`). When set, partition-by-field is enabled and the `{partition_date}` token is available in `key_naming_convention`.                                                                                           |
-| partition_date_format | TARGET_GCS_PARTITION_DATE_FORMAT     | string  | no       | year=%Y/month=%m/day=%d | strftime-style format for the partition path segment (e.g. Hive-style `year=YYYY/month=MM/day=DD`). Used when resolving `{partition_date}` and for fallback when the record field is missing or unparseable.                                                                                    |
+| hive_partitioned      | TARGET_GCS_HIVE_PARTITIONED          | boolean | no       | false         | When true, Hive-style partitioning from stream schema (`x-partition-fields`) or current date; path built per record; `{partition_date}` and `{hive}` available in key template.                                                                                                                |
 
 **File chunking (optional):** When `max_records_per_file` is set and greater than 0, the target writes multiple files per stream; each file contains at most that many records, and the last file for a stream may have fewer. When 0 or omitted, one file per stream per run is written (no chunking).
 
@@ -53,13 +52,13 @@ The target is configured via [Meltano](https://meltano.com/): settings and `conf
 
 See `meltano.yml` in this directory for an example `config` block; it may include `max_records_per_file` to demonstrate chunking.
 
-### Hive partitioning by record date field
+### Hive partitioning (schema-driven)
 
-When you set `partition_date_field` to a record property name (e.g. `created_at`, `updated_at`), the target builds a partition path per record from that field and exposes it as the `{partition_date}` token in `key_naming_convention`. With partition-by-field enabled and no custom key template, object keys follow `{stream}/{partition_date}/{timestamp}.jsonl`. `{hive}` is an alias for `{partition_date}` in the key template when partition-by-field is on. Use `partition_date_format` (strftime-style) to control the path segment; the default is `year=%Y/month=%m/day=%d` (Hive-style, e.g. `year=2024/month=03/day=11`). The `{date}` token is unchanged: it always represents the run date (formatted with `date_format`), not the record’s partition date.
+When `hive_partitioned` is **true**, the target builds a Hive-style partition path per record and exposes it as the `{partition_date}` token in `key_naming_convention`. With no custom key template, object keys follow `{stream}/{partition_date}/{timestamp}.jsonl`. `{hive}` is an alias for `{partition_date}`.
 
-**Fallback:** If the record is missing the field or the value is unparseable (not a valid date/datetime string), the target uses the run date formatted with `partition_date_format` as the partition path and does not raise an error.
+**Path from stream schema:** If the stream schema defines `x-partition-fields` (array of property names at the top level), the path is built from those fields in **array order**. Each field must be in `properties`, in `required`, and non-nullable; the target validates this at sink init and raises `ValueError` if invalid. For each field: **Date-parseable** values (e.g. ISO date/datetime strings) → one segment `year=YYYY/month=MM/day=DD` (Hive-style). **Other values** → a literal folder; path-unsafe characters (e.g. `/`) are replaced (e.g. with `_`). **Fallback when no x-partition-fields:** If the stream has no `x-partition-fields` or it is empty, the target uses the **current date** (run date) for the partition path. **Removal of old settings:** `partition_date_field` and `partition_date_format` are no longer supported; use `hive_partitioned: true` and define partition fields on the stream schema via `x-partition-fields`.
 
-**Example:** To write keys like `{stream}/export_date=year=2024/month=03/day=11/{timestamp}.jsonl` using the record’s date field, set the loader `config` in `meltano.yml`:
+**Example:** Stream schema with `x-partition-fields` (e.g. `["region", "created_at"]`); set the loader `config` in `meltano.yml`:
 
 ```yaml
 plugins:
@@ -69,12 +68,13 @@ plugins:
       pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=loaders/target-gcs
       config:
         bucket_name: my-bucket
-        partition_date_field: created_at
-        partition_date_format: "year=%Y/month=%m/day=%d"
-        key_naming_convention: "{stream}/export_date={partition_date}/{timestamp}.jsonl"
+        hive_partitioned: true
+        key_naming_convention: "{stream}/{partition_date}/{timestamp}.jsonl"
 ```
 
-**Chunking:** When both `max_records_per_file` and `partition_date_field` are set, the target rotates to a new file after that many records **within the current partition**. The partition path stays the same; the new file uses a new timestamp (and optionally `{chunk_index}`) in the key.
+Resulting path order: first segment from `region` (literal, e.g. `region=eu`), then `year=.../month=.../day=...` from `created_at`. For `x-partition-fields: ["country", "event_date"]`, paths look like `country=UK/year=2024/month=03/day=13/` (literal then date).
+
+**Chunking:** When both `max_records_per_file` and `hive_partitioned` are set, the target rotates to a new file after that many records **within the current partition**. The partition path stays the same; the new file uses a new timestamp (and optionally `{chunk_index}`) in the key.
 
 A full list of supported settings and capabilities for this
 target is available by running:
