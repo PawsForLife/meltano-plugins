@@ -2,7 +2,7 @@
 
 ## Feature: target-gcs-extraction-patterns
 
-**Pipeline State:** Phase 3–4 Complete. Phase 5 In progress. Phase 6 Not started. Task Completion Status: 01-create-base-pattern, 02-base-rotation-and-write, 03-implement-simple-sink completed. Execution Order: see below.
+**Pipeline State:** Phase 3–4 Complete. Phase 5 In progress. Phase 6 Not started. Task Completion Status: 01-create-base-pattern, 02-base-rotation-and-write, 03-implement-simple-sink, 04-implement-dated-sink completed. Execution Order: see below.
 
 ### Phase 1 (Research) summary:
 
@@ -54,6 +54,7 @@
 - Task 02-base-rotation-and-write completed, tests passing.
 - Task 03-implement-simple-sink completed, tests passing.
 - Task 04-implement-dated-sink completed, tests passing.
+- Task 05-implement-partitioned-sink completed, tests passing.
 
 ---
 
