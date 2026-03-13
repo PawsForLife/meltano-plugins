@@ -66,6 +66,8 @@ Task 03-remove-key-naming-config completed, tests passing
 
 Task 04-basepathpattern-add-methods completed, tests passing
 
+Task 06-datedpath completed, tests passing
+
 Task 05-simplepath completed, tests passing
 
 Task 07-partitionedpath completed, tests passing

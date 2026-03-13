@@ -42,11 +42,9 @@ def _key_from_open_call(call_args: tuple) -> str:
 # --- Key generation (single path) ---
 
 
-def test_simple_path_key_generation_single_path_matches_stream_date_timestamp_format() -> (
-    None
-):
-    """WHAT: After processing one record, the key passed to open matches stream/date/timestamp.jsonl (path + filename).
-    WHY: Single-path key shape uses PATH_SIMPLE + FILENAME_TEMPLATE per split-path-filename."""
+def test_path_from_path_simple_constant() -> None:
+    """WHAT: After processing one record, the key passed to open matches {stream}/{date}/{timestamp}.jsonl.
+    WHY: Path is built from PATH_SIMPLE at init; full key = path + filename from full_key()."""
     fixed_ts = 12345.0
     fixed_dt = datetime(2024, 3, 11)
     mock_handle = MagicMock()
@@ -60,10 +58,46 @@ def test_simple_path_key_generation_single_path_matches_stream_date_timestamp_fo
         subject.process_record({"id": 1, "name": "a"}, {})
         assert mock_open.call_count == 1
         key = _key_from_open_call(mock_open.call_args)
-        assert key.startswith("my_stream/")
-        assert "2024-03-11" in key
-        assert "12345" in key
-        assert key.endswith(".jsonl")
+        assert key == "my_stream/2024-03-11/12345.jsonl"
+
+
+def test_filename_is_timestamp_jsonl() -> None:
+    """WHAT: The filename segment (last path component) is {timestamp}.jsonl.
+    WHY: filename_for_current_file uses FILENAME_TEMPLATE; full_key joins path and filename."""
+    fixed_ts = 99999.0
+    fixed_dt = datetime(2024, 1, 15)
+    mock_handle = MagicMock()
+    with patch(
+        "target_gcs.paths.simple.smart_open.open", return_value=mock_handle
+    ) as mock_open:
+        subject = _build_simple_path(
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: fixed_dt,
+        )
+        subject.process_record({"id": 1}, {})
+        key = _key_from_open_call(mock_open.call_args)
+        assert key.endswith("/99999.jsonl")
+        filename = key.split("/")[-1]
+        assert filename == "99999.jsonl"
+
+
+def test_uses_date_format_from_config() -> None:
+    """WHAT: With date_format='%Y', path contains year only (e.g. my_stream/2024/12345.jsonl).
+    WHY: Path built at init uses config date_format for the date token."""
+    fixed_ts = 12345.0
+    fixed_dt = datetime(2024, 3, 11)
+    mock_handle = MagicMock()
+    with patch(
+        "target_gcs.paths.simple.smart_open.open", return_value=mock_handle
+    ) as mock_open:
+        subject = _build_simple_path(
+            config={"bucket_name": "test-bucket", "date_format": "%Y"},
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: fixed_dt,
+        )
+        subject.process_record({"id": 1}, {})
+        key = _key_from_open_call(mock_open.call_args)
+        assert key == "my_stream/2024/12345.jsonl"
 
 
 # --- One handle (no chunking) ---
@@ -92,9 +126,9 @@ def test_simple_path_one_handle_when_no_chunking_uses_single_key() -> None:
 # --- Rotation at limit ---
 
 
-def test_simple_path_rotation_at_limit_produces_distinct_keys() -> None:
-    """WHAT: With max_records_per_file=2, processing more than 2 records opens multiple handles with distinct keys.
-    WHY: Rotation at limit must produce multiple files; key shape uses timestamp (no chunk_index after task 03)."""
+def test_rotation_at_limit_uses_timestamp_only() -> None:
+    """WHAT: With max_records_per_file=2, processing 5 records opens multiple handles; keys differ by timestamp only.
+    WHY: Chunking uses timestamp-only filenames (no chunk_index); path prefix is shared."""
     timestamps = iter([1000.0, 1001.0, 1002.0, 1003.0, 1004.0, 1005.0, 1006.0, 1007.0])
     mock_handles = [MagicMock(), MagicMock(), MagicMock()]
     with patch(
@@ -110,6 +144,14 @@ def test_simple_path_rotation_at_limit_produces_distinct_keys() -> None:
         assert mock_open.call_count >= 2
         keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
         assert len(set(keys)) >= 2, "rotation must produce distinct keys"
+        path_prefix = "my_stream/2024-03-11"
+        for key in keys:
+            assert key.startswith(path_prefix), f"key {key} must share path prefix"
+        filenames = [k.split("/")[-1] for k in keys]
+        assert all(f.endswith(".jsonl") for f in filenames)
+        assert all(f.replace(".jsonl", "").isdigit() for f in filenames), (
+            "filenames must be {timestamp}.jsonl (no chunk_index)"
+        )
 
 
 # --- Close behaviour (black-box: after close, next write uses new handle) ---

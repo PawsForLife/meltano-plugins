@@ -6,8 +6,7 @@ from typing import Any
 
 import smart_open
 
-from target_gcs.constants import PATH_DATED
-from target_gcs.helpers.partition_path import DEFAULT_PARTITION_DATE_FORMAT
+from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT, PATH_DATED
 from target_gcs.paths.base import BasePathPattern
 
 
@@ -36,22 +35,14 @@ class DatedPath(BasePathPattern):
             storage_client=storage_client,
             extraction_date=extraction_date,
         )
-        self._partition_path: str = self._extraction_date.strftime(
-            DEFAULT_PARTITION_DATE_FORMAT
-        )
-
-    def _build_key(self) -> str:
-        """Build current object key: stream + partition_date + timestamp."""
-        path = PATH_DATED.format(
-            stream=self.stream_name, hive_path=self._partition_path
-        )
-        filename = self.filename_for_current_file()
-        return self.full_key(path, filename)
+        hive_path: str = self._extraction_date.strftime(DEFAULT_PARTITION_DATE_FORMAT)
+        self._path: str = PATH_DATED.format(stream=stream_name, hive_path=hive_path)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
         """Rotate if at limit, ensure handle open, write record as JSONL, set current key."""
         self.maybe_rotate_if_at_limit()
-        key = self._build_key()
+        filename = self.filename_for_current_file()
+        key = self.full_key(self._path, filename)
         self._key_name = key
         if self._current_handle is None:
             uri = f"gs://{self.bucket_name}/{key}"

@@ -40,12 +40,12 @@ def _key_from_open_call(call_args: tuple) -> str:
     return url.split("/", 3)[-1]
 
 
-# --- Partition path from extraction date ---
+# --- Path from PATH_DATED constant ---
 
 
-def test_dated_path_partition_path_from_extraction_date_in_key() -> None:
-    """WHAT: Key used for open/write contains partition path from extraction date (year=.../month=.../day=...) and stream and timestamp.
-    WHY: Dated partition path must be correct and stable for the run."""
+def test_path_from_path_dated_constant() -> None:
+    """WHAT: Key matches {stream}/{hive_path}/{timestamp}.jsonl shape from PATH_DATED.
+    WHY: Validates path is built from PATH_DATED constant at init."""
     fixed_ts = 12345.0
     fixed_dt = datetime(2024, 3, 11)
     mock_handle = MagicMock()
@@ -59,10 +59,44 @@ def test_dated_path_partition_path_from_extraction_date_in_key() -> None:
         subject.process_record({"id": 1, "name": "a"}, {})
         assert mock_open.call_count == 1
         key = _key_from_open_call(mock_open.call_args)
-        assert "year=2024/month=03/day=11" in key
         assert key.startswith("my_stream/")
+        assert "year=2024/month=03/day=11" in key
         assert "12345" in key
         assert key.endswith(".jsonl")
+
+
+def test_hive_path_is_extraction_date_formatted() -> None:
+    """WHAT: hive_path segment equals year=YYYY/month=MM/day=DD from extraction date.
+    WHY: Validates DatedPath semantics: partition path uses DEFAULT_PARTITION_DATE_FORMAT."""
+    mock_handle = MagicMock()
+    with patch(
+        "target_gcs.paths.dated.smart_open.open", return_value=mock_handle
+    ) as mock_open:
+        subject = build_dated_sink(
+            time_fn=lambda: 99999.0,
+            extraction_date=datetime(2024, 6, 15),
+        )
+        subject.process_record({"id": 1}, {})
+        key = _key_from_open_call(mock_open.call_args)
+        assert "year=2024/month=06/day=15" in key
+
+
+def test_filename_is_timestamp_jsonl() -> None:
+    """WHAT: Filename segment is {timestamp}.jsonl (no chunk_index).
+    WHY: Validates filename format uses timestamp-only chunking (FILENAME_TEMPLATE)."""
+    fixed_ts = 77777.0
+    mock_handle = MagicMock()
+    with patch(
+        "target_gcs.paths.dated.smart_open.open", return_value=mock_handle
+    ) as mock_open:
+        subject = build_dated_sink(
+            time_fn=lambda: fixed_ts,
+            date_fn=lambda: datetime(2024, 1, 1),
+        )
+        subject.process_record({"id": 1}, {})
+        key = _key_from_open_call(mock_open.call_args)
+        assert key.endswith("77777.jsonl")
+        assert "-0" not in key and "-1" not in key
 
 
 # --- One handle per run ---
