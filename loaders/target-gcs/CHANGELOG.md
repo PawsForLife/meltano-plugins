@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **target-gcs-function-name-alignment:** Removed dead helper `get_partition_path_from_record` and its tests; sink uses only `get_partition_path_from_schema_and_record` (x-partition-fields). Dropped export from `target_gcs.helpers`. See [_archive/target-gcs-function-name-alignment](../../_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md).
+- **Tests:** Removed two redundant tests: duplicate "valid hive schema constructs" in test_sinks (`test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds`; kept `test_hive_partitioned_valid_schema_constructs_successfully`) and duplicate "fallback date in key when no x-partition-fields" in test_partition_key_generation (`test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date`; coverage retained in test_sinks).
+
 ### Added
 
 - **hive-partition-key-value-paths** — Partition path literal segments as Hive-standard `key=value` (e.g. `region=eu`).
