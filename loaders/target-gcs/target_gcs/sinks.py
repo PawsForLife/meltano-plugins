@@ -89,6 +89,21 @@ class GCSSink(RecordSink):
             return DEFAULT_KEY_NAMING_CONVENTION_HIVE
         return DEFAULT_KEY_NAMING_CONVENTION
 
+    def _apply_key_prefix_and_normalize(self, base: str) -> str:
+        """Apply config key_prefix to the base path and normalize slashes.
+
+        Joins key_prefix (or empty string if unset) with base, collapses repeated
+        slashes, and strips leading slash so the key never starts with /.
+
+        Args:
+            base: Path segment to prefix and normalize (e.g. stream/partition/timestamp.jsonl).
+
+        Returns:
+            Normalized key string (no leading slash, no double slashes).
+        """
+        prefix = self.config.get("key_prefix", "") or ""
+        return f"{prefix}/{base}".replace("//", "/").lstrip("/")
+
     def _build_key_for_record(self, record: dict, partition_path: str) -> str:
         """Build the object key for a single record when hive_partitioned is true.
 
@@ -125,10 +140,7 @@ class GCSSink(RecordSink):
         if "{format}" in base_key_name:
             format_map["format"] = self.output_format
         base = base_key_name.format_map(format_map)
-        prefixed = (
-            f"{self.config.get('key_prefix', '')}/{base}".replace("//", "/")
-        ).lstrip("/")
-        return prefixed
+        return self._apply_key_prefix_and_normalize(base)
 
     @property
     def storage_client(self) -> Client:
@@ -203,6 +215,23 @@ class GCSSink(RecordSink):
         self._key_name = ""
         self._current_timestamp = None
 
+    def _write_record_as_jsonl(self, record: dict) -> None:
+        """Write a single record as a JSONL line to the current GCS write handle.
+
+        Serializes the record with orjson (OPT_APPEND_NEWLINE, _json_default for
+        non-JSON-serializable values) and writes the result to gcs_write_handle.
+
+        Args:
+            record: Record dict to serialize and write.
+        """
+        self.gcs_write_handle.write(
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
+        )
+
     def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
         """Process one record when hive_partitioned is false (single-file or chunked by row limit).
 
@@ -218,13 +247,7 @@ class GCSSink(RecordSink):
             and self._records_written_in_current_file >= max_records
         ):
             self._rotate_to_new_chunk()
-        self.gcs_write_handle.write(
-            orjson.dumps(
-                record,
-                option=orjson.OPT_APPEND_NEWLINE,
-                default=_json_default,
-            )
-        )
+        self._write_record_as_jsonl(record)
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
 
@@ -270,13 +293,7 @@ class GCSSink(RecordSink):
                 "wb",
                 transport_params={"client": self.storage_client},
             )
-        self._gcs_write_handle.write(
-            orjson.dumps(
-                record,
-                option=orjson.OPT_APPEND_NEWLINE,
-                default=_json_default,
-            )
-        )
+        self._write_record_as_jsonl(record)
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
 
