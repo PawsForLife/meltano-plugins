@@ -10,6 +10,7 @@
 - **hive-partition-format-only** — Archive summary: [hive-partition-format-only.md](_archive/hive-partition-format-only/hive-partition-format-only.md)
 - **target-gcs-schema-hive-partitioning** — Archive summary: [target-gcs-schema-hive-partitioning.md](_archive/target-gcs-schema-hive-partitioning/target-gcs-schema-hive-partitioning.md)
 - **target-gcs-hive-default-key-path** — Archive summary: [target-gcs-hive-default-key-path.md](_archive/target-gcs-hive-default-key-path/target-gcs-hive-default-key-path.md)
+- **target-gcs-extraction-patterns** — Archive summary: [target-gcs-extraction-patterns.md](_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md)
 
 ## 2026-03-12
 
