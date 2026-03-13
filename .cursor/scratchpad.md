@@ -2,7 +2,7 @@
 
 ## Feature: target-gcs-extraction-patterns
 
-**Pipeline State:** Phase 3–4 Complete. Phase 5–6 Not started. Task Completion Status: None completed. Execution Order: see below.
+**Pipeline State:** Phase 3–4 Complete. Phase 5 In progress. Phase 6 Not started. Task Completion Status: 01-create-base-pattern completed. Execution Order: see below.
 
 ### Phase 1 (Research) summary:
 
@@ -51,6 +51,7 @@
 - Task plan created: 08-regression-and-documentation at plans/tasks/08-regression-and-documentation.md
 
 - Task 01-create-base-pattern completed, tests passing.
+- Task 02-base-rotation-and-write completed, tests passing.
 
 ---
 

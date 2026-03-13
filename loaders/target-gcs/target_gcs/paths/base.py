@@ -1,4 +1,4 @@
-"""Base path pattern for GCS: key prefix, template, and write/rotation stubs.
+"""Base path pattern for GCS: key prefix, template, and write/rotation.
 
 Shared by Simple, Dated, and Partitioned path patterns; GCSSink will delegate to a pattern
 after refactor. Do not import from target_gcs.sinks to avoid circular dependency.
@@ -7,11 +7,15 @@ after refactor. Do not import from target_gcs.sinks to avoid circular dependency
 from __future__ import annotations
 
 import abc
-import contextlib
+import time
 from collections.abc import Callable
 from datetime import datetime
 from io import FileIO
 from typing import Any
+
+import orjson
+
+from target_gcs.helpers import _json_default
 
 # Default key template when hive_partitioned is false.
 DEFAULT_KEY_NAMING_CONVENTION = "{stream}_{timestamp}.{format}"
@@ -102,28 +106,67 @@ class BasePathPattern(abc.ABC):
         """Flush and release resources; subclass must implement."""
         ...
 
-    def write_record_as_jsonl(self, record: dict[str, Any]) -> None:  # noqa: B027
-        """Write record as one JSONL line. Stub; full implementation in a later task."""
-        pass
+    def write_record_as_jsonl(self, record: dict[str, Any]) -> None:
+        """Write record as one JSONL line to _current_handle.
 
-    def maybe_rotate_if_at_limit(self) -> None:  # noqa: B027
-        """Rotate to new chunk if record limit reached. Stub; full implementation in a later task."""
-        pass
+        Serializes with orjson (OPT_APPEND_NEWLINE, _json_default for Decimal).
+        Caller must set _current_handle to an open handle before calling.
+
+        Args:
+            record: Record dict to serialize and write.
+        """
+        if self._current_handle is None:
+            return
+        self._current_handle.write(
+            orjson.dumps(
+                record,
+                option=orjson.OPT_APPEND_NEWLINE,
+                default=_json_default,
+            )
+        )
+        self._records_written_in_current_file += 1
+
+    def maybe_rotate_if_at_limit(self) -> None:
+        """Rotate to new chunk when max_records_per_file is reached.
+
+        When max_records_per_file > 0 and _records_written_in_current_file >= limit,
+        flushes and closes the handle, increments _chunk_index, resets record count,
+        and refreshes _current_timestamp. No-op when max_records_per_file is 0 or missing.
+        """
+        max_records = self.config.get("max_records_per_file", 0)
+        if max_records <= 0:
+            return
+        if self._records_written_in_current_file < max_records:
+            return
+        self.flush_and_close_handle()
+        self._chunk_index += 1
+        self._records_written_in_current_file = 0
+        time_fn = self._time_fn or time.time
+        self._current_timestamp = round(time_fn())
 
     def flush_and_close_handle(self) -> None:
-        """Flush and close the current write handle; set _current_handle to None."""
+        """Flush and close the current write handle; set _current_handle to None.
+
+        Safe when handle has no flush attribute (only flush if hasattr).
+        """
         if self._current_handle is not None:
-            with contextlib.suppress(OSError):
+            if hasattr(self._current_handle, "flush"):
                 self._current_handle.flush()
-            with contextlib.suppress(OSError):
-                self._current_handle.close()
+            self._current_handle.close()
             self._current_handle = None
 
     def get_chunk_format_map(self) -> dict[str, Any]:
-        """Return format map for key template (stream, timestamp, format, chunk_index, etc.). Minimal stub."""
-        return {
+        """Return format map for key template: stream, date, timestamp, format; chunk_index when chunking."""
+        date_fmt = self.config.get("date_format", "%Y-%m-%d")
+        date_val = self._extraction_date.strftime(date_fmt)
+        time_fn = self._time_fn or time.time
+        ts = round(time_fn())
+        out: dict[str, Any] = {
             "stream": self.stream_name,
-            "timestamp": self._current_timestamp or 0,
+            "date": date_val,
+            "timestamp": ts,
             "format": "jsonl",
-            "chunk_index": self._chunk_index,
         }
+        if self.config.get("max_records_per_file", 0) > 0:
+            out["chunk_index"] = self._chunk_index
+        return out
