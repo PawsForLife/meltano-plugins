@@ -189,7 +189,7 @@ def test_schema_and_record_single_date_field_string_iso():
 
 
 def test_schema_and_record_single_literal_field():
-    """Single literal (non-date) field yields one path segment. WHAT: x-partition-fields [region], record region='eu', no date format → 'eu'. WHY: Literal partition keys (e.g. region) produce path-safe folder names."""
+    """Single literal (non-date) field yields one Hive key=value segment. WHAT: x-partition-fields [region], record region='eu', no date format → 'region=eu'. WHY: Literal partition keys use Hive-standard field_name=value segments."""
     schema = {
         "properties": {"region": {"type": "string"}},
         "x-partition-fields": ["region"],
@@ -199,11 +199,11 @@ def test_schema_and_record_single_literal_field():
         record={"region": "eu"},
         fallback_date=FALLBACK_DATE,
     )
-    assert result == "eu"
+    assert result == "region=eu"
 
 
 def test_schema_and_record_enum_then_date_order():
-    """Two fields (enum then date) produce path in array order. WHAT: region then dt → 'eu/year=2024/month=03/day=11'. WHY: Path order must follow x-partition-fields array order."""
+    """Two fields (enum then date) produce path in array order with key=value literal. WHAT: region then dt → 'region=eu/year=2024/month=03/day=11'. WHY: Path order follows x-partition-fields; literal segments are Hive key=value."""
     schema = {
         "properties": {
             "region": {"type": "string"},
@@ -216,11 +216,11 @@ def test_schema_and_record_enum_then_date_order():
         record={"region": "eu", "dt": datetime(2024, 3, 11)},
         fallback_date=FALLBACK_DATE,
     )
-    assert result == "eu/year=2024/month=03/day=11"
+    assert result == "region=eu/year=2024/month=03/day=11"
 
 
 def test_schema_and_record_date_then_enum_order():
-    """Two fields (date then enum) produce path in array order. WHAT: dt then region → 'year=2024/month=03/day=11/eu'. WHY: Path order must follow x-partition-fields array order."""
+    """Two fields (date then enum) produce path in array order with key=value literal. WHAT: dt then region → 'year=2024/month=03/day=11/region=eu'. WHY: Path order follows x-partition-fields; literal segments are Hive key=value."""
     schema = {
         "properties": {
             "dt": {"type": "string", "format": "date-time"},
@@ -233,11 +233,11 @@ def test_schema_and_record_date_then_enum_order():
         record={"region": "eu", "dt": datetime(2024, 3, 11)},
         fallback_date=FALLBACK_DATE,
     )
-    assert result == "year=2024/month=03/day=11/eu"
+    assert result == "year=2024/month=03/day=11/region=eu"
 
 
 def test_schema_and_record_literal_with_slash_sanitized():
-    """Literal value containing slash is path-sanitized (e.g. slash → underscore). WHAT: record region='a/b' yields segment 'a_b'. WHY: Embedded slashes would break path structure."""
+    """Literal value containing slash is path-sanitized; segment is Hive key=value. WHAT: record region='a/b' yields segment 'region=a_b'. WHY: Embedded slashes sanitized; literal segments use field_name=value."""
     schema = {
         "properties": {"region": {"type": "string"}},
         "x-partition-fields": ["region"],
@@ -247,7 +247,7 @@ def test_schema_and_record_literal_with_slash_sanitized():
         record={"region": "a/b"},
         fallback_date=FALLBACK_DATE,
     )
-    assert result == "a_b"
+    assert result == "region=a_b"
 
 
 def test_schema_and_record_unparseable_date_raises_parser_error():
@@ -279,7 +279,7 @@ def test_schema_and_record_no_format_datetime_still_date_segment():
 
 
 def test_schema_and_record_no_format_parseable_string_literal_segment():
-    """No format + dateutil-parseable string yields path-safe literal. WHAT: Partition field has no format; value is string '2024/03/11'; path is literal segment with slashes replaced. WHY: We must not infer date from string content when schema does not declare date/date-time format."""
+    """No format + dateutil-parseable string yields Hive key=value literal segment. WHAT: Partition field dt has no format; value '2024/03/11' → literal segment 'dt=2024_03_11'. WHY: No date inference when schema has no format; literal segments use field_name=value."""
     schema = {
         "properties": {"dt": {"type": "string"}},
         "x-partition-fields": ["dt"],
@@ -289,4 +289,4 @@ def test_schema_and_record_no_format_parseable_string_literal_segment():
         record={"dt": "2024/03/11"},
         fallback_date=FALLBACK_DATE,
     )
-    assert result == "2024_03_11"
+    assert result == "dt=2024_03_11"
