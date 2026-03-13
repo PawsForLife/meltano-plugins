@@ -4,6 +4,10 @@
 
 ### Added
 
+- **test-creation-skill-and-agent** — Details: [test-creation-skill-and-agent.md](_archive/test-creation-skill-and-agent/test-creation-skill-and-agent.md)
+  - Add `.cursor/skills/test-creation/SKILL.md` (test naming, path, TDD, black-box, regression; defers to development_practices and CONVENTIONS).
+  - Add `.cursor/agents/test-writer.md` subagent for test generation; invoke with test-creation skill and request string.
+  - Update `implement-task-feature.md` and `implement-task-fix.md` Step 2.1 to invoke test-writer subagent with test-creation skill and request.
 - **document-test-structure-intent** — Document test structure and scoping in .cursor: one test file per source module, unit tests in-scope, integration tests thin, no duplication or mixing. Details: [document-test-structure-intent.md](_archive/document-test-structure-intent/document-test-structure-intent.md)
   - Add "Test structure and scoping" to `.cursor/rules/development_practices.mdc`.
   - Align `docs/AI_CONTEXT/AI_CONTEXT_PATTERNS.md` "Testing & TDD" / test layout with the rule.
