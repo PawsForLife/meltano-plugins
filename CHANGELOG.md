@@ -4,6 +4,7 @@
 
 ### Added
 
+- **target-gcs-function-name-alignment** — Archive summary: [target-gcs-function-name-alignment.md](_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md)
 - **hive-partition-key-value-paths** — Archive summary: [hive-partition-key-value-paths.md](_archive/hive-partition-key-value-paths/hive-partition-key-value-paths.md)
 - **hive-partition-format-only** — Archive summary: [hive-partition-format-only.md](_archive/hive-partition-format-only/hive-partition-format-only.md)
 - **target-gcs-schema-hive-partitioning** — Archive summary: [target-gcs-schema-hive-partitioning.md](_archive/target-gcs-schema-hive-partitioning/target-gcs-schema-hive-partitioning.md)
