@@ -16,20 +16,19 @@ def _build_simple_path(
     time_fn: Any = None,
     date_fn: Any = None,
     storage_client: Any = None,
+    extraction_date: Any = None,
 ) -> SimplePath:
-    """Build SimplePath with given config and injectables. Uses minimal schema and stream name."""
+    """Build SimplePath with given config and injectables. Uses minimal stream name."""
     cfg = config or {}
     default = {"bucket_name": "test-bucket"}
     merged = {**default, **cfg}
     return SimplePath(
-        target=None,
         stream_name="my_stream",
-        schema={"properties": {}},
-        key_properties=[],
         config=merged,
         time_fn=time_fn,
         date_fn=date_fn,
         storage_client=storage_client,
+        extraction_date=extraction_date,
     )
 
 

@@ -37,6 +37,8 @@
 
 ### Changed
 
+- **restructure-target-gcs-tests** — Details: [restructure-target-gcs-tests.md](../../_archive/restructure-target-gcs-tests/restructure-target-gcs-tests.md).
+  - Task 01: Rename test files to match source modules (test_core→test_target, test_simple_path→test_paths_simple, test_dated_path→test_paths_dated, test_partitioned_path→test_paths_partitioned).
 - **target-gcs-extraction-patterns (task 08)** — GCSSink now delegates to extraction patterns (SimplePath, DatedPath, PartitionedPath); behaviour and key shapes unchanged; no new required config or env vars.
 - **target-gcs-dedup-split-logic** — Unify partition date format constant: single source for `DEFAULT_PARTITION_DATE_FORMAT` in `partition_path.py`; sinks import it; removed local constant from sinks.py.
   - Add `_flush_and_close_handle` on GCSSink; refactor `_rotate_to_new_chunk` and `_close_handle_and_clear_state` to use it.

@@ -1,26 +1,26 @@
 # Pipeline Scratchpad
 
----
-
 ## Feature: restructure-target-gcs-tests
 
-**Pipeline State:** Phase 2 Complete; Phase 3–6 Not started.
-**Task Completion Status:** Research (Phase 1) complete; planning docs written; master plan (Phase 2) complete.
-**Execution Order:** (empty until Phase 3 completes.)
-**Plan location:** `_features/restructure-target-gcs-tests/plans/master/` — overview.md, architecture.md, interfaces.md, implementation.md, testing.md, dependencies.md, documentation.md.
+**Pipeline State:** Phase 1 Complete, Phase 2 Complete, Phase 3 Complete, Phase 4 Complete, Phase 5 Not started, Phase 6 Not started.
 
-**Phase 1 summary:**
-- **Output directory:** `_features/restructure-target-gcs-tests/planning/` — contains `impacted-systems.md`, `new-systems.md`, `possible-solutions.md`, `selected-solution.md`.
-- **Test-to-source mapping:** Flat layout; 1:1 mapping. Renames: `test_core.py` → `test_target.py`; `test_simple_path.py` → `test_paths_simple.py`; `test_dated_path.py` → `test_paths_dated.py`; `test_partitioned_path.py` → `test_paths_partitioned.py`. Keep `test_sinks.py`, `test_paths_base.py`, and `tests/helpers/*` names.
-- **Split/consolidate:** Merge sink-relevant tests from `test_partition_key_generation.py` into `test_sinks.py`; remove tests that only re-validate partition_path / partition_schema / path behaviour (already covered by unit tests). Delete `test_partition_key_generation.py` after merge.
-- **What to skip:** Integration tests that duplicate unit tests (e.g. partition path format, schema validation); duplicate "valid hive schema" and "fallback date in key" tests per existing scratchpad notes.
-- **Rules:** Unit = one file per source module, black-box (inputs → outputs / state). Integration = only in test_sinks.py, assert sink’s key paths and pattern selection, not lower-level behaviour.
+**Task Completion Status:** Task 01-rename-test-files completed, tests passing.
 
-**Phase 2 key decisions:**
-- **Task ordering:** (1) Renames only; (2) Merge test_partition_key_generation into test_sinks + remove duplicates + delete file; (3) Optional shared helpers; (4) CI/script path updates; (5) Verification. Step 2 depends on Step 1.
-- **File mapping table:** See `plans/master/implementation.md`. Renames: test_core→test_target; test_simple_path→test_paths_simple; test_dated_path→test_paths_dated; test_partitioned_path→test_paths_partitioned. test_partition_key_generation→removed (tests merged into test_sinks).
-- **Duplicates:** Keep `test_hive_partitioned_valid_schema_constructs_successfully`; remove the other "valid hive schema" test. Keep one "fallback date in key" test in test_sinks; do not add a second when merging.
-- **File length:** If test_sinks.py exceeds 500 lines after merge, split per content_length.mdc (e.g. test_sinks_integration.py or submodule).
+Task plan created: 02-merge-partition-key-tests-into-sinks at plans/tasks/02-merge-partition-key-tests-into-sinks.md
+
+**Task plan created:** 01-rename-test-files at plans/tasks/01-rename-test-files.md
+
+**Task plan created:** 05-verification-and-quality at plans/tasks/05-verification-and-quality.md
+
+**Task plan created:** 03-optional-shared-sink-test-helpers at plans/tasks/03-optional-shared-sink-test-helpers.md
+
+**Task plan created:** 04-update-ci-and-script-paths at plans/tasks/04-update-ci-and-script-paths.md
+
+**Execution Order:** 01-rename-test-files.md, 02-merge-partition-key-tests-into-sinks.md, 03-optional-shared-sink-test-helpers.md, 04-update-ci-and-script-paths.md, 05-verification-and-quality.md
+
+**Task count:** 5
+
+**Plan location:** _features/restructure-target-gcs-tests/plans/master/
 
 ---
 

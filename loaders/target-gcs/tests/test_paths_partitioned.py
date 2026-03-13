@@ -36,10 +36,8 @@ def build_partitioned_sink(
         "required": ["region", "dt"],
     }
     return PartitionedPath(
-        target=None,
         stream_name=stream_name,
         schema=schema if schema is not None else default_schema,
-        key_properties=[],
         config=merged,
         time_fn=time_fn,
         date_fn=date_fn,

@@ -17,7 +17,6 @@ def build_dated_sink(
     date_fn: Any = None,
     storage_client: Any = None,
     stream_name: str = "my_stream",
-    schema: dict[str, Any] | None = None,
     extraction_date: datetime | None = None,
 ) -> DatedPath:
     """Build DatedPath with given config and injectables. Uses hive_partitioned=True so key template uses partition_date."""
@@ -25,10 +24,7 @@ def build_dated_sink(
     default = {"bucket_name": "test-bucket", "hive_partitioned": True}
     merged = {**default, **cfg}
     return DatedPath(
-        target=None,
         stream_name=stream_name,
-        schema=schema or {"properties": {}},
-        key_properties=[],
         config=merged,
         time_fn=time_fn,
         date_fn=date_fn,
