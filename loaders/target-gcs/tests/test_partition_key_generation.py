@@ -140,11 +140,17 @@ def test_build_key_for_record_uses_user_template_when_key_naming_convention_set(
     record = {"id": 1, "created_at": "2024-03-11"}
     key = sink._build_key_for_record(record, partition_path)
     assert "my_stream/" in key, "key must contain stream prefix from user template"
-    assert "dt=year=2024" in key, "key must contain user segment dt=... (not internal default without dt=)"
-    assert partition_path in key or "dt=year=2024/month=03/day=11" in key, "key must contain full partition path in user format"
+    assert "dt=year=2024" in key, (
+        "key must contain user segment dt=... (not internal default without dt=)"
+    )
+    assert partition_path in key or "dt=year=2024/month=03/day=11" in key, (
+        "key must contain full partition path in user format"
+    )
     assert "88888" in key, "key must contain deterministic timestamp"
     assert key.endswith(".jsonl"), "key must end with .jsonl"
-    assert key == f"my_stream/dt={partition_path}/{fixed_ts:.0f}.jsonl", "key must exactly match user template shape"
+    assert key == f"my_stream/dt={partition_path}/{fixed_ts:.0f}.jsonl", (
+        "key must exactly match user template shape"
+    )
 
 
 def test_build_key_for_record_hive_token_expands_like_partition_date():
@@ -162,8 +168,12 @@ def test_build_key_for_record_hive_token_expands_like_partition_date():
     )
     record = {"id": 1, "created_at": "2024-03-11"}
     key = sink._build_key_for_record(record, partition_path)
-    assert partition_path in key, "key must contain partition path segment (hive expands like partition_date)"
-    assert key == f"my_stream/{partition_path}/{fixed_ts:.0f}.jsonl", "key must match template with {hive} expanded to partition_path"
+    assert partition_path in key, (
+        "key must contain partition path segment (hive expands like partition_date)"
+    )
+    assert key == f"my_stream/{partition_path}/{fixed_ts:.0f}.jsonl", (
+        "key must match template with {hive} expanded to partition_path"
+    )
 
 
 def test_build_key_for_record_uses_fallback_when_partition_path_from_fallback():

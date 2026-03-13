@@ -117,14 +117,22 @@ def test_sink_accepts_date_fn_and_stores_it():
 def test_get_effective_key_template_returns_user_template_when_set():
     """WHAT: _get_effective_key_template returns key_naming_convention when set and non-empty.
     WHY: User override must take precedence over partition or default template."""
-    subject = build_sink({"key_naming_convention": "custom/{stream}/dt={partition_date}.jsonl"})
-    assert subject._get_effective_key_template() == "custom/{stream}/dt={partition_date}.jsonl"
+    subject = build_sink(
+        {"key_naming_convention": "custom/{stream}/dt={partition_date}.jsonl"}
+    )
+    assert (
+        subject._get_effective_key_template()
+        == "custom/{stream}/dt={partition_date}.jsonl"
+    )
 
 
 def test_get_effective_key_template_returns_hive_default_when_partition_set_and_no_user_template():
     """WHAT: _get_effective_key_template returns DEFAULT_KEY_NAMING_CONVENTION_HIVE when partition_date_field is set and key_naming_convention omitted.
     WHY: Hive-style default must apply when partitioning by date and user did not set a template."""
-    schema_with_partition = {"properties": {"created_at": {"type": "string"}}, "required": ["created_at"]}
+    schema_with_partition = {
+        "properties": {"created_at": {"type": "string"}},
+        "required": ["created_at"],
+    }
     subject = build_sink(
         config={"partition_date_field": "created_at"},
         schema=schema_with_partition,

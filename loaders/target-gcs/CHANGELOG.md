@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Schema-driven Hive partitioning (task 01):** Add `validate_partition_fields_schema(stream_name, schema, partition_fields)` in `target_gcs.helpers.partition_schema`; validates that each partition field exists in schema properties, is required, and is non-nullable. Exported from `target_gcs.helpers`. Unit tests in `tests/helpers/test_partition_schema.py` (valid case, missing field, not required, required not list, null-only type).
 - **Hive default key path:** Add `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`, and `_get_effective_key_template()` in sinks.py; effective template resolution (user override → partition default → non-partition default). `_build_key_for_record` and `key_name` both use effective template and format map (tasks 06–07).
 
 ### Changed

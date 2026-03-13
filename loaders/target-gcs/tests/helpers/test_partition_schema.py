@@ -1,8 +1,11 @@
-"""Unit tests for validate_partition_date_field_schema: partition-date-field schema validation."""
+"""Unit tests for partition schema validation (partition-date-field and partition-fields)."""
 
 import pytest
 
-from target_gcs.helpers import validate_partition_date_field_schema
+from target_gcs.helpers import (
+    validate_partition_date_field_schema,
+    validate_partition_fields_schema,
+)
 
 STREAM_NAME = "test_stream"
 
@@ -149,3 +152,96 @@ def test_validate_partition_field_no_properties_key_raises():
     assert STREAM_NAME in msg
     assert field_name in msg
     assert "not in schema" in msg or "not in" in msg.lower()
+
+
+# --- validate_partition_fields_schema (x-partition-fields / schema-driven Hive) ---
+
+
+def test_validate_partition_fields_schema_valid_passes():
+    """All partition fields in properties, required, and non-nullable; no exception."""
+    schema = {
+        "properties": {
+            "A": {"type": "string"},
+            "B": {"type": "number"},
+        },
+        "required": ["A", "B"],
+    }
+    partition_fields = ["A", "B"]
+    validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+
+
+def test_validate_partition_fields_schema_missing_field_in_properties_raises():
+    """Partition field not in schema properties raises ValueError with stream name and 'not in schema'."""
+    schema = {"properties": {"A": {"type": "string"}}, "required": ["A"]}
+    partition_fields = ["A", "C"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "C" in msg
+    assert "not in schema" in msg or "not in" in msg.lower()
+
+
+def test_validate_partition_fields_schema_field_not_required_raises():
+    """Partition field in properties but not in required raises ValueError 'must be required'."""
+    schema = {
+        "properties": {"A": {"type": "string"}, "B": {"type": "string"}},
+        "required": ["A"],
+    }
+    partition_fields = ["A", "B"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "B" in msg
+    assert "must be required" in msg
+
+
+def test_validate_partition_fields_schema_required_not_list_raises():
+    """Schema with required not a list raises ValueError so schema shape is valid."""
+    schema = {"properties": {"a": {"type": "string"}}, "required": "a"}
+    partition_fields = ["a"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "required" in msg.lower()
+
+
+def test_validate_partition_fields_schema_null_only_type_raises():
+    """Property type 'null' only raises ValueError 'null-only'."""
+    schema = {"properties": {"x": {"type": "null"}}, "required": ["x"]}
+    partition_fields = ["x"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "x" in msg
+    assert "null-only" in msg
+
+
+def test_validate_partition_fields_schema_null_only_array_type_raises():
+    """Property type ['null'] raises ValueError 'null-only'; same as single null."""
+    schema = {"properties": {"x": {"type": ["null"]}}, "required": ["x"]}
+    partition_fields = ["x"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "x" in msg
+    assert "null-only" in msg
+
+
+def test_validate_partition_fields_schema_mixed_optional_required_raises():
+    """Required [A]; partition_fields [A, B]; B optional raises ValueError for B."""
+    schema = {
+        "properties": {"A": {"type": "string"}, "B": {"type": "string"}},
+        "required": ["A"],
+    }
+    partition_fields = ["A", "B"]
+    with pytest.raises(ValueError) as exc_info:
+        validate_partition_fields_schema(STREAM_NAME, schema, partition_fields)
+    msg = str(exc_info.value)
+    assert STREAM_NAME in msg
+    assert "B" in msg
+    assert "must be required" in msg
