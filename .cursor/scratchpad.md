@@ -3,7 +3,7 @@
 ## Feature: target-gcs-dedup-split-logic
 
 **Pipeline State:** Phase 1–5 Complete; Phase 6 Not started.
-**Task Completion Status:** Task 01–04 completed, tests passing. Task 05-add-maybe-rotate-if-at-limit completed: `_maybe_rotate_if_at_limit()` added; `_process_record_single_or_chunked` and `_process_record_hive_partitioned` refactored to call it before writing; full target-gcs pytest 107 passed. Task 06–07 as previously noted.
+**Task Completion Status:** Task 01–05 completed (see above). Task 06–07 as previously noted. Task 09-update-docstrings-and-ai-context completed: docstrings confirmed for all new GCSSink private methods; comment added in `_apply_key_prefix_and_normalize`; `docs/AI_CONTEXT/AI_CONTEXT_target-gcs.md` updated (private helpers, constant in partition_path, partition_schema validators); full target-gcs pytest 107 passed.
 **Task count:** 9.
 **Execution Order:** 01-unify-partition-date-format-constant → 02-add-flush-and-close-handle → 03-add-apply-key-prefix-and-normalize → 04-add-write-record-as-jsonl → 05-add-maybe-rotate-if-at-limit → 06-add-compute-non-hive-key → 07-add-init-hive-partitioning → 08-add-assert-field-required-and-non-null → 09-update-docstrings-and-ai-context.
 **Ordered task file names:** 01-unify-partition-date-format-constant.md, 02-add-flush-and-close-handle.md, 03-add-apply-key-prefix-and-normalize.md, 04-add-write-record-as-jsonl.md, 05-add-maybe-rotate-if-at-limit.md, 06-add-compute-non-hive-key.md, 07-add-init-hive-partitioning.md, 08-add-assert-field-required-and-non-null.md, 09-update-docstrings-and-ai-context.md.

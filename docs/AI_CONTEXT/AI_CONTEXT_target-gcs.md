@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.4 |
+| Version | 1.5 |
 | Last Updated | 2026-03-13 |
 | Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink, RecordSink |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, env), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (typing, testing), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (target, destination, streams, Sink, config file, SCHEMA/RECORD/STATE), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md) (tap component) |
@@ -30,7 +30,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 
 - **Signature**: `get_partition_path_from_schema_and_record(schema, record, extraction_date, *, partition_date_format) -> str`
 - **Role**: Build partition path from stream schema `x-partition-fields` and record. Path order = array order. Every partition segment is `key=value`: literal (non-date) segments use `field_name=value` (path-safe value); date segments use `year=.../month=.../day=...`. Example path: `region=eu/year=2024/month=03/day=11`. **Date-parseable** is determined only by the field's schema having `format: "date"` or `"date-time"`; string values are never parsed as dates without that format. Native `datetime`/`date` values are always treated as date segments. When format is absent, values are emitted as literal segments (path-safe: `str(value).replace("/", "_")`). Used by `GCSSink` when `hive_partitioned` is true. Exported from `target_gcs.helpers`. Unparseable date strings (when format is date/date-time) raise `ParserError`. Extraction date used when `x-partition-fields` is missing or empty (e.g. run/extraction date).
-- **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style).
+- **Constant**: `DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"` (Hive-style). Single source of truth: defined in `target_gcs.helpers.partition_path`; sinks import it from there.
 
 ### GCSTarget (`target_gcs.target`)
 
@@ -64,6 +64,15 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 - **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line with `orjson.dumps(..., option=orjson.OPT_APPEND_NEWLINE, default=_json_default)`. `_json_default` serializes `decimal.Decimal` as float; other non-JSON types raise `TypeError`.
 - **Record processing**: `process_record(self, record: dict, context: dict) -> None` writes the record to the open handle. When `hive_partitioned` is true: partition path is resolved per record via `get_partition_path_from_schema_and_record` (schema `x-partition-fields` or extraction date). Unparseable partition date strings raise `ParserError`.
 
+### GCSSink private helpers (refactor dedup/split)
+
+- **`_flush_and_close_handle()`**: Flush (if supported) and close the current GCS write handle; set `_gcs_write_handle` to None. Used by `_rotate_to_new_chunk` and `_close_handle_and_clear_state`.
+- **`_apply_key_prefix_and_normalize(base)`**: Apply config `key_prefix` to the base path and normalize slashes (collapse `//`, strip leading `/`) so the GCS key is valid. Used by `_build_key_for_record` and `_compute_non_hive_key`.
+- **`_write_record_as_jsonl(record)`**: Serialize record with orjson (OPT_APPEND_NEWLINE, `_json_default`) and write to the current handle. Used by both record-processing paths.
+- **`_maybe_rotate_if_at_limit()`**: If `max_records_per_file` is set and current file has reached that limit, call `_rotate_to_new_chunk`. No-op when chunking is disabled. Called before writing in both paths.
+- **`_compute_non_hive_key()`**: Build non-hive key from template, timestamp, date, format_map (and chunk_index when chunking); assign to `_key_name` and return it. Used by `key_name` when hive_partitioned is false and key not yet set.
+- **`_init_hive_partitioning()`**: Set `_current_partition_path`; when schema has non-empty `x-partition-fields`, call `validate_partition_fields_schema`. Invoked from `__init__` when `hive_partitioned` is true.
+
 ### Authentication
 
 - No `credentials_file` or path in config. Schema and tests assert the config file has no `credentials_file`.
@@ -88,7 +97,7 @@ When `hive_partitioned` is true, the sink uses one active write handle. On each 
 
 ### Partition fields validation (sink init)
 
-When `hive_partitioned` is true and the stream schema has non-empty `x-partition-fields`, the sink validates at init via `validate_partition_fields_schema` in `target_gcs.helpers.partition_schema`. Each listed field must be in `schema["properties"]`, in `schema["required"]`, and non-nullable. On failure a `ValueError` is raised with the stream name, field name, and reason.
+When `hive_partitioned` is true and the stream schema has non-empty `x-partition-fields`, the sink validates at init via `validate_partition_fields_schema` in `target_gcs.helpers.partition_schema`. Each listed field must be in `schema["properties"]`, in `schema["required"]`, and have at least one non-null type. On failure a `ValueError` is raised with the stream name, field name, and reason. `validate_partition_date_field_schema` (for partition_date_field) applies the same “field in properties, required, non-null type” checks. The shared logic is in `_assert_field_required_and_non_null_type(stream_name, field_name, schema, *, field_label=..., no_type_reason=..., null_only_reason=...)`; both validators call it and are exported from `target_gcs.helpers`.
 
 ---
 

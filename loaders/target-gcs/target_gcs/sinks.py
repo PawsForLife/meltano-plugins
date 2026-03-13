@@ -105,6 +105,7 @@ class GCSSink(RecordSink):
             Normalized key string (no leading slash, no double slashes).
         """
         prefix = self.config.get("key_prefix", "") or ""
+        # Collapse double slashes and strip leading slash so GCS key is valid (no //, no leading /).
         return f"{prefix}/{base}".replace("//", "/").lstrip("/")
 
     def _compute_non_hive_key(self) -> str:
