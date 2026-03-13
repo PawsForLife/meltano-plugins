@@ -27,6 +27,7 @@
 
 - **target-gcs-dedup-split-logic** — Unify partition date format constant: single source for `DEFAULT_PARTITION_DATE_FORMAT` in `partition_path.py`; sinks import it; removed local constant from sinks.py.
   - Add `_flush_and_close_handle` on GCSSink; refactor `_rotate_to_new_chunk` and `_close_handle_and_clear_state` to use it.
+  - Add `_apply_key_prefix_and_normalize(base)` on GCSSink; refactor `_build_key_for_record` to use it (prefix + normalize logic centralized).
   - Add `_write_record_as_jsonl(record)`; refactor `_process_record_single_or_chunked` and `_process_record_hive_partitioned` to use it (no duplicated orjson.dumps + write).
 - **partition-path-extraction-date-clarity:** Parameter and naming clarity: `fallback_date` → `extraction_date` in `get_partition_path_from_schema_and_record`; sink attribute `self.fallback` → `self._extraction_date`. All "fallback" wording in partition-path context (docstrings, comments, test names) → "extraction date" so the no-partition-fields case is clearly the extraction date path, not a fallback. No behaviour change.
 - **hive-partition-key-value-paths:** Literal partition path segments are now Hive-standard `key=value` (e.g. `region=eu`, `country=UK`) instead of value-only. Improves compatibility with Athena, Glue, BigQuery external tables, and Spark. Existing object keys that used value-only literal segments are not migrated; new writes use key=value segments.
