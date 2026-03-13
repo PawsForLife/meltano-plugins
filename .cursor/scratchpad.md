@@ -27,3 +27,4 @@
 - Task 03-helper-exports completed, tests passing
 - Task 04-config-schema completed, tests passing
 - Task 05-sink-init-validation completed, tests passing
+- Task 06-sink-record-processing completed, tests passing. Task 05 had already switched path resolution to get_partition_path_from_schema_and_record with DEFAULT_PARTITION_DATE_FORMAT; task 06 renamed the method to _process_record_hive_partitioned and updated docstring/call site.

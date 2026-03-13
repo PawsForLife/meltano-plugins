@@ -230,14 +230,16 @@ class GCSSink(RecordSink):
         if max_records and max_records > 0:
             self._records_written_in_current_file += 1
 
-    def _process_record_partition_by_field(self, record: dict, context: dict) -> None:
-        """Process one record when hive_partitioned is true (partition-by-schema strategy).
+    def _process_record_hive_partitioned(self, record: dict, context: dict) -> None:
+        """Process one record when hive_partitioned is true (schema-driven Hive path).
 
-        Assumes hive_partitioned is true. Resolves partition path from schema and record
-        via get_partition_path_from_schema_and_record; on partition change closes handle
-        and clears key/partition state and resets chunk index; rotates within partition
-        when at max_records_per_file; builds key via _build_key_for_record; opens handle
-        when none or key changed; writes record and increments count when chunking.
+        Assumes hive_partitioned is true. Partition path comes from
+        get_partition_path_from_schema_and_record(schema, record, fallback,
+        partition_date_format=DEFAULT_PARTITION_DATE_FORMAT). On partition change closes
+        handle and clears key/partition state and resets chunk index; rotates within
+        partition when at max_records_per_file; builds key via _build_key_for_record;
+        opens handle when none or key changed; writes record and increments count when
+        chunking. Re-raises ParserError from path builder on unparseable date.
         """
         try:
             partition_path = get_partition_path_from_schema_and_record(
@@ -289,6 +291,6 @@ class GCSSink(RecordSink):
         (one key/handle per stream per run, optional rotation by max_records_per_file).
         """
         if self.config.get("hive_partitioned"):
-            self._process_record_partition_by_field(record, context)
+            self._process_record_hive_partitioned(record, context)
         else:
             self._process_record_single_or_chunked(record, context)
