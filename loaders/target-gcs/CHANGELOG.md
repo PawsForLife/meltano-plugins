@@ -23,6 +23,7 @@
 - **Tests:** Add test that when `partition_date_field` is set and `key_naming_convention` is omitted, key uses hive default pattern `{stream}/{partition_date}/{timestamp}.jsonl`; xfail removed after task 06.
 - **Tests:** Add test that when both `partition_date_field` and `key_naming_convention` are set, built key follows the user template (e.g. `{stream}/dt={partition_date}/{timestamp}.jsonl`); regression guard so user config is never overridden by hive default.
 - **Tests:** Add test that `{hive}` in key_naming_convention expands to the same partition segment as `{partition_date}`; xfail removed after task 06 (hive in format map).
+- **Tests (task 08):** Sink and key-generation black-box tests: hive_partitioned false/true key behaviour, fallback date path, x-partition-fields literal+date segments, partition-change handle lifecycle; test_partition_key_generation migrated from partition_date_field to hive_partitioned + x-partition-fields; added fallback path, multiple streams order, ParserError for date-format unparseable.
 
 ## [3.0.0] - 2026-03-12
 

@@ -513,3 +513,114 @@ def test_hive_partitioned_unset_constructs_successfully():
     schema = {"properties": {"id": {}}}
     sink = build_sink(config=config, schema=schema)
     assert sink.stream_name == "my_stream"
+
+
+# --- Key/path behaviour (black-box: keys and observable handle behaviour only) ---
+
+FIXED_DATE = datetime(2024, 3, 11)
+
+
+def test_hive_partitioned_false_key_has_no_record_driven_partition_segments():
+    """With hive_partitioned false, process_record produces a key without partition segments derived from record data (flat or existing behaviour).
+    WHAT: Key does not contain year=.../month=.../day=... from record. WHY: Regression guard for non-Hive mode."""
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
+        ) as mock_open,
+    ):
+        sink = build_sink(config={"hive_partitioned": False})
+        sink.process_record({"id": 1, "created_at": "2024-03-11", "region": "eu"}, {})
+    key = _key_from_open_call(mock_open.call_args)
+    assert "year=2024" not in key or "month=03" not in key or "day=11" not in key, (
+        "key must not contain Hive partition segments from record when hive_partitioned is false"
+    )
+
+
+def test_hive_partitioned_true_no_x_partition_fields_key_contains_fallback_date():
+    """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the fallback date segment from date_fn.
+    WHAT: Key contains year=.../month=.../day=... from date_fn. WHY: Fallback path when schema has no partition fields."""
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
+        ) as mock_open,
+    ):
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema={"properties": {}},
+            date_fn=lambda: FIXED_DATE,
+            time_fn=lambda: 11111.0,
+        )
+        sink.process_record({"id": 1, "name": "any"}, {})
+    key = _key_from_open_call(mock_open.call_args)
+    assert "year=2024" in key and "month=03" in key and "day=11" in key, (
+        "key must contain fallback date segment from date_fn when hive_partitioned true and no x-partition-fields"
+    )
+
+
+def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_segments():
+    """With hive_partitioned true and x-partition-fields [r, d], record with r='x' and d=datetime produces key with literal 'x' and date segment in order.
+    WHAT: Key contains literal segment and year=2024/month=03/day=11 in schema order. WHY: Schema-driven partition path in key."""
+    schema = {
+        "x-partition-fields": ["r", "d"],
+        "properties": {
+            "r": {"type": "string"},
+            "d": {"type": "string", "format": "date-time"},
+        },
+        "required": ["r", "d"],
+    }
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open", return_value=MagicMock()
+        ) as mock_open,
+    ):
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema=schema,
+            date_fn=lambda: FIXED_DATE,
+            time_fn=lambda: 22222.0,
+        )
+        sink.process_record(
+            {"id": 1, "r": "x", "d": datetime(2024, 3, 11)},
+            {},
+        )
+    key = _key_from_open_call(mock_open.call_args)
+    assert "x" in key, "key must contain literal partition segment from record"
+    assert "year=2024/month=03/day=11" in key, "key must contain date partition segment"
+    idx_x = key.index("x")
+    idx_date = key.index("year=2024")
+    assert idx_x < idx_date, (
+        "literal segment must appear before date segment in key order"
+    )
+
+
+def test_partition_change_closes_handle_two_distinct_keys():
+    """Two records with different partition paths produce two open calls and two distinct keys (handle closed and reopened).
+    WHAT: Observable behaviour: two keys, two open calls. WHY: Black-box guard for partition-change handle lifecycle."""
+    schema = {
+        "x-partition-fields": ["dt"],
+        "properties": {"dt": {"type": "string"}},
+        "required": ["dt"],
+    }
+    with (
+        patch("target_gcs.sinks.Client"),
+        patch(
+            "target_gcs.sinks.smart_open.open",
+            side_effect=[MagicMock(), MagicMock()],
+        ) as mock_open,
+    ):
+        sink = build_sink(
+            config={"hive_partitioned": True},
+            schema=schema,
+            date_fn=lambda: FIXED_DATE,
+            time_fn=lambda: 33333.0,
+        )
+        sink.process_record({"dt": "2024-03-10", "id": 1}, {})
+        sink.process_record({"dt": "2024-03-11", "id": 2}, {})
+    assert mock_open.call_count == 2
+    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    assert keys[0] != keys[1], (
+        "two distinct keys must be used when partition path changes"
+    )
