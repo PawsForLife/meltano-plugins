@@ -9,7 +9,7 @@
 | Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink, RecordSink |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, env), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (typing, testing), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (target, destination, streams, Sink, config file, SCHEMA/RECORD/STATE), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md) (tap component) |
 
-**Summary:** Singer **target** (loader) that reads SCHEMA, RECORD, and STATE messages from stdin and loads record data into **Google Cloud Storage** as the destination. One **sink** per stream; writes JSONL using **config file** settings (bucket, key prefix, key naming, optional `hive_partitioned` and chunking).
+**Summary:** Singer **target** (loader) that reads SCHEMA, RECORD, and STATE messages from stdin and loads record data into **Google Cloud Storage** as the destination. One **sink** per stream; writes JSONL using **config file** settings (bucket, key prefix, optional `hive_partitioned` and chunking). Key format is fixed by internal constants; no user-configurable key template.
 
 ---
 
@@ -32,6 +32,8 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 
 ### Constants (`target_gcs.constants`)
 
+- **`PATH_SIMPLE`**, **`PATH_DATED`**, **`PATH_PARTITIONED`**: Path templates for SimplePath, DatedPath, PartitionedPath. Tokens: `{stream}`, `{date}`, `{hive_path}`.
+- **`FILENAME_TEMPLATE`**: `"{timestamp}.jsonl"` — filename segment; timestamp-only chunking (no `{chunk_index}`).
 - **`DEFAULT_PARTITION_DATE_FORMAT`**: `"year=%Y/month=%m/day=%d"` (Hive-style). Single source of truth for partition date formatting. Used by `DatedPath` and `_partitioned.string_functions` for date segments in partition paths.
 
 ### GCSTarget (`target_gcs.target`)
@@ -41,8 +43,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 - **Config schema** (`config_jsonschema`): Declared with `singer_sdk.typing`:
   - `bucket_name` (string, **required**): GCS bucket name.
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
-  - `key_naming_convention` (string, optional): Template for the object key. When omitted, the effective default is conditional: if `hive_partitioned` is true, default is `{stream}/{partition_date}/{timestamp}.jsonl`; if false or omitted, default is `{stream}_{timestamp}.jsonl`.
-  - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. When chunking is enabled, the key token `{chunk_index}` (0-based) is available and `{timestamp}` is refreshed per chunk.
+  - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. Chunking uses timestamp-only filenames; `{timestamp}` is refreshed per chunk.
   - `hive_partitioned` (boolean, optional, default false): When true, Hive-style partitioning from stream schema `x-partition-fields` or extraction date; path built per record via `hive_path(record)` in PartitionedPath or extraction date in DatedPath.
 - **Sink**: `default_sink_class = GCSSink`.
 - **Sink creation**: Overrides `get_sink()` and `_add_sink_with_client()` so each sink receives `storage_client=self._storage_client`. `_storage_client` is `None` by default (sink then uses `Client()`); tests set it to a mock (e.g. `GCSTargetWithMockStorage`).
@@ -56,7 +57,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 - **Pattern selection**: `hive_partitioned` false or unset → `SimplePath`; `hive_partitioned` true + non-empty `x-partition-fields` in schema → `PartitionedPath`; `hive_partitioned` true + no/empty `x-partition-fields` → `DatedPath`. Same injectables (time_fn, date_fn, storage_client) are passed into the pattern constructor.
 - **Delegation**: `process_record(record, context)` and `close()` delegate to `_extraction_pattern.process_record` and `_extraction_pattern.close()`. `key_name` and `storage_client` delegate to the pattern’s `current_key` and `storage_client`. Key naming, GCS handle (smart_open), JSONL write, and chunk rotation are implemented in the base and concrete pattern classes in `target_gcs.paths` (base, simple, dated, partitioned).
 - **Class attribute**: `max_size = 1000` (batch size hint for SDK; records are still written per `process_record` call).
-- **Key tokens** (implemented in pattern classes): `{stream}`, `{date}`, `{partition_date}` / `{hive}`, `{timestamp}`, `{chunk_index}` (when chunking). Behaviour is unchanged from pre-refactor; see path classes for details.
+- **Key tokens** (implemented in pattern classes): `{stream}`, `{date}`, `{hive_path}`, `{timestamp}`. Path and filename come from constants `PATH_SIMPLE`, `PATH_DATED`, `PATH_PARTITIONED`, `FILENAME_TEMPLATE`; key building uses `filename_for_current_file()` and `full_key(path, filename)`. Chunking is timestamp-only (no `{chunk_index}`).
 - **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line; pattern classes use base `write_record_as_jsonl` (orjson, `_json_default`). Unparseable partition date strings in PartitionedPath raise `ParserError`.
 
 ### Authentication
@@ -110,7 +111,7 @@ When `hive_partitioned` is true and the stream schema has non-empty `x-partition
 }
 ```
 
-Key name defaults to `{stream}_{timestamp}.jsonl` when `hive_partitioned` is false; when `hive_partitioned` is true and `key_naming_convention` is omitted, default is `{stream}/{partition_date}/{timestamp}.jsonl` (with optional `key_prefix` if set).
+Key format is fixed: SimplePath → `{stream}/{date}/{timestamp}.jsonl`; DatedPath/PartitionedPath → `{stream}/{hive_path}/{timestamp}.jsonl`. `key_prefix` is prepended if set.
 
 ### Full sample config (Meltano / file)
 
@@ -118,12 +119,11 @@ Key name defaults to `{stream}_{timestamp}.jsonl` when `hive_partitioned` is fal
 {
   "bucket_name": "datateer-managed-prt-prod-raw-data",
   "key_prefix": "prt-test/triton",
-  "date_format": "%Y-%m-%d",
-  "key_naming_convention": "{stream}/export_date={date}/{timestamp}.jsonl"
+  "date_format": "%Y-%m-%d"
 }
 ```
 
-Resulting key pattern: `prt-test/triton/{stream}/export_date={date}/{timestamp}.jsonl` with `{stream}`, `{date}`, and `{timestamp}` replaced.
+Resulting key pattern: `prt-test/triton/{stream}/{date}/{timestamp}.jsonl` (SimplePath) or `prt-test/triton/{stream}/{hive_path}/{timestamp}.jsonl` (DatedPath/PartitionedPath) with tokens replaced.
 
 ### Test sink helper (from tests)
 

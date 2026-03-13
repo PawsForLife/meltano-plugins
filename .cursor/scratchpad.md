@@ -75,3 +75,5 @@ Task 07-partitionedpath completed, tests passing
 Task 08-sinks-config-wiring completed, tests passing
 
 Task 09-helpers-cleanup completed, tests passing
+
+Task 10-documentation completed, tests passing

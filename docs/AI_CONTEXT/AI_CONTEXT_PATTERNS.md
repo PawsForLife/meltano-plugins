@@ -106,7 +106,7 @@
 
 ### How do I add a new target option?
 
-1. Add a `th.Property(...)` to `GCSTarget.config_jsonschema` in `loaders/target-gcs/target_gcs/target.py` (e.g. `key_naming_convention`, `date_format`).
+1. Add a `th.Property(...)` to `GCSTarget.config_jsonschema` in `loaders/target-gcs/target_gcs/target.py` (e.g. `date_format`, `max_records_per_file`).
 2. Read the option in the sink from `self.config.get("option_name", default)` (e.g. in `GCSSink.key_name` and related logic in `sinks.py`).
 3. Add or adjust tests that build the sink with the new config and assert on behaviour (e.g. key name format), not on call counts.
 

@@ -49,6 +49,7 @@
   - Task 07: PartitionedPath uses `path_for_record(record)` with `hive_path(record)`; partition change detection; remove `get_partition_path_from_schema_and_record` and `record_path`; key building via `full_key(path, filename_for_current_file())`.
   - Task 08: Sinks config wiring: sink does not pass or use key_naming_convention; add test_key_shape_matches_constants; key shape from constants.
   - Task 09: Remove `get_partition_path_from_schema_and_record` and `helpers/partition_path.py`; `DEFAULT_PARTITION_DATE_FORMAT` single source in `constants.py`.
+  - Task 10: Documentation: README (remove `key_naming_convention` from config table; update Hive section; add key format table; remove `chunk_index` from chunking); AI context (config schema, key tokens, path patterns, examples); CHANGELOG.
 - **restructure-target-gcs-tests** — Details: [restructure-target-gcs-tests.md](../../_archive/restructure-target-gcs-tests/restructure-target-gcs-tests.md).
   - Task 01: Rename test files to match source modules (test_core→test_target, test_simple_path→test_paths_simple, test_dated_path→test_paths_dated, test_partitioned_path→test_paths_partitioned).
 - **target-gcs-extraction-patterns (task 08)** — GCSSink now delegates to extraction patterns (SimplePath, DatedPath, PartitionedPath); behaviour and key shapes unchanged; no new required config or env vars.

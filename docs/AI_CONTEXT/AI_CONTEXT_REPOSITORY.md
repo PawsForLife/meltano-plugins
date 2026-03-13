@@ -105,7 +105,7 @@ Details: [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md).
 | **Role** | Singer target: reads Singer JSONL from stdin, writes record batches to GCS. |
 | **Entry** | `target-gcs` CLI → `target_gcs.target:GCSTarget.cli`. |
 | **Core modules** | `target.py` (GCSTarget, config_jsonschema, default_sink_class), `sinks.py` (GCSSink, key naming, batch writes via smart_open / GCS client). |
-| **Config** | bucket_name (required), key_prefix, key_naming_convention, date_format. |
+| **Config** | bucket_name (required), key_prefix, date_format. |
 | **Input** | Singer JSONL (SCHEMA, RECORD, STATE) on stdin. |
 
 Details: [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md).

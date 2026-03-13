@@ -125,7 +125,7 @@ cat stream.jsonl | target-gcs --config config.json
 ## Core Interfaces (Quick View)
 
 - **restful-api-tap:** Subclasses `singer_sdk.Tap`; stream logic in `DynamicStream`; auth via `get_authenticator`; uses `singer_sdk.typing` for schema.
-- **target-gcs:** Subclasses `singer_sdk.target_base.Target`; `GCSSink` (RecordSink) writes to GCS; config: `bucket_name`, `key_prefix`, `key_naming_convention`.
+- **target-gcs:** Subclasses `singer_sdk.target_base.Target`; `GCSSink` (RecordSink) writes to GCS; config: `bucket_name`, `key_prefix`.
 
 Both follow the Singer spec (stdout/stdin JSONL, Discovery, sync). See [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) for data flow.
 
