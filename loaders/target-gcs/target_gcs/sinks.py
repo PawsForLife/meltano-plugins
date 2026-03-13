@@ -176,6 +176,14 @@ class GCSSink(RecordSink):
             )
         return self._gcs_write_handle
 
+    def _flush_and_close_handle(self) -> None:
+        """Flush and close the current GCS write handle and set it to None. Safe when handle has no flush attribute."""
+        if self._gcs_write_handle is not None:
+            if hasattr(self._gcs_write_handle, "flush"):
+                self._gcs_write_handle.flush()
+            self._gcs_write_handle.close()
+            self._gcs_write_handle = None
+
     @property
     def output_format(self) -> str:
         """In the future maybe we will support more formats"""
@@ -183,11 +191,7 @@ class GCSSink(RecordSink):
 
     def _rotate_to_new_chunk(self) -> None:
         """Close the current file handle, clear key cache, increment chunk index, reset record count, and refresh cached timestamp for key generation. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
-        if self._gcs_write_handle is not None:
-            if hasattr(self._gcs_write_handle, "flush"):
-                self._gcs_write_handle.flush()
-            self._gcs_write_handle.close()
-            self._gcs_write_handle = None
+        self._flush_and_close_handle()
         self._key_name = ""
         self._chunk_index += 1
         self._records_written_in_current_file = 0
@@ -195,11 +199,7 @@ class GCSSink(RecordSink):
 
     def _close_handle_and_clear_state(self) -> None:
         """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string and _current_timestamp to None so the next open gets a fresh timestamp. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
-        if self._gcs_write_handle is not None:
-            if hasattr(self._gcs_write_handle, "flush"):
-                self._gcs_write_handle.flush()
-            self._gcs_write_handle.close()
-            self._gcs_write_handle = None
+        self._flush_and_close_handle()
         self._key_name = ""
         self._current_timestamp = None
 
