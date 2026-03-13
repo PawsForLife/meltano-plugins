@@ -262,3 +262,34 @@ def test_schema_and_record_unparseable_date_raises_parser_error():
             record={"dt": "not-a-date"},
             fallback_date=FALLBACK_DATE,
         )
+
+
+def test_schema_and_record_no_format_datetime_still_date_segment():
+    """No format + datetime yields Hive date segment. WHAT: Partition field has no format in schema; value is native datetime; path is still a Hive date segment. WHY: Native datetime/date are always treated as date segments regardless of schema format."""
+    schema = {
+        "properties": {"dt": {"type": "string"}},
+        "x-partition-fields": ["dt"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"dt": datetime(2024, 3, 11)},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "year=2024/month=03/day=11"
+
+
+@pytest.mark.xfail(
+    reason="Implementation in task 03: string date inference removed; will pass after partition_path.py updated."
+)
+def test_schema_and_record_no_format_parseable_string_literal_segment():
+    """No format + dateutil-parseable string yields path-safe literal. WHAT: Partition field has no format; value is string '2024/03/11'; path is literal segment with slashes replaced. WHY: We must not infer date from string content when schema does not declare date/date-time format."""
+    schema = {
+        "properties": {"dt": {"type": "string"}},
+        "x-partition-fields": ["dt"],
+    }
+    result = get_partition_path_from_schema_and_record(
+        schema=schema,
+        record={"dt": "2024/03/11"},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert result == "2024_03_11"
