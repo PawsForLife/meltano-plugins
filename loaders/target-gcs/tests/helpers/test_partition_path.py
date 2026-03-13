@@ -127,6 +127,19 @@ def test_partition_path_unknown_timezone_surfaces_visibility():
 # --- get_partition_path_from_schema_and_record ---
 
 
+def test_get_partition_path_from_schema_and_record_importable_from_helpers():
+    """Public API: get_partition_path_from_schema_and_record is importable from target_gcs.helpers and returns a non-empty path. WHAT: Import from helpers and call with empty schema/record and fallback_date; result is fallback path. WHY: Ensures the symbol is exported and callable from the public API."""
+    from target_gcs.helpers import get_partition_path_from_schema_and_record
+
+    result = get_partition_path_from_schema_and_record(
+        schema={},
+        record={},
+        fallback_date=FALLBACK_DATE,
+    )
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+
 def test_schema_and_record_no_x_partition_fields_uses_fallback():
     """No x-partition-fields in schema yields fallback_date formatted path. WHAT: When schema has no key or empty schema, path is fallback_date.strftime(partition_date_format). WHY: Ensures predictable path when partitioning is not schema-driven."""
     result = get_partition_path_from_schema_and_record(

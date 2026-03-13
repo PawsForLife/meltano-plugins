@@ -157,6 +157,14 @@ def test_validate_partition_field_no_properties_key_raises():
 # --- validate_partition_fields_schema (x-partition-fields / schema-driven Hive) ---
 
 
+def test_validate_partition_fields_schema_importable_from_helpers():
+    """Public API: validate_partition_fields_schema is importable from target_gcs.helpers and callable with valid args. WHAT: Import from helpers and call with minimal valid schema/partition_fields. WHY: Ensures the symbol is exported and usable from the public API."""
+    from target_gcs.helpers import validate_partition_fields_schema
+
+    schema = {"properties": {"x": {"type": "string"}}, "required": ["x"]}
+    validate_partition_fields_schema(STREAM_NAME, schema, ["x"])
+
+
 def test_validate_partition_fields_schema_valid_passes():
     """All partition fields in properties, required, and non-nullable; no exception."""
     schema = {

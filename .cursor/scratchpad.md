@@ -24,3 +24,4 @@
 - Task plan created: 07-sink-process-record-dispatch at plans/tasks/07-sink-process-record-dispatch.md
 - Task 01-validator-tests-and-impl completed, tests passing
 - Task 02-path-builder-tests-and-impl completed, tests passing
+- Task 03-helper-exports completed, tests passing
