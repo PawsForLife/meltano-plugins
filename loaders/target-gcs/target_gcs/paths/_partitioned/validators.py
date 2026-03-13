@@ -7,4 +7,4 @@ def is_date_field(field_definition: dict[str, Any]) -> bool:
         return True
 
     field_format = field_definition.get("format")
-    return field_format and field_format in ["date", "date-time"]
+    return bool(field_format and field_format in ["date", "date-time"])

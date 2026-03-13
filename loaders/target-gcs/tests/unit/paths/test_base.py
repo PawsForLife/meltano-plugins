@@ -1,4 +1,4 @@
-"""Tests for BasePathPattern: key prefix normalization and effective key template.
+"""Tests for BasePathPattern: key prefix normalization, filename_for_current_file, full_key, rotation.
 
 Black-box: assert on returned strings and observable state only; no call counts or log assertions.
 """
@@ -12,24 +12,9 @@ from unittest.mock import MagicMock
 
 from target_gcs.paths.base import BasePathPattern
 
-# Fallback templates for _MinimalPattern until task 04 removes key_template.
-_DEFAULT_TEMPLATE = "{stream}_{timestamp}.{format}"
-_DEFAULT_TEMPLATE_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
-
 
 class _MinimalPattern(BasePathPattern):
     """Minimal concrete subclass so BasePathPattern can be instantiated in tests."""
-
-    @property
-    def key_template(self) -> str:
-        conv = (self.config.get("key_naming_convention") or "").strip()
-        if conv:
-            return conv
-        return (
-            _DEFAULT_TEMPLATE_HIVE
-            if self.config.get("hive_partitioned")
-            else _DEFAULT_TEMPLATE
-        )
 
     def process_record(self, record: dict, context: dict) -> None:
         pass
@@ -175,8 +160,8 @@ def test_flush_and_close_handle_without_flush_does_not_raise() -> None:
 # --- maybe_rotate_if_at_limit ---
 
 
-def test_maybe_rotate_if_at_limit_under_limit_does_not_close_or_increment() -> None:
-    """WHAT: When max_records_per_file is set and record count is below limit, handle stays open and chunk_index unchanged.
+def test_maybe_rotate_if_at_limit_under_limit_does_not_close() -> None:
+    """WHAT: When max_records_per_file is set and record count is below limit, handle stays open.
     WHY: Rotation must only occur at limit."""
     subject = _build_pattern({"max_records_per_file": 5})
     subject._current_handle = io.BytesIO()
@@ -185,87 +170,62 @@ def test_maybe_rotate_if_at_limit_under_limit_does_not_close_or_increment() -> N
         subject.write_record_as_jsonl({"x": 1})
     subject.maybe_rotate_if_at_limit()
     assert subject._current_handle is not None
-    assert subject._chunk_index == 0
 
 
-def test_maybe_rotate_if_at_limit_at_limit_clears_handle_and_increments_chunk_index() -> (
-    None
-):
-    """WHAT: When record count reaches max_records_per_file, handle is cleared, _chunk_index incremented, _records_written_in_current_file reset.
-    WHY: Shared rotation behaviour for all patterns; assert observable state only."""
-    fixed_time = 2000.0
+# --- filename_for_current_file ---
+
+
+def test_filename_for_current_file_returns_timestamp_jsonl() -> None:
+    """WHAT: With time_fn=lambda: 12345, filename_for_current_file returns '12345.jsonl'.
+    WHY: Core filename contract uses FILENAME_TEMPLATE with timestamp only (no chunk_index)."""
+    subject = _build_pattern(time_fn=lambda: 12345.0)
+    result = subject.filename_for_current_file()
+    assert result == "12345.jsonl"
+
+
+def test_filename_for_current_file_uses_injected_time_fn() -> None:
+    """WHAT: Deterministic time_fn yields predictable filename; asserts DI for deterministic tests.
+    WHY: Tests must be deterministic; time_fn injection enables this."""
+    subject = _build_pattern(time_fn=lambda: 99999.0)
+    result = subject.filename_for_current_file()
+    assert result == "99999.jsonl"
+
+
+# --- full_key ---
+
+
+def test_full_key_joins_path_and_filename() -> None:
+    """WHAT: full_key('a/b', 'c.jsonl') returns normalized key (path + filename, prefix applied).
+    WHY: Key composition must join path and filename correctly."""
+    subject = _build_pattern()
+    result = subject.full_key("a/b", "c.jsonl")
+    assert result == "a/b/c.jsonl"
+
+
+def test_full_key_applies_key_prefix() -> None:
+    """WHAT: With key_prefix='x/y', full_key result starts with prefix.
+    WHY: User prefix must be applied to composed key."""
+    subject = _build_pattern({"key_prefix": "x/y"})
+    result = subject.full_key("stream/part", "123.jsonl")
+    assert result.startswith("x/y/")
+    assert "123.jsonl" in result
+
+
+# --- maybe_rotate (timestamp-only, no chunk_index) ---
+
+
+def test_maybe_rotate_resets_records_no_chunk_index() -> None:
+    """WHAT: After rotate at max_records_per_file, next filename_for_current_file has timestamp; no chunk_index in key.
+    WHY: Chunking uses timestamp-only filenames; rotation resets record count; filename has no -0/-1 suffix."""
     subject = _build_pattern(
         {"max_records_per_file": 2},
-        time_fn=lambda: fixed_time,
+        time_fn=lambda: 2001.0,
     )
     subject._records_written_in_current_file = 2
     subject._current_handle = MagicMock()
-    subject._chunk_index = 0
-    subject._current_timestamp = None
     subject.maybe_rotate_if_at_limit()
     assert subject._current_handle is None
-    assert subject._chunk_index == 1
     assert subject._records_written_in_current_file == 0
-    assert subject._current_timestamp == round(fixed_time)
-
-
-# --- get_chunk_format_map ---
-
-
-def test_get_chunk_format_map_returns_stream_date_timestamp_format() -> None:
-    """WHAT: get_chunk_format_map returns dict with stream, date, timestamp, format.
-    WHY: Key building in subclasses uses this for template substitution."""
-    from datetime import datetime
-
-    fixed_dt = datetime(2024, 3, 11)
-    subject = _build_pattern(
-        {},
-        time_fn=lambda: 12345.67,
-        date_fn=lambda: fixed_dt,
-    )
-    subject._extraction_date = fixed_dt
-    m = subject.get_chunk_format_map()
-    assert m["stream"] == "my_stream"
-    assert m["date"] == "2024-03-11"
-    assert m["timestamp"] == 12346
-    assert m["format"] == "jsonl"
-
-
-def test_get_chunk_format_map_includes_chunk_index_when_chunking_enabled() -> None:
-    """WHAT: When max_records_per_file > 0, get_chunk_format_map includes chunk_index.
-    WHY: Key template uses chunk_index for -0, -1 suffix when chunking."""
-    subject = _build_pattern({"max_records_per_file": 10})
-    subject._chunk_index = 2
-    m = subject.get_chunk_format_map()
-    assert "chunk_index" in m
-    assert m["chunk_index"] == 2
-
-
-def test_get_chunk_format_map_omits_chunk_index_when_chunking_disabled() -> None:
-    """WHAT: When max_records_per_file is 0 or unset, get_chunk_format_map does not include chunk_index.
-    WHY: Single-file mode does not use chunk index in key."""
-    subject = _build_pattern()
-    m = subject.get_chunk_format_map()
-    assert "chunk_index" not in m
-
-
-# --- chunk index in key ---
-
-
-def test_chunk_index_in_key_template_produces_suffix_before_extension() -> None:
-    """WHAT: Key built from template and get_chunk_format_map contains -0, -1 before extension when chunking enabled.
-    WHY: Validates the -{chunk_index} convention used by downstream patterns."""
-    subject = _build_pattern({"max_records_per_file": 5})
-    template = "{stream}_{timestamp}-{chunk_index}.{format}"
-    subject._chunk_index = 0
-    m = subject.get_chunk_format_map()
-    m["timestamp"] = 1000
-    key0 = template.format_map(m)
-    assert "-0." in key0
-    assert key0.endswith(".jsonl")
-    subject._chunk_index = 1
-    m1 = subject.get_chunk_format_map()
-    m1["timestamp"] = 1000
-    key1 = template.format_map(m1)
-    assert "-1." in key1
-    assert key1.endswith(".jsonl")
+    fn = subject.filename_for_current_file()
+    assert fn == "2001.jsonl"
+    assert "chunk" not in fn and "-0" not in fn and "-1" not in fn

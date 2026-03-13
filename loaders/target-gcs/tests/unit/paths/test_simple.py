@@ -45,8 +45,8 @@ def _key_from_open_call(call_args: tuple) -> str:
 def test_simple_path_key_generation_single_path_matches_stream_date_timestamp_format() -> (
     None
 ):
-    """WHAT: After processing one record, the key passed to open matches stream, date (from date_fn), timestamp (from time_fn), and format.
-    WHY: Single-path key shape must match current non-hive behaviour for compatibility."""
+    """WHAT: After processing one record, the key passed to open matches stream/date/timestamp.jsonl (path + filename).
+    WHY: Single-path key shape uses PATH_SIMPLE + FILENAME_TEMPLATE per split-path-filename."""
     fixed_ts = 12345.0
     fixed_dt = datetime(2024, 3, 11)
     mock_handle = MagicMock()
@@ -60,7 +60,8 @@ def test_simple_path_key_generation_single_path_matches_stream_date_timestamp_fo
         subject.process_record({"id": 1, "name": "a"}, {})
         assert mock_open.call_count == 1
         key = _key_from_open_call(mock_open.call_args)
-        assert key.startswith("my_stream_")
+        assert key.startswith("my_stream/")
+        assert "2024-03-11" in key
         assert "12345" in key
         assert key.endswith(".jsonl")
 

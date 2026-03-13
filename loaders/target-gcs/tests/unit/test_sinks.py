@@ -80,11 +80,11 @@ def build_sink(
 
 
 def test_extraction_timestamp_is_unix_time():
-    """Key name after first write matches default stream_timestamp.jsonl pattern. WHAT: key_name reflects pattern current key. WHY: Regression for simple path key shape."""
+    """Key name after first write matches stream/date/timestamp.jsonl pattern. WHAT: key_name reflects pattern current key. WHY: Regression for simple path key shape (split-path-filename)."""
     with _patch_all_pattern_modules():
         subject = build_sink()
         subject.process_record({"id": 1}, {})
-    assert re.match(r"my_stream_\d+.jsonl", subject.key_name)
+    assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/\d+\.jsonl", subject.key_name)
 
 
 def test_key_name_includes_prefix_when_provided():
@@ -249,16 +249,16 @@ def test_one_key_and_one_handle_when_chunking_disabled():
 
 
 def test_key_has_no_chunk_index_when_chunking_disabled():
-    """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp pattern.
-    Backward compatibility: key format is unchanged when chunking is off."""
+    """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp.jsonl pattern.
+    Key format uses path + filename (split-path-filename)."""
     with _patch_all_pattern_modules():
         sink = build_sink()
         sink.process_record({"id": 1}, {})
     assert "{chunk_index}" not in sink.key_name, (
         "key must not contain chunk_index token when chunking is disabled"
     )
-    assert re.match(r"my_stream_\d+\.jsonl", sink.key_name), (
-        "key must match default pattern (stream, timestamp) when chunking is off"
+    assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/\d+\.jsonl", sink.key_name), (
+        "key must match default pattern (stream/date/timestamp) when chunking is off"
     )
 
 

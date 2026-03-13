@@ -1,4 +1,4 @@
-"""Base path pattern for GCS: key prefix, template, and write/rotation.
+"""Base path pattern for GCS: key prefix, filename, full_key, and write/rotation.
 
 Shared by Simple, Dated, and Partitioned path patterns; GCSSink will delegate to a pattern
 after refactor. Do not import from target_gcs.sinks to avoid circular dependency.
@@ -16,6 +16,7 @@ from typing import Any
 import orjson
 from google.cloud.storage import Client
 
+from target_gcs.constants import FILENAME_TEMPLATE
 from target_gcs.helpers import _json_default
 
 
@@ -49,9 +50,7 @@ class BasePathPattern(abc.ABC):
         )
         self._current_handle: FileIO | None = None
         self._key_name: str = ""
-        self._chunk_index: int = 0
         self._records_written_in_current_file: int = 0
-        self._current_timestamp: int | None = None
         self.bucket_name: str = config.get("bucket_name", "") or ""
 
     @property
@@ -81,11 +80,29 @@ class BasePathPattern(abc.ABC):
         """Current object key (e.g. after a write); empty until set by subclass."""
         return self._key_name
 
-    @property
-    @abc.abstractmethod
-    def key_template(self) -> str:
-        """Template string for generating path key"""
-        ...
+    def filename_for_current_file(self) -> str:
+        """Return filename for current file using FILENAME_TEMPLATE with timestamp only.
+
+        Uses injected time_fn when provided for deterministic tests.
+
+        Returns:
+            Filename string (e.g. '12345.jsonl').
+        """
+        time_fn = self._time_fn or time.time
+        return FILENAME_TEMPLATE.format(timestamp=round(time_fn()))
+
+    def full_key(self, path: str, filename: str) -> str:
+        """Join path and filename, apply key_prefix, and normalize.
+
+        Args:
+            path: Path segment (e.g. stream/date or stream/hive_path).
+            filename: Filename (e.g. from filename_for_current_file).
+
+        Returns:
+            Normalized key string (no leading slash, no double slashes).
+        """
+        base = f"{path.rstrip('/')}/{filename.lstrip('/')}"
+        return self.apply_key_prefix_and_normalize(base)
 
     @abc.abstractmethod
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
@@ -121,8 +138,9 @@ class BasePathPattern(abc.ABC):
         """Rotate to new chunk when max_records_per_file is reached.
 
         When max_records_per_file > 0 and _records_written_in_current_file >= limit,
-        flushes and closes the handle, increments _chunk_index, resets record count,
-        and refreshes _current_timestamp. No-op when max_records_per_file is 0 or missing.
+        flushes and closes the handle and resets record count. Next filename_for_current_file()
+        yields a new timestamp (timestamp-only chunking; no chunk_index).
+        No-op when max_records_per_file is 0 or missing.
         """
         max_records = self.config.get("max_records_per_file", 0)
         if max_records <= 0:
@@ -130,10 +148,7 @@ class BasePathPattern(abc.ABC):
         if self._records_written_in_current_file < max_records:
             return
         self.flush_and_close_handle()
-        self._chunk_index += 1
         self._records_written_in_current_file = 0
-        time_fn = self._time_fn or time.time
-        self._current_timestamp = round(time_fn())
 
     def flush_and_close_handle(self) -> None:
         """Flush and close the current write handle; set _current_handle to None.
@@ -145,19 +160,3 @@ class BasePathPattern(abc.ABC):
                 self._current_handle.flush()
             self._current_handle.close()
             self._current_handle = None
-
-    def get_chunk_format_map(self) -> dict[str, Any]:
-        """Return format map for key template: stream, date, timestamp, format; chunk_index when chunking."""
-        date_fmt = self.config.get("date_format", "%Y-%m-%d")
-        date_val = self._extraction_date.strftime(date_fmt)
-        time_fn = self._time_fn or time.time
-        ts = round(time_fn())
-        out: dict[str, Any] = {
-            "stream": self.stream_name,
-            "date": date_val,
-            "timestamp": ts,
-            "format": "jsonl",
-        }
-        if self.config.get("max_records_per_file", 0) > 0:
-            out["chunk_index"] = self._chunk_index
-        return out

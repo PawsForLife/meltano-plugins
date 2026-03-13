@@ -63,3 +63,5 @@ Task 01-update-constants completed, tests passing
 Task 02-fix-date-as-partition completed, tests passing
 
 Task 03-remove-key-naming-config completed, tests passing
+
+Task 04-basepathpattern-add-methods completed, tests passing

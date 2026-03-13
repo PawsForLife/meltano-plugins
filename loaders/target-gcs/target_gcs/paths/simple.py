@@ -6,24 +6,20 @@ from typing import Any
 
 import smart_open
 
+from target_gcs.constants import PATH_SIMPLE
 from target_gcs.paths.base import BasePathPattern
-
-# Fallback when key_naming_convention is not in config (removed in task 03).
-_DEFAULT_KEY_TEMPLATE = "{stream}_{timestamp}.{format}"
 
 
 class SimplePath(BasePathPattern):
-    """Non-hive-partitioned pattern: one path per stream, one handle, rotation at max_records_per_file with -{idx} in the key."""
-
-    @property
-    def key_template(self) -> str:
-        return str(self.config.get("key_naming_convention", _DEFAULT_KEY_TEMPLATE))
+    """Non-hive-partitioned pattern: one path per stream, one handle, rotation at max_records_per_file (timestamp-only)."""
 
     def _build_key(self) -> str:
-        """Build current object key from template and format map (stream, date, timestamp, format, optional chunk_index)."""
-        fmt = self.get_chunk_format_map()
-        base = self.key_template.format(**fmt)
-        return self.apply_key_prefix_and_normalize(base)
+        """Build current object key from path + filename (stream, date, timestamp)."""
+        date_fmt = self.config.get("date_format", "%Y-%m-%d")
+        date_val = self._extraction_date.strftime(date_fmt)
+        path = PATH_SIMPLE.format(stream=self.stream_name, date=date_val)
+        filename = self.filename_for_current_file()
+        return self.full_key(path, filename)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
         """Rotate if at limit, ensure handle open, write record as JSONL, and set current key."""

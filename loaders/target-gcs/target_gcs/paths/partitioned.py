@@ -12,6 +12,7 @@ from typing import Any
 
 import smart_open
 
+from target_gcs.constants import PATH_PARTITIONED
 from target_gcs.helpers import (
     get_partition_path_from_schema_and_record,
     validate_partition_fields_schema,
@@ -21,12 +22,9 @@ from target_gcs.paths.base import BasePathPattern
 
 from ._partitioned import get_hive_path_generator
 
-# Fallback when key_naming_convention is not in config (removed in task 03).
-_DEFAULT_KEY_TEMPLATE_HIVE = "{stream}/{partition_date}/{timestamp}.{format}"
-
 
 class PartitionedPath(BasePathPattern):
-    """Hive path from schema x-partition-fields; validation at init; handle lifecycle on partition change; -{idx} when chunking.
+    """Hive path from schema x-partition-fields; validation at init; handle lifecycle on partition change (timestamp-only).
 
     Partition path is resolved per record from x-partition-fields via
     get_partition_path_from_schema_and_record. On partition change the handle is
@@ -68,12 +66,6 @@ class PartitionedPath(BasePathPattern):
             extraction_date=extraction_date,
         )
 
-    @property
-    def key_template(self) -> str:
-        return str(
-            self.config.get("key_naming_convention", _DEFAULT_KEY_TEMPLATE_HIVE)
-        )
-
     def hive_path(self, record: dict[str, Any]) -> str:
         hive_path_elements = []
         for field_name, generator in self.hive_path_generator:
@@ -85,11 +77,12 @@ class PartitionedPath(BasePathPattern):
         return "/".join(hive_path_elements)
 
     def record_path(self, partition_path: str) -> str:
-        """Build object key for the given partition path: stream + partition_date + timestamp + optional chunk_index."""
-        fmt = self.get_chunk_format_map()
-        fmt["partition_date"] = partition_path
-        base = self.key_template.format(**fmt)
-        return self.apply_key_prefix_and_normalize(base)
+        """Build object key for the given partition path: stream + partition_date + timestamp."""
+        path = PATH_PARTITIONED.format(
+            stream=self.stream_name, hive_path=partition_path
+        )
+        filename = self.filename_for_current_file()
+        return self.full_key(path, filename)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
         """Resolve partition path, handle partition change (close + reset), rotate if at limit, open handle if needed, write record. Re-raises ParserError from get_partition_path_from_schema_and_record."""
@@ -102,7 +95,6 @@ class PartitionedPath(BasePathPattern):
         if partition_path != self._current_partition_path:
             self.flush_and_close_handle()
             self._current_partition_path = partition_path
-            self._chunk_index = 0
             self._records_written_in_current_file = 0
             self._key_name = ""
         self.maybe_rotate_if_at_limit()
