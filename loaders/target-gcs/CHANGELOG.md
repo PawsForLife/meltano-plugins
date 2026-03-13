@@ -33,6 +33,7 @@
   - Add `_flush_and_close_handle` on GCSSink; refactor `_rotate_to_new_chunk` and `_close_handle_and_clear_state` to use it.
   - Add `_apply_key_prefix_and_normalize(base)` on GCSSink; refactor `_build_key_for_record` to use it (prefix + normalize logic centralized).
   - Add `_write_record_as_jsonl(record)`; refactor `_process_record_single_or_chunked` and `_process_record_hive_partitioned` to use it (no duplicated orjson.dumps + write).
+  - Add `_maybe_rotate_if_at_limit()` on GCSSink; refactor `_process_record_single_or_chunked` and `_process_record_hive_partitioned` to call it before writing (rotation at limit in one place).
   - Add `_init_hive_partitioning()` on GCSSink; refactor `__init__` hive branch to call it (sets `_current_partition_path`, validates x-partition-fields when non-empty).
   - Add `_compute_non_hive_key()`; non-hive key computation uses template, timestamp, date, format_map, and `_apply_key_prefix_and_normalize`. Refactor `key_name` non-hive branch to call it when `_key_name` is unset.
 - **partition-path-extraction-date-clarity:** Parameter and naming clarity: `fallback_date` → `extraction_date` in `get_partition_path_from_schema_and_record`; sink attribute `self.fallback` → `self._extraction_date`. All "fallback" wording in partition-path context (docstrings, comments, test names) → "extraction date" so the no-partition-fields case is clearly the extraction date path, not a fallback. No behaviour change.
