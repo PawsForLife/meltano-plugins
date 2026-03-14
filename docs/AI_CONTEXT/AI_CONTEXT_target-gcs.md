@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.5 |
+| Version | 1.6 |
 | Last Updated | 2026-03-13 |
 | Tags | target-gcs, singer, target, GCS, meltano, loader, destination, sink, RecordSink |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, data flow), [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md) (commands, env), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (typing, testing), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (target, destination, streams, Sink, config file, SCHEMA/RECORD/STATE), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md) (tap component) |
@@ -23,6 +23,12 @@
 | `target_gcs/paths/simple.py` | `SimplePath`: single path per stream, one handle; rotation at `max_records_per_file`. |
 | `target_gcs/paths/dated.py` | `DatedPath`: Hive-style by extraction date only; partition path from extraction_date via `DEFAULT_PARTITION_DATE_FORMAT`; rotation at limit. |
 | `target_gcs/paths/partitioned.py` | `PartitionedPath`: schema-driven Hive from `x-partition-fields`; partition path per record via `hive_path(record)`; on partition change closes handle and resets state; rotation at limit within partition. |
+| `target_gcs/paths/_partitioned/hive.py` | `get_hive_path_generator(partition_fields, schema)`: returns list of `(field_name, fn)`; fn is `date_as_partition` or `string_as_partition` per field schema. |
+| `target_gcs/paths/_partitioned/string_functions.py` | `date_as_partition`, `string_as_partition`: format partition path segments; date uses `DEFAULT_PARTITION_DATE_FORMAT`; date parsing via `dateutil.parser.parse` (raises `dateutil.parser.ParserError` when unparseable). |
+| `target_gcs/paths/_partitioned/validators.py` | `is_date_field(field_definition)`: true when schema type/format is date or date-time (used to choose date vs string segment). |
+| `target_gcs/paths/_types.py` | `PathType` enum: SIMPLE, DATED, PARTITIONED (for typing; not used in runtime selection). |
+| `target_gcs/helpers/partition_schema.py` | `validate_partition_fields_schema`, `validate_partition_date_field_schema`, `_assert_field_required_and_non_null_type`: schema validation for partition fields. |
+| `target_gcs/helpers/json_parsing.py` | `_json_default`: orjson default for `Decimal` → float; raises `TypeError` for other non-serializable types. |
 
 Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared code with the tap; communication is Singer JSONL on stdin.
 
@@ -58,7 +64,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 - **Delegation**: `process_record(record, context)` and `close()` delegate to `_extraction_pattern.process_record` and `_extraction_pattern.close()`. `key_name` and `storage_client` delegate to the pattern’s `current_key` and `storage_client`. Key naming, GCS handle (smart_open), JSONL write, and chunk rotation are implemented in the base and concrete pattern classes in `target_gcs.paths` (base, simple, dated, partitioned).
 - **Class attribute**: `max_size = 1000` (batch size hint for SDK; records are still written per `process_record` call).
 - **Key tokens** (implemented in pattern classes): `{stream}`, `{date}`, `{hive_path}`, `{timestamp}`. Path and filename come from constants `PATH_SIMPLE`, `PATH_DATED`, `PATH_PARTITIONED`, `FILENAME_TEMPLATE`; key building uses `filename_for_current_file()` and `full_key(path, filename)`. Chunking is timestamp-only (no `{chunk_index}`).
-- **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line; pattern classes use base `write_record_as_jsonl` (orjson, `_json_default`). Unparseable partition date strings in PartitionedPath raise `ParserError`.
+- **Output**: `output_format` = `"jsonl"`. Each record is written as one JSON line; pattern classes use base `write_record_as_jsonl` (orjson, `_json_default`). Unparseable partition date strings in PartitionedPath raise `dateutil.parser.ParserError` (from `date_as_partition` in `_partitioned/string_functions.py`).
 
 ### Authentication
 
@@ -83,7 +89,7 @@ The sink also reads `date_format` from config (used for the `{date}` token). It 
 **Selection rule**: `hive_partitioned` false or unset → **SimplePath** (single path per stream, no partition). `hive_partitioned` true + non-empty `x-partition-fields` → **PartitionedPath** (partition path per record from schema). `hive_partitioned` true + no/empty `x-partition-fields` → **DatedPath** (extraction date only).
 
 - **DatedPath**: Partition path is the run/extraction date via `DEFAULT_PARTITION_DATE_FORMAT` (e.g. `year=2024/month=03/day=11`). One logical partition per run; chunking rotates within it.
-- **PartitionedPath**: Partition path per record via `hive_path(record)` from stream schema `x-partition-fields` and the record. Path order = array order. Every segment is `key=value`: literal segments `field_name=value` (path-safe); date segments `year=.../month=.../day=...`. **Date-parseable** is determined only by schema `format: "date"` or `"date-time"`; native `datetime`/`date` are date segments. Unparseable date strings (when format is date/date-time) raise `ParserError`. On partition change the pattern closes the handle and resets state; when the same partition returns, the next write gets a new key (new file). Chunking rotates within the current partition.
+- **PartitionedPath**: Partition path per record via `hive_path(record)` from stream schema `x-partition-fields` and the record. Path order = array order. Every segment is `key=value`: literal segments `field_name=value` (path-safe); date segments `year=.../month=.../day=...`. **Date-parseable** is determined by `is_date_field()` (schema type/format date or date-time); native `datetime`/`date` are date segments. Unparseable date strings raise `dateutil.parser.ParserError`. On partition change the pattern closes the handle and resets state; when the same partition returns, the next write gets a new key (new file). Chunking rotates within the current partition.
 
 ### Partition fields validation (sink init)
 
@@ -162,9 +168,13 @@ target-gcs --config /path/to/your-config.json < singer_output.jsonl
 
 ## Tests
 
-- **Location**: `loaders/target-gcs/tests/`
-- **test_core.py**: Runs SDK standard target tests via `get_target_test_class(GCSTargetWithMockStorage, config=SAMPLE_CONFIG)`. `GCSTargetWithMockStorage` sets `self._storage_client = MagicMock()` so no real GCS is used. `SAMPLE_CONFIG = {"bucket_name": "test-bucket"}`.
-- **test_sinks.py**: Key naming, config schema, GCS client behaviour, chunking rotation, record integrity, Decimal serialization (`_json_default`), and non-serializable type (`TypeError`). Uses `build_sink(..., storage_client=...)` and mocks `Client` / `smart_open.open`.
-- **test_partition_key_generation.py**: Partition path in key; `_build_key_for_record` with `hive_partitioned` and `x-partition-fields`; partition change and partition-return; chunking within partition; extraction date; ParserError.
+- **Location**: `loaders/target-gcs/tests/unit/` (mirrors source: `paths/`, `helpers/`).
+- **test_target.py**: SDK standard target tests via `get_target_test_class(GCSTargetWithMockStorage, config=SAMPLE_CONFIG)`. `GCSTargetWithMockStorage` sets `self._storage_client = MagicMock()`. `SAMPLE_CONFIG = {"bucket_name": "test-bucket"}`.
+- **test_sinks.py**: Key naming, config schema, GCS client behaviour, chunking rotation, record integrity, Decimal serialization (`_json_default`), non-serializable type (`TypeError`). Uses `build_sink(..., storage_client=...)`; mocks at `target_gcs.paths.{simple,dated,partitioned}.smart_open.open` and `target_gcs.paths.base.Client`.
+- **paths/test_base.py**: BasePathPattern key prefix, filename, full_key, write/rotation, flush/close.
+- **paths/test_simple.py**, **paths/test_dated.py**: SimplePath/DatedPath key shape, rotation at limit.
+- **paths/test_partitioned.py**: PartitionedPath init validation, partition path from record, handle lifecycle on partition change, rotation at limit, `dateutil.parser.ParserError` propagation, `current_key`.
+- **paths/_partitioned/test_string_functions.py**: `date_as_partition`, `string_as_partition` behaviour and ParserError.
+- **helpers/test_partition_schema.py**, **helpers/test_json_parsing.py**: Partition schema validators and `_json_default`.
 
-Tests use mocks for GCS (`patch("target_gcs.sinks.Client")`, `patch("target_gcs.sinks.smart_open.open")`) so no real bucket is required. Black-box style: assert on `key_name`, written payloads, and client/handle call arguments, not internal call counts.
+Tests use mocks for GCS so no real bucket is required. Black-box style: assert on `key_name`, written payloads, and client/handle call arguments, not internal call counts.

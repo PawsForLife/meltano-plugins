@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-12 |
+| Version | 1.3 |
+| Last Updated | 2026-03-13 |
 | Tags | quick-reference, meltano, singer, sdk, taps, targets, python |
 | Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, entry points, data flow), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, config file, state file, Catalog, streams), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) |
 

@@ -4,8 +4,8 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.3 |
-| Last Updated | 2026-03-12 |
+| Version | 1.4 |
+| Last Updated | 2026-03-13 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
 | Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
 
@@ -44,13 +44,22 @@ meltano-plugins/
 │       └── config.sample.json    # Sample config
 ├── loaders/
 │   └── target-gcs/               # Target (loader) package
-│       ├── target_gcs/            # Source package
+│       ├── target_gcs/           # Source package
 │       │   ├── target.py         # Target class, CLI entry
-│       │   └── sinks.py         # GCSSink
-│       ├── tests/                # Loader tests
-│       ├── pyproject.toml        # Deps, script entry point
-│       ├── install.sh            # Venv, deps, lint, test
-│       └── meltano.yml           # Plugin definition
+│       │   ├── sinks.py         # GCSSink, batch writes
+│       │   ├── constants.py     # Config defaults
+│       │   ├── paths/           # Key naming (base, simple, dated, partitioned)
+│       │   │   ├── base.py
+│       │   │   ├── simple.py
+│       │   │   ├── dated.py
+│       │   │   ├── partitioned.py
+│       │   │   └── _partitioned/ # Hive/string helpers
+│       │   └── helpers/         # Partition schema, JSON parsing
+│       ├── tests/
+│       │   └── unit/             # Mirrors source path (paths/, helpers/)
+│       ├── pyproject.toml
+│       ├── install.sh
+│       └── meltano.yml
 ├── docs/                         # Project documentation
 │   ├── AI_CONTEXT/               # AI context docs ({context_docs_dir})
 │   │   ├── GLOSSARY_MELTANO_SINGER.md
@@ -80,7 +89,7 @@ meltano-plugins/
 └── CHANGELOG.md
 ```
 
-Placeholders `{context_docs_dir}`, `{features_dir}`, `{bugs_dir}`, `{archive_dir}` are defined in `.cursor/CONVENTIONS.md` (defaults: `docs/AI_CONTEXT`, `_features`, `_bugs`, `_archive`).
+Placeholders `{context_docs_dir}`, `{features_dir}`, `{bugs_dir}`, `{archive_dir}` are defined in `.cursor/CONVENTIONS.md` (defaults: `docs/AI_CONTEXT`, `_features`, `_bugs`, `_archive`). **Test layout**: target-gcs uses `tests/unit/` mirroring source path (`tests/unit/paths/`, `tests/unit/helpers/`); restful-api-tap uses a flat `tests/` with `test_*.py` per module. See CONVENTIONS for `test_{module}.py` naming and `conftest.py`/`files/` usage.
 
 ---
 
@@ -104,8 +113,8 @@ Details: [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md).
 |----------------|-------------|
 | **Role** | Singer target: reads Singer JSONL from stdin, writes record batches to GCS. |
 | **Entry** | `target-gcs` CLI → `target_gcs.target:GCSTarget.cli`. |
-| **Core modules** | `target.py` (GCSTarget, config_jsonschema, default_sink_class), `sinks.py` (GCSSink, key naming, batch writes via smart_open / GCS client). |
-| **Config** | bucket_name (required), key_prefix, date_format. |
+| **Core modules** | `target.py` (GCSTarget, config_jsonschema, default_sink_class), `sinks.py` (GCSSink, batch writes via smart_open/GCS), `paths/` (key naming: base, simple, dated, partitioned/hive), `helpers/` (partition_schema, json_parsing), `constants.py`. |
+| **Config** | bucket_name (required), key_prefix, date_format, path strategy options. |
 | **Input** | Singer JSONL (SCHEMA, RECORD, STATE) on stdin. |
 
 Details: [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md).
@@ -178,6 +187,6 @@ Each plugin is installable on its own via `pip` from its subdirectory (`pip inst
 - **Running** — After install (Meltano or `uv sync` in plugin dir), run the CLI with `--config <path>` (tap/target read config from config file or Meltano-injected env). Target reads Singer messages from stdin.
 - **Extension points**
   - **Tap**: Subclass `RestfulApiTap`; add or override streams (e.g. subclass or replace `DynamicStream`); add auth via `get_authenticator` / custom `APIAuthenticatorBase`; custom pagination in `restful_api_tap.pagination` and stream classes.
-  - **Target**: Subclass `GCSTarget` and/or `GCSSink`; override `default_sink_class` or sink behavior (e.g. key naming, batch size, format).
+  - **Target**: Subclass `GCSTarget` and/or `GCSSink`; override `default_sink_class` or sink behavior (e.g. batch size, format). Custom key naming via `target_gcs.paths` (e.g. `BasePathPattern`, `SimplePath`, `DatedPath`, `PartitionedPath`).
 
 Discovery of components: the repo layout is the source of truth; the two main components are the directories under `taps/` and `loaders/` that contain a `pyproject.toml` and a Singer tap or target implementation.
