@@ -22,7 +22,7 @@ Before updating the repository document, read (as appropriate):
 
 - `@README.md` — project purpose and high-level goals
 - Project layout — discover components from repo structure (e.g. top-level packages or directories; do **not** assume fixed names like `python_service` or `webview-ui`)
-- `@tests/` or project test layout — where tests live
+- `@tests/` or project test layout — where tests live. When documenting: unit tests under `tests/unit/` mirroring source path; filenames `test_{module}.py`; global `conftest.py` and `files/` for fixtures and test data (see `@.cursor/CONVENTIONS.md`).
 - `@.cursor/rules/environment.mdc` — structure and tooling expectations
 - Existing `@{context_docs_dir}/AI_CONTEXT_REPOSITORY.md` (if present)
 

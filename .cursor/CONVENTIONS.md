@@ -15,6 +15,9 @@ Path placeholders used by agents, commands, and workflows in this folder. Defaul
 ## Usage
 
 - In agents, commands, and workflows: use these placeholders (or the default paths) so paths stay consistent and overridable.
+- **Test layout**: One test file per source module; unit vs integration scope and thin integration tests per `.cursor/rules/development_practices.mdc`.
+- **Test file naming**: The test file name **must** match the pattern `test_{file-name}.py`, where `{file-name}` is the source module’s basename (e.g. `simple.py` → `test_simple.py`). The folder path has no relevance to the file name.
+- **Test path**: The path within the source directory **must** be mirrored under `tests/unit/`. Example: source `target_gcs/paths/simple.py` → test `tests/unit/paths/test_simple.py`. The `tests/unit/` subfolder separates unit tests from the base test folder, allows a global `conftest.py` for universal fixtures and helpers, and allows a `files/` folder for complex JSON (or other) test input/expected output.
 - **Components/libraries**: use discovery-oriented language — e.g. "each major package or library in the repository", "affected component(s) as identified from the plan". Do not hardcode component names (e.g. `python_service/`, `src/`, `webview-ui/`). Discover components from repo layout (e.g. top-level packages or directories, or as documented in README). For Singer/Meltano projects: refer to data extractors as **taps**, data loaders as **targets**; use **source** (where data is extracted from) and **destination** (where data is loaded to); use **streams** for named data sets. See `docs/AI_CONTEXT/GLOSSARY_MELTANO_SINGER.md` when describing taps, targets, or pipelines.
 
 ## Git / Fork

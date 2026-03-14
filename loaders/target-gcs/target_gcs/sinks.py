@@ -1,30 +1,16 @@
 """RecordSink implementation for the GCS target. Each sink handles one stream, receiving SCHEMA, RECORD, and STATE messages from the target and writing record data to the destination (GCS). The sink uses the config file for bucket and key settings. On close or when the target drains the sink (sink drain), buffered data is flushed to the destination."""
 
-import time
-from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
-from io import FileIO
-from typing import Any
+from typing import Any, cast
 
-import orjson
-import smart_open
-from dateutil.parser import ParserError
-from google.cloud.storage import Client
 from singer_sdk.sinks import RecordSink
 
-from .helpers import (
-    _json_default,
-    get_partition_path_from_record,
-    validate_partition_date_field_schema,
-)
-
-# Default Hive-style partition path format when partition_date_format is omitted by callers.
-DEFAULT_PARTITION_DATE_FORMAT = "year=%Y/month=%m/day=%d"
+from .paths import BasePathPattern, DatedPath, PartitionedPath, SimplePath
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. When max_records_per_file is set, the sink rotates to a new file after that many records and uses current timestamp and chunk index in the key. When partition_date_field is set, the key is derived per record from that field; one active handle; on partition change the sink closes and clears state; when the partition \"returns,\" the next write creates a new key (new file)."""
+    """GCS sink implementing RecordSink (one record at a time). Selects one of SimplePath, DatedPath, or PartitionedPath from config and schema and delegates process_record and close to that pattern. Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed."""
 
     max_size = 1000  # Max records to write in one batch
 
@@ -45,234 +31,80 @@ class GCSSink(RecordSink):
             schema=schema,
             key_properties=key_properties,
         )
-        self._gcs_write_handle: FileIO | None = None
-        self._key_name: str = ""
-        self._records_written_in_current_file: int = (
-            0  # Records written to current file; reset on rotation.
-        )
-        self._chunk_index: int = 0  # 0-based chunk index; incremented on rotation.
-        self._current_timestamp: int | None = (
-            None  # Cached at handle open; used for key building.
-        )
+        self._target_ref = target  # Keep reference for pattern constructors (SDK may not expose .target).
         self._time_fn: Callable[[], float] | None = time_fn
-        # Optional run-date callable for partition fallback and tests; default None → use datetime.today where needed.
         self._date_fn: Callable[[], datetime] | None = date_fn
-        self.fallback = self._date_fn() if self._date_fn else datetime.today()
-
+        self._extraction_date = self._date_fn() if self._date_fn else datetime.today()
         self._storage_client: Any | None = storage_client
 
-        if self.config.get("partition_date_field"):
-            # Current partition path when partition-by-field is on; None when cleared or not yet set.
-            self._current_partition_path: str | None = None
-            # Validate partition field exists in stream schema and is date-parseable; raises ValueError if not.
-            validate_partition_date_field_schema(
-                self.stream_name,
-                self.config["partition_date_field"],
-                self.schema,
+        # Select extraction pattern: hive_partitioned false/unset → SimplePath;
+        # hive_partitioned true + non-empty x-partition-fields → PartitionedPath;
+        # hive_partitioned true + no/empty x-partition-fields → DatedPath.
+        hive = self.config.get("hive_partitioned")
+        x_partition_fields = self.schema.get("x-partition-fields")
+        has_partition_fields = (
+            isinstance(x_partition_fields, list) and len(x_partition_fields) > 0
+        )
+        schema = dict(self.schema)
+        config = dict(self.config)
+        if not hive:
+            self._extraction_pattern = cast(
+                BasePathPattern,
+                SimplePath(
+                    stream_name=self.stream_name,
+                    config=config,
+                    time_fn=self._time_fn,
+                    date_fn=self._date_fn,
+                    storage_client=self._storage_client,
+                    extraction_date=self._extraction_date,
+                ),
+            )
+        elif has_partition_fields:
+            self._extraction_pattern = cast(
+                BasePathPattern,
+                PartitionedPath(
+                    stream_name=self.stream_name,
+                    schema=schema,
+                    config=config,
+                    partition_fields=cast(list[str], x_partition_fields),
+                    time_fn=self._time_fn,
+                    date_fn=self._date_fn,
+                    storage_client=self._storage_client,
+                    extraction_date=self._extraction_date,
+                ),
+            )
+        else:
+            self._extraction_pattern = cast(
+                BasePathPattern,
+                DatedPath(
+                    stream_name=self.stream_name,
+                    config=config,
+                    time_fn=self._time_fn,
+                    date_fn=self._date_fn,
+                    storage_client=self._storage_client,
+                    extraction_date=self._extraction_date,
+                ),
             )
 
-    def _build_key_for_record(self, record: dict, partition_path: str) -> str:
-        """Build the object key for a single record when partition_date_field is set.
+    def process_record(self, record: dict, context: dict) -> None:
+        """Process one record (RECORD message payload). Delegates to the selected extraction pattern."""
+        self._extraction_pattern.process_record(record=record, context=context)
 
-        Uses key_prefix and key_naming_convention with format_map: stream,
-        partition_date (= partition_path), timestamp (from _time_fn or time.time),
-        and chunk_index when chunking is enabled. Same normalization as key_name
-        (no double slashes, no leading slash). Callers pass a pre-resolved
-        partition_path (e.g. from get_partition_path_from_record).
-
-        Args:
-            record: Record dict (unused; partition_path is pre-resolved).
-            partition_path: Pre-resolved partition path segment (e.g. year=2024/month=03/day=11).
-
-        Returns:
-            Normalized key string for the GCS object.
-        """
-        if self._current_timestamp is None:
-            self._current_timestamp = round((self._time_fn or time.time)())
-
-        extraction_timestamp = self._current_timestamp
-        base_key_name = self.config.get(
-            "key_naming_convention",
-            f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
-        )
-        max_records = self.config.get("max_records_per_file", 0)
-        format_map = defaultdict(
-            str,
-            stream=self.stream_name,
-            partition_date=partition_path,
-            timestamp=extraction_timestamp,
-        )
-        if max_records and max_records > 0:
-            format_map["chunk_index"] = self._chunk_index
-        base = base_key_name.format_map(format_map)
-        prefixed = (
-            f"{self.config.get('key_prefix', '')}/{base}".replace("//", "/")
-        ).lstrip("/")
-        return prefixed
-
-    @property
-    def storage_client(self) -> Client:
-        if self._storage_client is None:
-            self._storage_client = Client()
-        return self._storage_client
+    def close(self) -> None:
+        """Flush and close the pattern's write handle. Called on sink drain/teardown."""
+        self._extraction_pattern.close()
 
     @property
     def key_name(self) -> str:
-        """Return the key name. When partition_date_field is set, returns the current key after a write (or empty string); callers needing per-record keys use _build_key_for_record. When unset, recomputes from stream, date, timestamp and optionally chunk_index."""
-        if self.config.get("partition_date_field"):
-            return self._key_name
-        if not self._key_name:
-            # Time is injectable via time_fn for deterministic key assertions in tests.
-            extraction_timestamp = round((self._time_fn or time.time)())
-            base_key_name = self.config.get(
-                "key_naming_convention",
-                f"{self.stream_name}_{extraction_timestamp}.{self.output_format}",
-            )
-            prefixed_key_name = (
-                f"{self.config.get('key_prefix', '')}/{base_key_name}".replace(
-                    "//", "/"
-                )
-            ).lstrip("/")
-            run_date = self._date_fn() if self._date_fn else datetime.today()
-            date = run_date.strftime(self.config.get("date_format", "%Y-%m-%d"))
-            max_records = self.config.get("max_records_per_file", 0)
-            format_map = defaultdict(
-                str,
-                stream=self.stream_name,
-                date=date,
-                timestamp=extraction_timestamp,
-            )
-            if max_records and max_records > 0:
-                format_map["chunk_index"] = self._chunk_index
-            self._key_name = prefixed_key_name.format_map(format_map)
-        return self._key_name
+        """Current object key after a write; delegates to the pattern's current_key."""
+        return self._extraction_pattern.current_key
 
     @property
-    def gcs_write_handle(self) -> FileIO:
-        """Opens a write handle for the destination (GCS object) for this stream."""
-        if not self._gcs_write_handle:
-            self._gcs_write_handle = smart_open.open(
-                f"gs://{self.config.get('bucket_name')}/{self.key_name}",
-                "wb",
-                transport_params={"client": self.storage_client},
-            )
-        return self._gcs_write_handle
+    def storage_client(self):
+        """Storage client used for GCS writes; returns injectable or pattern's client."""
+        return self._extraction_pattern.storage_client
 
     @property
     def output_format(self) -> str:
-        """In the future maybe we will support more formats"""
+        """Output file format; currently only jsonl is supported."""
         return "jsonl"
-
-    def _rotate_to_new_chunk(self) -> None:
-        """Close the current file handle, clear key cache, increment chunk index, reset record count, and refresh cached timestamp for key generation. Used when record count reaches max_records_per_file before writing the next record. Flushes the handle before close when it supports flush (guarded so handles without flush do not raise)."""
-        if self._gcs_write_handle is not None:
-            if hasattr(self._gcs_write_handle, "flush"):
-                self._gcs_write_handle.flush()
-            self._gcs_write_handle.close()
-            self._gcs_write_handle = None
-        self._key_name = ""
-        self._chunk_index += 1
-        self._records_written_in_current_file = 0
-        self._current_timestamp = round((self._time_fn or time.time)())
-
-    def _close_handle_and_clear_state(self) -> None:
-        """Close the current GCS write handle and clear key state. If a handle is open, flushes (if supported), closes it, and sets _gcs_write_handle to None; then sets _key_name to empty string and _current_timestamp to None so the next open gets a fresh timestamp. Does not modify _current_partition_path, _chunk_index, or _records_written_in_current_file; the caller updates those when appropriate."""
-        if self._gcs_write_handle is not None:
-            if hasattr(self._gcs_write_handle, "flush"):
-                self._gcs_write_handle.flush()
-            self._gcs_write_handle.close()
-            self._gcs_write_handle = None
-        self._key_name = ""
-        self._current_timestamp = None
-
-    def _process_record_single_or_chunked(self, record: dict, context: dict) -> None:
-        """Process one record when partition_date_field is unset (single-file or chunked by row limit).
-
-        Assumes partition_date_field is unset. Rotates to a new chunk when
-        max_records_per_file is set and record count has reached the limit;
-        writes the record via gcs_write_handle; increments _records_written_in_current_file
-        when chunking is enabled.
-        """
-        max_records = self.config.get("max_records_per_file", 0)
-        if (
-            max_records
-            and max_records > 0
-            and self._records_written_in_current_file >= max_records
-        ):
-            self._rotate_to_new_chunk()
-        self.gcs_write_handle.write(
-            orjson.dumps(
-                record,
-                option=orjson.OPT_APPEND_NEWLINE,
-                default=_json_default,
-            )
-        )
-        if max_records and max_records > 0:
-            self._records_written_in_current_file += 1
-
-    def _process_record_partition_by_field(self, record: dict, context: dict) -> None:
-        """Process one record when partition_date_field is set (partition-by-field strategy).
-
-        Assumes partition_date_field is set. Resolves partition path from record;
-        on partition change closes handle and clears key/partition state and resets
-        chunk index; rotates within partition when at max_records_per_file; builds
-        key via _build_key_for_record; opens handle when none or key changed;
-        writes record and increments count when chunking.
-        """
-        partition_date_format = (
-            self.config.get("partition_date_format") or DEFAULT_PARTITION_DATE_FORMAT
-        )
-        try:
-            partition_path = get_partition_path_from_record(
-                record,
-                self.config["partition_date_field"],
-                partition_date_format,
-                self.fallback,
-            )
-        except ParserError:
-            # Unparseable partition date string: re-raise so the run fails visibly.
-            raise
-        if partition_path != self._current_partition_path:
-            self._close_handle_and_clear_state()
-            self._current_partition_path = partition_path
-            self._chunk_index = 0
-            self._records_written_in_current_file = 0
-        max_records = self.config.get("max_records_per_file", 0)
-        if (
-            max_records
-            and max_records > 0
-            and self._records_written_in_current_file >= max_records
-        ):
-            self._rotate_to_new_chunk()
-        key = self._build_key_for_record(record, partition_path)
-        if self._gcs_write_handle is None or self._key_name != key:
-            self._close_handle_and_clear_state()
-            self._key_name = key
-            self._gcs_write_handle = smart_open.open(
-                f"gs://{self.config.get('bucket_name')}/{key}",
-                "wb",
-                transport_params={"client": self.storage_client},
-            )
-        self._gcs_write_handle.write(
-            orjson.dumps(
-                record,
-                option=orjson.OPT_APPEND_NEWLINE,
-                default=_json_default,
-            )
-        )
-        if max_records and max_records > 0:
-            self._records_written_in_current_file += 1
-
-    def process_record(self, record: dict, context: dict) -> None:
-        """Process one record (RECORD message payload).
-
-        Dispatches by partition_date_field: when set, partition-by-field path
-        (per-record partition, handle lifecycle on partition/key change); when
-        unset, single-file or chunked path (one key/handle per stream per run,
-        optional rotation by max_records_per_file).
-        """
-        partition_date_field = self.config.get("partition_date_field")
-        if partition_date_field:
-            self._process_record_partition_by_field(record, context)
-        else:
-            self._process_record_single_or_chunked(record, context)

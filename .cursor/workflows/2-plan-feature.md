@@ -72,6 +72,7 @@ Once prerequisites are verified:
    **e. `testing.md`** - Test strategy and approach:
    - Test strategy following TDD principles
    - Which tests to write first (before implementation)
+   - Test file paths per `@.cursor/CONVENTIONS.md`: under `tests/unit/` mirroring source path, filename `test_{source-basename}.py`
    - Test cases for each component
    - Integration test requirements
    - Validation steps to verify implementation works correctly

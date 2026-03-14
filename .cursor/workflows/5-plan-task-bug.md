@@ -38,7 +38,7 @@ Ensure `{bugs_dir}/{bug_name}/plans/tasks/` exists. Create a single plan documen
 
 1. **Overview**: What this task accomplishes within the fix
 2. **Files to Create/Modify**: List all files with specific changes
-3. **Test Strategy**: Regression tests first when feasible (TDD)
+3. **Test Strategy**: Regression tests first when feasible (TDD). Specify test file paths per `@.cursor/CONVENTIONS.md`: under `tests/unit/` mirroring source path, filename `test_{source-basename}.py`.
 4. **Implementation Order**: Step-by-step sequence for this task
 5. **Validation Steps**: How to verify the task and prevent regression
 6. **Documentation Updates**: What docs need updating for this task

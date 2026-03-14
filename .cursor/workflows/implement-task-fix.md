@@ -31,7 +31,7 @@ Execute these phases in order. Focus only on this single task.
 - [ ] Step 1.5: Identified affected component(s)
 
 **Phase 2: Implementation**
-- [ ] Step 2.1: Wrote tests first (TDD), regression tests when feasible
+- [ ] Step 2.1: Invoked test-writer subagent with test-creation skill and request; wrote tests first (TDD), regression tests when feasible
 - [ ] Step 2.2: Verified tests FAIL before implementation
 - [ ] Step 2.3: Implemented code changes following the approved plan
 - [ ] Step 2.4: Ran project code quality tools and fixed issues
@@ -88,9 +88,13 @@ Emphasize:
 - Validation steps from `{bugs_dir}/{bug_name}/plans/master/validation.md`
 - Black box testing - validate functionality, not internal behavior
 
-### Step 2.1: Write Tests First
+### Step 2.1: Write Tests First (TDD)
 
-Create or update tests per the task plan's Test Strategy. Prioritize regression tests when feasible.
+Invoke the **test-writer** subagent with the **test-creation** skill. Pass a **request string** that includes: what to test (module or component from the task/plan), expected behaviour or scenarios, scope (unit vs integration), and any constraints from the task plan or Test Strategy. For bug fixes, emphasise regression tests when feasible.
+
+**Example request:** "Generate regression tests for [affected module]: reproduce [bug]; follow the task plan Test Strategy and place tests under `tests/unit/.../test_<module>.py`."
+
+Step 2.1 is fulfilled by invoking the test-writer subagent with the test-creation skill and the request above; the subagent applies naming and path rules from the skill and from `@.cursor/CONVENTIONS.md` and `@.cursor/rules/development_practices.mdc`.
 
 ### Step 2.2: Verify Tests Fail
 

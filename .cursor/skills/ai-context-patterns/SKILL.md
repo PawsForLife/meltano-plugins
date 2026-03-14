@@ -23,7 +23,7 @@ Before updating patterns, read (selectively):
 - `@.cursor/rules/development_practices.mdc` — TDD, models, DI, validation rules
 - `@.cursor/rules/environment.mdc` — tooling and layout assumptions
 - Representative source directories — code organization, types, error handling
-- `@tests/` or project test layout — how tests are structured and named
+- `@tests/` or project test layout — how tests are structured and named. Document: test file naming (`test_{file-name}.py`), placement under `tests/unit/` mirroring source path (e.g. `target_gcs/paths/simple.py` → `tests/unit/paths/test_simple.py`), and use of global `conftest.py` and `files/` for fixtures and test data.
 - Existing `@{context_docs_dir}/AI_CONTEXT_REPOSITORY.md` — overall architecture context
 
 Prefer reading **specific files that demonstrate patterns** instead of every file.

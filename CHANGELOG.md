@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-03-13
+
+### Added
+
+- **test-creation-skill-and-agent** — Details: [test-creation-skill-and-agent.md](_archive/test-creation-skill-and-agent/test-creation-skill-and-agent.md)
+  - Add `.cursor/skills/test-creation/SKILL.md` (test naming, path, TDD, black-box, regression; defers to development_practices and CONVENTIONS).
+  - Add `.cursor/agents/test-writer.md` subagent for test generation; invoke with test-creation skill and request string.
+  - Update `implement-task-feature.md` and `implement-task-fix.md` Step 2.1 to invoke test-writer subagent with test-creation skill and request.
+- **document-test-structure-intent** — Document test structure and scoping in .cursor: one test file per source module, unit tests in-scope, integration tests thin, no duplication or mixing. Details: [document-test-structure-intent.md](_archive/document-test-structure-intent/document-test-structure-intent.md)
+  - Add "Test structure and scoping" to `.cursor/rules/development_practices.mdc`.
+  - Align `docs/AI_CONTEXT/AI_CONTEXT_PATTERNS.md` "Testing & TDD" / test layout with the rule.
+  - Add test layout pointer to `.cursor/CONVENTIONS.md`.
+- **target-gcs-dedup-split-logic** — Archive summary: [target-gcs-dedup-split-logic.md](_archive/target-gcs-dedup-split-logic/target-gcs-dedup-split-logic.md)
+- **target-gcs-function-name-alignment** — Archive summary: [target-gcs-function-name-alignment.md](_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md)
+- **hive-partition-key-value-paths** — Archive summary: [hive-partition-key-value-paths.md](_archive/hive-partition-key-value-paths/hive-partition-key-value-paths.md)
+- **hive-partition-format-only** — Archive summary: [hive-partition-format-only.md](_archive/hive-partition-format-only/hive-partition-format-only.md)
+- **target-gcs-schema-hive-partitioning** — Archive summary: [target-gcs-schema-hive-partitioning.md](_archive/target-gcs-schema-hive-partitioning/target-gcs-schema-hive-partitioning.md)
+- **target-gcs-hive-default-key-path** — Archive summary: [target-gcs-hive-default-key-path.md](_archive/target-gcs-hive-default-key-path/target-gcs-hive-default-key-path.md)
+- **target-gcs-extraction-patterns** — Archive summary: [target-gcs-extraction-patterns.md](_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md)
+- **split-path-filename** — Archive summary: [split-path-filename.md](_archive/split-path-filename/split-path-filename.md)
+
 ## 2026-03-12
 
 ### Added
