@@ -15,6 +15,8 @@
 
 ### Added
 
+- **readme-and-docs-structure** — Separate user and developer docs; developer guide in plugin docs. Details: [readme-and-docs-structure.md](../../_archive/readme-and-docs-structure/readme-and-docs-structure.md).
+  - Add developer guide at `docs/DEVELOPMENT.md`; plugin README will link to it (task 03).
 - **target-gcs-extraction-patterns** — Base path pattern for extraction-pattern refactor. Details: [_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md](../../_archive/target-gcs-extraction-patterns/target-gcs-extraction-patterns.md) (when archived in Phase 6).
   - Task 01: Add `target_gcs.paths.base` with `BasePathPattern` ABC (constructor, key prefix/template helpers, stubs for write/rotation/flush/chunk-format); constants `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; tests in `test_paths_base.py` (key prefix normalize, effective key template, minimal concrete subclass).
   - Task 02: Implement `write_record_as_jsonl` (orjson + _json_default), `flush_and_close_handle` (hasattr flush), `maybe_rotate_if_at_limit`, `get_chunk_format_map` (stream, date, timestamp, format, chunk_index when chunking); tests for write, flush, rotation under/at limit, format map, chunk index in key.
