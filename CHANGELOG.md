@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-03-16
+
+### Changed
+
+- **readme-and-docs-structure** — Documentation: separate user and developer docs; add per-plugin developer guides (`docs/DEVELOPMENT.md`) and link from plugin READMEs; repo README now points explicitly to `docs/` for developing new plugins. Details: [readme-and-docs-structure.md](_archive/readme-and-docs-structure/readme-and-docs-structure.md).
+
 ## 2026-03-13
 
 ### Added
