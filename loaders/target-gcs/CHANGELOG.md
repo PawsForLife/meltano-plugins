@@ -39,6 +39,8 @@
 - **Schema-driven Hive partitioning (task 02):** Add `get_partition_path_from_schema_and_record(schema, record, fallback_date, *, partition_date_format)` and `DEFAULT_PARTITION_DATE_FORMAT` in `target_gcs.helpers.partition_path`; builds partition path from `x-partition-fields` and record (fallback when missing/empty; date segments vs path-safe literals; literal slash → underscore). Unit tests in `tests/helpers/test_partition_path.py` (no/empty x-partition-fields, single date/literal, enum+date order, literal with slash, unparseable date → ParserError).
 - **Schema-driven Hive partitioning (task 03):** Export `get_partition_path_from_schema_and_record` and `validate_partition_fields_schema` from `target_gcs.helpers` (both in `__all__`). Add import/usage tests that import from `target_gcs.helpers` and assert callability and correct behaviour.
 - **Hive default key path:** Add `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`, and `_get_effective_key_template()` in sinks.py; effective template resolution (user override → partition default → non-partition default). `_build_key_for_record` and `key_name` both use effective template and format map (tasks 06–07).
+- **target-gcs-conftest-restructure** — Centralise test fixtures and helpers under conftest and test_helpers.
+  - Task 01: Add `tests/test_helpers.py` with `key_from_open_call(call_args)` to extract GCS key from smart_open.open positional args; unit tests in `test_test_helpers.py`.
 
 ### Changed
 
