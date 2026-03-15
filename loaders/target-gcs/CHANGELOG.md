@@ -41,6 +41,7 @@
 - **Hive default key path:** Add `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`, and `_get_effective_key_template()` in sinks.py; effective template resolution (user override → partition default → non-partition default). `_build_key_for_record` and `key_name` both use effective template and format map (tasks 06–07).
 - **target-gcs-conftest-restructure** — Centralise test fixtures and helpers under conftest and test_helpers.
   - Task 01: Add `tests/test_helpers.py` with `key_from_open_call(call_args)` to extract GCS key from smart_open.open positional args; unit tests in `test_test_helpers.py`.
+  - Task 02: Add `tests/conftest.py` with constants (SAMPLE_CONFIG, FIXED_DATE, DEFAULT_STREAM_NAME), fixtures (sample_config, fixed_time_fn, fixed_date_fn, fixed_date, mock_storage_client, mock_open_handle, patch_all_pattern_modules), factory helpers (build_sink, build_simple_path, build_dated_path, build_partitioned_path), and GCSTargetWithMockStorage for test_target.
 
 ### Changed
 
