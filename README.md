@@ -94,7 +94,7 @@ Each subdirectory is a standalone Python package with its own `pyproject.toml` a
 
 ## Documentation
 
-See [docs/](docs/README.md) for guides on creating Meltano plugins with the Singer SDK, the Singer spec, and using plugins from this monorepo.
+See [docs/](docs/README.md) for **developing new plugins** (Singer SDK, Singer spec, building taps and targets) and using plugins from this monorepo.
 
 ---
 
