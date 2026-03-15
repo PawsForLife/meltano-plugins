@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **readme-and-docs-structure** — Separate user and developer docs; developer guide in plugin docs. Details: [readme-and-docs-structure.md](../../_archive/readme-and-docs-structure/readme-and-docs-structure.md).
+  - Add developer guide at `docs/DEVELOPMENT.md`; plugin README will link to it (task 04).
+
 ## [1.6.1] - 2026-03-12
 
 ### Changed
