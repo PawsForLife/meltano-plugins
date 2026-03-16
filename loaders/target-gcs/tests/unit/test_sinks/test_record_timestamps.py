@@ -80,6 +80,7 @@ def test_record_with_unparseable_datetime_string_raises(
     record = {"created_at": "not-a-date"}
     with pytest.raises((ValueError, Exception)) as exc_info:
         sink._validate_and_parse(record)
-    assert "created_at" in str(exc_info.value).lower() or "parse" in str(
-        exc_info.value
-    ).lower()
+    assert (
+        "created_at" in str(exc_info.value).lower()
+        or "parse" in str(exc_info.value).lower()
+    )

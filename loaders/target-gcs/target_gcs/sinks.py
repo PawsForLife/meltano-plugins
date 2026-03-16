@@ -149,9 +149,7 @@ class GCSSink(RecordSink):
                             if isinstance(value, str):
                                 parsed = dateutil_parser.parse(value)
                                 date_val = (
-                                    parsed.date()
-                                    if datelike_type == "date"
-                                    else parsed
+                                    parsed.date() if datelike_type == "date" else parsed
                                 )
                             else:
                                 date_val = value
