@@ -77,8 +77,13 @@ class PartitionedPath(BasePathPattern):
         return PATH_PARTITIONED.format(stream=self.stream_name, hive_path=hive_path_str)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
-        """Resolve path via path_for_record, handle partition change (close + reset), rotate if at limit, open handle if needed, write record. Re-raises ParserError from hive_path."""
-        path = self.path_for_record(record)
+        """Resolve path via path_for_record, handle partition change (close + reset), rotate if at limit, open handle if needed, write record. Re-raises ParserError from hive_path.
+
+        Path comparison uses only the Hive path (stream + partition segments); the
+        timestamp-based filename is not part of it, so rotation occurs only on
+        partition change or chunk limit, not on time.
+        """
+        path = self.path_for_record(record)  # stream/hive_path only; no filename
         if path != self._current_partition_path:
             self.flush_and_close_handle()
             self._current_partition_path = path
