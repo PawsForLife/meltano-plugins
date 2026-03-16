@@ -234,17 +234,21 @@ def test_config_schema_includes_max_records_per_file():
     assert "max_records_per_file" not in required
 
 
-def test_config_validates_with_max_records_per_file():
+def test_config_validates_with_max_records_per_file(
+    recording_storage_client: RecordingGCSClient,
+):
     """Config including max_records_per_file is valid; target instantiates without validation error."""
     config = {"bucket_name": "b", "max_records_per_file": 1000}
-    target = GCSTarget(config=config)
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
     assert target.config["max_records_per_file"] == 1000
 
 
-def test_config_validates_without_max_records_per_file():
+def test_config_validates_without_max_records_per_file(
+    recording_storage_client: RecordingGCSClient,
+):
     """Config without max_records_per_file is valid; optional property may be omitted."""
     config = {"bucket_name": "b"}
-    target = GCSTarget(config=config)
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
     assert (
         target.config.get("max_records_per_file") is None
         or target.config.get("max_records_per_file") == 0
@@ -280,16 +284,22 @@ def test_config_schema_omits_partition_date_format():
     assert "partition_date_format" not in properties
 
 
-def test_config_validates_with_hive_partitioned():
+def test_config_validates_with_hive_partitioned(
+    recording_storage_client: RecordingGCSClient,
+):
     """Config with hive_partitioned true or false is valid; target instantiates and exposes the value (or default false)."""
     config_true = {"bucket_name": "b", "hive_partitioned": True}
-    target_true = GCSTarget(config=config_true)
+    target_true = GCSTarget(config=config_true, storage_client=recording_storage_client)
     assert target_true.config["hive_partitioned"] is True
     config_false = {"bucket_name": "b", "hive_partitioned": False}
-    target_false = GCSTarget(config=config_false)
+    target_false = GCSTarget(
+        config=config_false, storage_client=recording_storage_client
+    )
     assert target_false.config["hive_partitioned"] is False
     config_omitted = {"bucket_name": "b"}
-    target_omitted = GCSTarget(config=config_omitted)
+    target_omitted = GCSTarget(
+        config=config_omitted, storage_client=recording_storage_client
+    )
     assert target_omitted.config.get("hive_partitioned") is False
 
 
