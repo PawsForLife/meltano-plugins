@@ -1,0 +1,10 @@
+# Root hook: runs plugin checks (ruff, mypy, pytest) via wrapper script.
+repos:
+  - repo: local
+    hooks:
+      - id: plugin-checks
+        name: Run plugin checks (ruff, mypy, pytest)
+        entry: scripts/run_plugin_checks.sh
+        language: system
+        pass_filenames: false
+        files: '^taps/|^loaders/'

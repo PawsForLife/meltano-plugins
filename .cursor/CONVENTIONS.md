@@ -15,6 +15,9 @@ Path placeholders used by agents, commands, and workflows in this folder. Defaul
 ## Usage
 
 - In agents, commands, and workflows: use these placeholders (or the default paths) so paths stay consistent and overridable.
+- **Test layout**: One test file per source module; unit vs integration scope and thin integration tests per `.cursor/rules/development_practices.mdc`.
+- **Test file naming**: The test file name **must** match the pattern `test_{file-name}.py`, where `{file-name}` is the source module’s basename (e.g. `simple.py` → `test_simple.py`). The folder path has no relevance to the file name.
+- **Test path**: The path within the source directory **must** be mirrored under `tests/unit/`. Example: source `target_gcs/paths/simple.py` → test `tests/unit/paths/test_simple.py`. The `tests/unit/` subfolder separates unit tests from the base test folder, allows a global `conftest.py` for universal fixtures and helpers, and allows a `files/` folder for complex JSON (or other) test input/expected output.
 - **Components/libraries**: use discovery-oriented language — e.g. "each major package or library in the repository", "affected component(s) as identified from the plan". Do not hardcode component names (e.g. `python_service/`, `src/`, `webview-ui/`). Discover components from repo layout (e.g. top-level packages or directories, or as documented in README). For Singer/Meltano projects: refer to data extractors as **taps**, data loaders as **targets**; use **source** (where data is extracted from) and **destination** (where data is loaded to); use **streams** for named data sets. See `docs/AI_CONTEXT/GLOSSARY_MELTANO_SINGER.md` when describing taps, targets, or pipelines.
 
 ## Git / Fork
@@ -23,6 +26,16 @@ Path placeholders used by agents, commands, and workflows in this folder. Defaul
 - To pull from the parent without pushing there, add it as a fetch-only remote:
   `git remote add upstream https://github.com/Widen/tap-rest-api-msdk.git` then
   `git remote set-url --push upstream no_push`.
+
+## Changelogs
+
+- **Root changelog** (`CHANGELOG.md` at repo root): Repo-wide changes only — scripts, CI, root tooling (e.g. `install.sh`, `run_plugin_checks.sh`, `list_packages.py`), pre-commit, docs under `docs/` (e.g. monorepo, AI context), root README, Cursor workflows/commands/agents, and changes that affect multiple plugins or have no single plugin. Uses **date-based** headings only (no version numbers): `## YYYY-MM-DD` (commit date). New entries go under the heading for the commit date; if that date section does not exist, add it at the top. The repo is “released” by pushing; no separate versioning.
+- **Plugin changelog** (per plugin): Changes that affect only that plugin. Paths:
+  - Tap: `taps/{tap_directory_name}/CHANGELOG.md` (e.g. `taps/restful-api-tap/CHANGELOG.md`)
+  - Target: `loaders/{target_directory_name}/CHANGELOG.md` (e.g. `loaders/target-gcs/CHANGELOG.md`)
+  Plugin changelogs may use version blocks (e.g. `## [Unreleased]`, `## [1.0.0]`) if the plugin is published with versions; otherwise use the same date-based format as the root.
+- **Which to update**: From the task/plan, determine affected scope. Update the root changelog only for global scope; update the relevant plugin changelog(s) only for that plugin’s scope; update both only when a change has both global and plugin-specific parts.
+- **One heading per type per section**: Under each root date (`## YYYY-MM-DD`) or plugin version block (e.g. `## [Unreleased]`, `## [1.0.0]`), each change type must appear at most once. Use a single `### Added`, `### Changed`, `### Fixed`, `### Removed`, or `### Breaking` per section; append new bullets under that heading. Do not add a second `### Fixed` (or other type) in the same section.
 
 ## Overriding
 

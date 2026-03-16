@@ -24,7 +24,7 @@ You MUST follow these phases in order. **Planning is mandatory** - do not skip t
 
 **Phase 1: Context Gathering**
 - [ ] Step 1.1: Read relevant codebase context files from `{context_docs_dir}/` directory
-- [ ] Step 1.1: Read root `CHANGELOG.md` (or created if it doesn't exist)
+- [ ] Step 1.1: Read relevant changelog(s) (root and affected plugin per CONVENTIONS § Changelogs)
 - [ ] Step 1.2: Read feature file and extracted Background, This Task, and Testing Needed sections
 - [ ] Step 1.3:
 
@@ -41,7 +41,7 @@ You MUST follow these phases in order. **Planning is mandatory** - do not skip t
 - [ ] Step 3.5: Completed service-specific validation (if applicable)
 
 **Phase 4: Completion**
-- [ ] Step 4.1: Updated root `CHANGELOG.md` under `## [Unreleased]` with feature and archive summary (no task/plan links)
+- [ ] Step 4.1: Updated the correct changelog(s) per scope (root date-based, plugin per CONVENTIONS); one heading per change type per section; feature and archive summary (no task/plan links)
 - [ ] Step 4.2: Updated relevant documentation in `{context_docs_dir}/` directory
 - [ ] Step 4.2: Updated service READMEs (if applicable)
 - [ ] Step 4.3: Archived task and plan files to `{archive_dir}/{feature}/` (maintaining folder hierarchy)
@@ -62,10 +62,7 @@ You MUST follow these phases in order. **Planning is mandatory** - do not skip t
    - **Always read**: `AI_CONTEXT_PATTERNS.md` for code patterns and conventions
    - **If the feature affects Singer/Meltano components (taps, targets)**: Use terminology from `GLOSSARY_MELTANO_SINGER.md` (tap, target, stream, catalog, config file, state file, SCHEMA/RECORD/STATE)
 
-2. Read root `CHANGELOG.md` (create if it doesn't exist) to understand:
-   - Recent changes and their patterns
-   - Current state of the `[Unreleased]` section
-   - Changelog entry format (version-less, date-based releases)
+2. Read the relevant changelog(s) (see CONVENTIONS § Changelogs): root `CHANGELOG.md` and, if the feature affects a single plugin, that plugin's `taps/{name}/CHANGELOG.md` or `loaders/{name}/CHANGELOG.md`. Create root changelog if it doesn't exist. Understand recent changes, format, and the rule: root uses date headings (`## YYYY-MM-DD`); one heading per change type per date/version (append under existing headings).
 
 ### Step 1.2: Read Feature File
 
@@ -153,22 +150,23 @@ Run the validation steps appropriate to the affected component(s) as documented 
 
 ## Phase 4: Completion
 
-### Step 4.1: Update Changelog
+### Step 4.1: Update Changelog(s)
 
-Create or update root `CHANGELOG.md` under the `## [Unreleased]` section:
+**Which changelog to edit**: Per `@.cursor/CONVENTIONS.md` § Changelogs — **root** `CHANGELOG.md` for repo-wide changes; **plugin** `taps/{name}/CHANGELOG.md` or `loaders/{name}/CHANGELOG.md` for that plugin only. Update only the changelog(s) for the feature's scope.
 
-1. **If `CHANGELOG.md` doesn't exist**, create it with this structure:
-   ```markdown
-   # Changelog
+**Root changelog**: Use date-based heading `## YYYY-MM-DD` (commit date). If that date section exists, append; otherwise add it at the top. **Plugin changelog**: Under each version (e.g. `## [Unreleased]`), one heading per change type; append bullets. Do not add a second heading of the same type in the same section.
 
-   All notable changes to this project will be documented in this file.
+If root `CHANGELOG.md` doesn't exist, create it with a date section for the commit:
+```markdown
+# Changelog
 
-   ## [Unreleased]
+All notable changes to this project will be documented in this file.
 
-   ```
+## YYYY-MM-DD
 
-2. Add entries under appropriate subsection (`### Added`, `### Changed`, `### Fixed`, or `### Removed`)
-3. Reference the feature and the archive summary file only (no links to task/plan files; those are removed during clean-up). Each task is a brief bullet; optional sub-bullets for major parts. Full detail lives in the archive.
+```
+
+Add entries under the appropriate subsection (`### Added`, `### Changed`, `### Fixed`, or `### Removed`). Reference the feature and the archive summary file only (no links to task/plan files). Each task is a brief bullet; optional sub-bullets for major parts. Full detail lives in the archive.
 
 **Format** (feature pipeline):
 
@@ -179,7 +177,7 @@ Create or update root `CHANGELOG.md` under the `## [Unreleased]` section:
   - (Next task adds another bullet)
 ```
 
-**Note:** The changelog uses a version-less format organized by release date. When a release is made, entries from `[Unreleased]` are moved to a new section with format `## YYYY-MM-DD` (e.g., `## 2024-01-15`).
+**Note:** The root changelog uses date-based sections only (`## YYYY-MM-DD`). The repo is released by pushing; no version numbers. Each commit adds or appends under the commit date.
 
 ### Step 4.2: Update Documentation
 
@@ -239,7 +237,7 @@ Need to add support for new parsing behavior in the relevant component.
 - Error handling tests
 ```
 
-**Changelog Entry:** Add under `## [Unreleased]` referencing the feature and archive summary `{archive_dir}/{feature}/{feature}.md` only (no task/plan file links).
+**Changelog Entry:** Root: add under `## YYYY-MM-DD` (commit date). Plugin: add under `## [Unreleased]`. Reference the feature and archive summary `{archive_dir}/{feature}/{feature}.md` only (no task/plan file links).
 
 ### Example 2: Adding a UI or frontend component
 
@@ -259,7 +257,7 @@ Users need a new UI component or frontend behavior.
 - Any visual or E2E tests per project conventions
 ```
 
-**Changelog Entry:** Add under `## [Unreleased]` referencing the feature and archive summary `{archive_dir}/{feature}/{feature}.md` only (no task/plan file links).
+**Changelog Entry:** Root: add under `## YYYY-MM-DD` (commit date). Plugin: add under `## [Unreleased]`. Reference the feature and archive summary `{archive_dir}/{feature}/{feature}.md` only (no task/plan file links).
 
 ---
 
@@ -272,7 +270,7 @@ Users need a new UI component or frontend behavior.
 - **Archive, don't delete**: Task and plan files go to `{archive_dir}/{feature}/` maintaining folder hierarchy (`tasks/`, `plans/tasks/`), not trash
 - **Links in changelog**: Reference the feature and archive summary file only; do not link to task/plan files (removed during clean-up)
 - **One feature per file**: Each feature file should describe a single coherent change
-- **Version-less changelog**: Root `CHANGELOG.md` uses date-based releases, not version numbers
+- **Date-based root changelog**: Root `CHANGELOG.md` uses date headings only (`## YYYY-MM-DD`); no version numbers; released by pushing
 - **Component-specific testing**: Follow testing patterns appropriate to the affected component(s) as documented in project context
 
 ## Feature File Template Reference

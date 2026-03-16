@@ -1,6 +1,6 @@
 """Pagination helpers for streams that request paged data from a REST API source and yield records (RECORD messages)."""
 
-from typing import Any, List, Optional, cast
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -99,8 +99,8 @@ class SimpleOffsetPaginator(BaseOffsetPaginator):
 
         """
         if self._offset_records_jsonpath:
-            extracted: List[Any] = cast(
-                List[Any],
+            extracted: list[Any] = cast(
+                list[Any],
                 next(
                     extract_jsonpath(self._offset_records_jsonpath, response.json()),
                     [],
@@ -118,9 +118,9 @@ class RestAPIHeaderLinkPaginator(HeaderLinkPaginator):
         self,
         *args,
         pagination_page_size: int = 25,
-        pagination_results_limit: Optional[int] = None,
-        use_fake_since_parameter: Optional[bool] = False,
-        replication_key: Optional[str] = None,
+        pagination_results_limit: int | None = None,
+        use_fake_since_parameter: bool | None = False,
+        replication_key: str | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -129,7 +129,7 @@ class RestAPIHeaderLinkPaginator(HeaderLinkPaginator):
         self.use_fake_since_parameter = use_fake_since_parameter
         self.replication_key = replication_key
 
-    def get_next_url(self, response: requests.Response) -> Optional[Any]:
+    def get_next_url(self, response: requests.Response) -> Any | None:
         """Return next page parameter(s) for the stream.
 
         Returns next-page parameters for the next page of records, or None if no more pages.

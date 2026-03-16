@@ -2,7 +2,7 @@
 
 import copy
 import json
-from typing import Any, List, Optional
+from typing import Any
 
 import requests
 from genson import SchemaBuilder
@@ -25,7 +25,7 @@ class RestfulApiTap(Tap):
     tap_name = name
 
     # Caches the authenticator so the Tap does not hit the auth endpoint for each stream.
-    _authenticator: Optional[APIAuthenticatorBase] = None
+    _authenticator: APIAuthenticatorBase | None = None
 
     common_properties = th.PropertiesList(
         th.Property(
@@ -120,6 +120,14 @@ class RestfulApiTap(Tap):
             '{"bool": {"filter": [{"range": '
             '{"meta.lastUpdated": {"gt": "$last_run_date"}}}]}}. '
             "Escape any required double quotes in the template.",
+        ),
+        th.Property(
+            "is_sorted",
+            th.BooleanType(),
+            default=False,
+            required=False,
+            description="When true, the stream is declared sorted by replication_key; "
+            "enables resumable state if the sync is interrupted.",
         ),
     )
 
@@ -449,8 +457,10 @@ class RestfulApiTap(Tap):
 
     config_jsonschema = top_level_properties.to_dict()
 
-    def discover_streams(self) -> List[DynamicStream]:  # type: ignore
+    def discover_streams(self) -> list[DynamicStream]:  # type: ignore
         """Build the list of streams for Discovery. Returns stream instances used to build the catalog.
+
+        Resolves stream-level `is_sorted` with tap-level fallback and passes to DynamicStream.
 
         Returns:
             List of DynamicStream instances.
@@ -486,6 +496,7 @@ class RestfulApiTap(Tap):
             flatten_records = stream.get(
                 "flatten_records", self.config.get("flatten_records", False)
             )
+            is_sorted = stream.get("is_sorted", self.config.get("is_sorted", False))
 
             schema = {}
             schema_config = stream.get("schema")
@@ -553,12 +564,13 @@ class RestfulApiTap(Tap):
                     start_date=start_date,
                     source_search_field=source_search_field,
                     source_search_query=source_search_query,
+                    is_sorted=is_sorted,
                     use_request_body_not_params=self.config.get(
                         "use_request_body_not_params"
                     ),
                     backoff_type=self.config.get("backoff_type"),
                     backoff_param=self.config.get("backoff_param"),
-                    backoff_time_extension=self.config.get("backoff_time_extension"),
+                    backoff_time_extension=self.config.get("backoff_time_extension", 0),
                     store_raw_json_message=self.config.get("store_raw_json_message"),
                     flatten_records=flatten_records,
                     authenticator=self._authenticator,

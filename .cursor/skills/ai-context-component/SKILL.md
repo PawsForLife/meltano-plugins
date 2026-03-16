@@ -20,7 +20,7 @@ Use these to discover entry points and key files; do not assume project-specific
 Before updating the component context:
 
 - The component directory at the given path — entry points, main modules, public API
-- Tests that target this component (if present)
+- Tests that target this component (if present). Unit tests live under `tests/unit/` mirroring the source path, with filenames `test_{module}.py` (e.g. `paths/simple.py` → `tests/unit/paths/test_simple.py`).
 - Existing `@{context_docs_dir}/AI_CONTEXT_REPOSITORY.md` for overall architecture
 - Any existing `AI_CONTEXT_{COMPONENT_NAME}.md` for this component
 

@@ -117,6 +117,25 @@ class AWSConnectClient:
 class ConfigurableOAuthAuthenticator(OAuthAuthenticator):
     """Configurable OAuth Authenticator."""
 
+    def __init__(
+        self,
+        *args: Any,
+        oauth_config: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Create authenticator with explicit OAuth config (no stream).
+
+        Args:
+            *args: Forwarded to parent.
+            oauth_config: Dict of OAuth params (client_id, grant_type, etc.) for
+                oauth_request_body. Replaces deprecated stream/config access.
+            **kwargs: Forwarded to parent (e.g. auth_endpoint, oauth_scopes).
+
+        """
+        config = dict(oauth_config) if oauth_config else {}
+        super().__init__(*args, **kwargs)
+        self._config = config
+
     def get_initial_oauth_token(self):
         """Get oauth token for the tap schema discovery.
 
@@ -237,29 +256,25 @@ def select_authenticator(self) -> Any:
             for k, v in api_keys.items():
                 key = k
                 value = v
-        return APIKeyAuthenticator(stream=self, key=key, value=value)
+        return APIKeyAuthenticator(key=key, value=value)
     # Using Basic Authenticator
     elif auth_method == "basic":
         return BasicAuthenticator(
-            stream=self,
             username=my_config.get("username", ""),
             password=my_config.get("password", ""),
         )
     # Using OAuth Authenticator
     elif auth_method == "oauth":
         return ConfigurableOAuthAuthenticator(
-            stream=self,
             auth_endpoint=my_config.get("access_token_url", ""),
             oauth_scopes=my_config.get("scope", ""),
             default_expiration=my_config.get("oauth_expiration_secs", ""),
             oauth_headers=auth_headers,
+            oauth_config=my_config,
         )
     # Using Bearer Token Authenticator
     elif auth_method == "bearer_token":
-        return BearerTokenAuthenticator(
-            stream=self,
-            token=my_config.get("bearer_token", ""),
-        )
+        return BearerTokenAuthenticator(token=my_config.get("bearer_token", ""))
     # Using AWS Authenticator
     elif auth_method == "aws":
         # Establish an AWS Connection Client and returned Signed Credentials
@@ -309,7 +324,7 @@ def get_authenticator(self) -> Any:
         self._authenticator = select_authenticator(self)
         if not self._authenticator:
             # No Auth Method, use default Authenticator
-            self._authenticator = APIAuthenticatorBase(stream=self)
+            self._authenticator = APIAuthenticatorBase()
     if auth_method == "oauth":
         if not self._authenticator.is_token_valid():
             # Obtain a new OAuth token as it has expired

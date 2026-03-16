@@ -2,14 +2,27 @@
 
 ## [Unreleased]
 
-### Fixed
+## [1.6.1] - 2026-03-12
 
-- `post_process`: when `flatten_records` is false and `store_raw_json_message` is true, the non-flatten return path now adds `_sdc_raw_json` to the row (raw record copy) so the advertised field is emitted.
+### Added
+
+- **readme-and-docs-structure** — Separate user and developer docs; developer guide in plugin docs. Details: [readme-and-docs-structure.md](../../_archive/readme-and-docs-structure/readme-and-docs-structure.md).
+  - Add developer guide at `docs/DEVELOPMENT.md` (task 02).
+  - README: remove inline Developer Resources; add link to docs/DEVELOPMENT.md (task 04).
 
 ### Changed
 
-- Workflow `5-plan-task-bug.md`: normalized `{task_file}` to mean filename without `.md`; paths use `{task_file}.md`; example and scratchpad text updated.
-- Workflows and commands: applied same `{task_file}` convention across `5-plan-task-feature.md`, `implement-task-fix.md`, `implement-task-feature.md`, `bug-pipeline.md`, `feature-pipeline.md`, and `architect.md` (paths use `{task_file}.md`; examples and mv/changelog links use `.md`; "task file name without extension" in prerequisites and invocations).
+- Updated type hints to Python 3.12 style (built-in generics and pipe unions).
+
+## [1.6.0] - 2026-03-12
+
+### Changed
+
+- Discovery: stream-level `is_sorted` now falls back to tap-level `is_sorted` when omitted on a stream, so tap-wide `is_sorted` is honored.
+
+### Fixed
+
+- `post_process`: when `flatten_records` is false and `store_raw_json_message` is true, the non-flatten return path now adds `_sdc_raw_json` to the row (raw record copy) so the advertised field is emitted.
 
 ## [1.5.0] - 2026-03-10
 

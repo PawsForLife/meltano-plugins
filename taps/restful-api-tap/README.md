@@ -34,17 +34,17 @@ Gratitude goes to [anelendata](https://github.com/anelendata/tap-rest-api) for i
 
 ### Install from this monorepo
 
-This tap is a **custom** plugin (not on the Meltano Hub or PyPI). To use it from this repo, add the following to your project's `meltano.yml`, then run `meltano install`:
+This tap is a **custom** plugin (not on the Meltano Hub or PyPI). To use it from this repo, add the following to your project's `meltano.yml`, then run `meltano install`. Use `namespace` and omit `variant`; use a plain `git+https://...` URL (not the `package @ url` form—see [repo root README](https://github.com/PawsForLife/meltano-plugins)#troubleshooting).
 
 ```yaml
 plugins:
   extractors:
     - name: restful-api-tap
-      variant: petcircle
-      pip_url: "restful-api-tap @ git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap"
+      namespace: restful_api_tap
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap
 ```
 
-For the full installation guide and the loader (target-gcs), see the [repo root README](https://github.com/PawsForLife/meltano-plugins) or [docs/monorepo](../../docs/monorepo/README.md).
+For the full installation guide, troubleshooting, and the loader (target-gcs), see the [repo root README](https://github.com/PawsForLife/meltano-plugins) or [docs/monorepo](../../docs/monorepo/README.md).
 
 ### Generic Meltano setup
 
@@ -254,7 +254,9 @@ will overwrite their top-level counterparts except where noted below:
 
   At run-time, the tap will dynamically change the value **$last_run_date** with either the defined `start_date` parameter or the last bookmark (stream state) value.
   Example: source_search_field=**last-updated**, the
-  source_search_query = **gt$last_run_date**, and the current replication state = 2022-08-10:23:10:10+1200. At run time this creates a request parameter **last-updated=gt2022-06-10:23:10:10+1200**.
+  source_search_query = **gt$last_run_date**, and the current replication state = 2022-08-10:23:10:10+1200.   At run time this creates a request parameter **last-updated=gt2022-06-10:23:10:10+1200**.
+
+- `is_sorted`: optional: stream-level, boolean, default `False`. Set to `true` when the source API returns records ordered by the replication key (e.g. `sequence_id`, `created_at`). When `true`, the stream is declared sorted so interrupted syncs are resumable; the source API must actually return records ordered by the replication key. See [Meltano Singer SDK – Incremental replication](https://sdk.meltano.com/en/latest/incremental_replication.html).
 
 #### Top-Level Authentication config options.
 - `auth_method`: optional: The method of authentication used by the API. Supported options
@@ -620,68 +622,6 @@ or
 bash restful-api-tap --config=config.sample.json
 ```
 
-## Developer Resources
+## Developer documentation
 
-### Initialize your Development Environment
-
-```bash
-./install.sh
-```
-
-`./install.sh` runs pytest, ruff, and mypy; CI uses it for testing. Or manually with [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv venv
-. .venv/bin/activate
-uv sync --extra dev
-```
-
-### Create and Run Tests
-
-Create tests within the `tests/` directory and
-then run:
-
-```bash
-uv run pytest
-```
-
-You can also test the `restful-api-tap` CLI directly:
-
-```bash
-uv run restful-api-tap --help
-```
-
-### Continuous Integration
-
-`./install.sh` runs pytest, ruff, and mypy directly. CI relies on `install.sh` for testing; run it locally to match CI. Optionally run `uv run tox -e py` for local use.
-
-### Testing with [Meltano](https://www.meltano.com)
-
-_**Note:** This tap will work in any Singer environment and does not require Meltano.
-Examples here are for convenience and to streamline end-to-end orchestration scenarios._
-
-This project comes with an example `meltano.yml` project file already created.
-
-Next, install Meltano (if you haven't already) and any needed plugins:
-
-```bash
-# Install meltano (e.g. with uv)
-uv tool install meltano
-# Initialize meltano within this directory
-cd restful-api-tap
-meltano install
-```
-
-Now you can test and orchestrate using Meltano:
-
-```bash
-# Test invocation:
-meltano invoke restful-api-tap --version
-# OR run a test `elt` pipeline:
-meltano elt restful-api-tap target-jsonl
-```
-
-### SDK Dev Guide
-
-See the [dev guide](https://sdk.meltano.com/en/latest/dev_guide.html) for more instructions on how to use the SDK to
-develop your own taps and targets.
+See [Development guide](docs/DEVELOPMENT.md) for local setup, tests, lint, and contributing.

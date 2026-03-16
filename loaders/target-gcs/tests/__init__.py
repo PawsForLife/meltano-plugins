@@ -1,1 +1,1 @@
-"""Test suite for target-gcs (gcs_target package)."""
+"""Test suite for target-gcs (target_gcs package)."""
