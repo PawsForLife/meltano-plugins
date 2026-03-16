@@ -12,48 +12,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 from dateutil.parser import ParserError as DateutilParserError
 
-from target_gcs.paths.partitioned import PartitionedPath
+from ...conftest import build_partitioned_path
+from ...test_helpers import key_from_open_call
 
-
-def build_partitioned_sink(
-    config: dict[str, Any] | None = None,
-    *,
-    time_fn: Any = None,
-    date_fn: Any = None,
-    storage_client: Any = None,
-    stream_name: str = "my_stream",
-    schema: dict[str, Any] | None = None,
-    extraction_date: datetime | None = None,
-) -> PartitionedPath:
-    """Build PartitionedPath with given config and injectables."""
-    cfg = config or {}
-    merged = {**{"bucket_name": "test-bucket", "hive_partitioned": True}, **cfg}
-    default_schema = {
-        "x-partition-fields": ["region", "dt"],
-        "properties": {
-            "region": {"type": "string"},
-            "dt": {"type": "string"},
-        },
-        "required": ["region", "dt"],
-    }
-    sch = schema if schema is not None else default_schema
-    partition_fields = sch.get("x-partition-fields") or []
-    return PartitionedPath(
-        stream_name=stream_name,
-        schema=sch,
-        config=merged,
-        partition_fields=partition_fields,
-        time_fn=time_fn,
-        date_fn=date_fn,
-        storage_client=storage_client,
-        extraction_date=extraction_date,
-    )
-
-
-def _key_from_open_call(call_args: tuple) -> str:
-    """Extract GCS object key from smart_open.open first positional arg (gs://bucket/key)."""
-    url: str = str(call_args[0][0])
-    return url.split("/", 3)[-1]
+# Default schema for tests that do not pass a custom schema (conftest merges config with hive_partitioned).
+_DEFAULT_PARTITIONED_SCHEMA: dict[str, Any] = {
+    "x-partition-fields": ["region", "dt"],
+    "properties": {
+        "region": {"type": "string"},
+        "dt": {"type": "string"},
+    },
+    "required": ["region", "dt"],
+}
 
 
 # --- Validation at init ---
@@ -68,7 +38,7 @@ def test_partitioned_path_init_invalid_schema_raises() -> None:
         "required": ["region"],
     }
     with pytest.raises(ValueError) as exc_info:
-        build_partitioned_sink(schema=schema)
+        build_partitioned_path(schema, schema.get("x-partition-fields") or [])
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "missing_field" in msg
@@ -84,7 +54,7 @@ def test_partitioned_path_init_field_not_required_raises() -> None:
         "required": ["region"],
     }
     with pytest.raises(ValueError) as exc_info:
-        build_partitioned_sink(schema=schema)
+        build_partitioned_path(schema, schema.get("x-partition-fields") or [])
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "dt" in msg
@@ -94,7 +64,10 @@ def test_partitioned_path_init_field_not_required_raises() -> None:
 def test_partitioned_path_init_valid_schema_constructs() -> None:
     """WHAT: Building PartitionedPath with valid x-partition-fields and matching properties/required succeeds; sink has stream_name and config.
     WHY: Happy path init when schema is valid."""
-    subject = build_partitioned_sink()
+    subject = build_partitioned_path(
+        _DEFAULT_PARTITIONED_SCHEMA,
+        _DEFAULT_PARTITIONED_SCHEMA.get("x-partition-fields") or [],
+    )
     assert subject.stream_name == "my_stream"
     assert subject.config.get("bucket_name") == "test-bucket"
     assert subject.config.get("hive_partitioned") is True
@@ -106,7 +79,10 @@ def test_partitioned_path_init_valid_schema_constructs() -> None:
 def test_path_for_record_uses_hive_path_of_record() -> None:
     """WHAT: path_for_record(record) returns path matching {stream}/{hive_path} where hive_path is from hive_path(record).
     WHY: Validates path composition per record; path must contain partition segments from record."""
-    subject = build_partitioned_sink()
+    subject = build_partitioned_path(
+        _DEFAULT_PARTITIONED_SCHEMA,
+        _DEFAULT_PARTITIONED_SCHEMA.get("x-partition-fields") or [],
+    )
     record = {"id": 1, "region": "eu", "dt": "2024-03-11"}
     path = subject.path_for_record(record)
     assert "my_stream" in path
@@ -127,12 +103,14 @@ def test_partitioned_path_keys_contain_partition_segments_from_record() -> None:
     with patch(
         "target_gcs.paths.partitioned.smart_open.open", return_value=mock_handle
     ) as mock_open:
-        subject = build_partitioned_sink(
+        subject = build_partitioned_path(
+            _DEFAULT_PARTITIONED_SCHEMA,
+            _DEFAULT_PARTITIONED_SCHEMA.get("x-partition-fields") or [],
             time_fn=lambda: fixed_ts,
             date_fn=lambda: fixed_dt,
         )
         subject.process_record({"id": 1, "region": "eu", "dt": "2024-03-11"}, {})
-    key = _key_from_open_call(mock_open.call_args)
+    key = key_from_open_call(mock_open.call_args[0])
     assert "region=eu" in key
     assert "dt=2024-03-11" in key
     assert "my_stream" in key
@@ -157,15 +135,16 @@ def test_partition_change_closes_handle_and_resets() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         side_effect=mock_handles,
     ) as mock_open:
-        subject = build_partitioned_sink(
-            schema=schema,
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         subject.process_record({"id": 1, "region": "eu"}, {})
         subject.process_record({"id": 2, "region": "us"}, {})
     assert mock_open.call_count == 2
-    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
     assert "region=eu" in keys[0]
     assert "region=us" in keys[1]
     assert keys[0] != keys[1]
@@ -185,15 +164,16 @@ def test_partitioned_path_partition_change_closes_handle_and_opens_new_key() -> 
         "target_gcs.paths.partitioned.smart_open.open",
         side_effect=mock_handles,
     ) as mock_open:
-        subject = build_partitioned_sink(
-            schema=schema,
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         subject.process_record({"id": 1, "region": "eu"}, {})
         subject.process_record({"id": 2, "region": "us"}, {})
     assert mock_open.call_count == 2
-    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
     assert "region=eu" in keys[0]
     assert "region=us" in keys[1]
     assert keys[0] != keys[1]
@@ -212,8 +192,9 @@ def test_partitioned_path_partition_return_creates_new_file() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         side_effect=[MagicMock(), MagicMock(), MagicMock()],
     ) as mock_open:
-        subject = build_partitioned_sink(
-            schema=schema,
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
@@ -221,7 +202,7 @@ def test_partitioned_path_partition_return_creates_new_file() -> None:
         subject.process_record({"id": 2, "dt": "2024-03-11"}, {})
         subject.process_record({"id": 3, "dt": "2024-03-10"}, {})
     assert mock_open.call_count == 3
-    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
     assert len(keys) == len(set(keys))
     assert keys[2] != keys[0]
 
@@ -243,20 +224,21 @@ def test_chunking_within_partition() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         side_effect=mock_handles,
     ) as mock_open:
-        subject = build_partitioned_sink(
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             config={
                 "bucket_name": "test-bucket",
                 "hive_partitioned": True,
                 "max_records_per_file": 2,
             },
-            schema=schema,
             time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         for i in range(3):
             subject.process_record({"id": i, "region": "eu"}, {})
     assert mock_open.call_count == 2
-    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
     assert keys[0] != keys[1]
     assert "region=eu" in keys[0] and "region=eu" in keys[1]
     assert "5000" in keys[0] and "5001" in keys[1]
@@ -276,20 +258,21 @@ def test_partitioned_path_rotation_at_limit_within_partition() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         side_effect=mock_handles,
     ) as mock_open:
-        subject = build_partitioned_sink(
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             config={
                 "bucket_name": "test-bucket",
                 "hive_partitioned": True,
                 "max_records_per_file": 2,
             },
-            schema=schema,
             time_fn=lambda: next(timestamps),
             date_fn=lambda: datetime(2024, 3, 11),
         )
         for i in range(3):
             subject.process_record({"id": i, "region": "eu"}, {})
     assert mock_open.call_count == 2
-    keys = [_key_from_open_call(c) for c in mock_open.call_args_list]
+    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
     assert keys[0] != keys[1]
     assert "region=eu" in keys[0] and "region=eu" in keys[1]
 
@@ -309,8 +292,9 @@ def test_partitioned_path_parser_error_when_date_format_unparseable() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         return_value=MagicMock(),
     ):
-        subject = build_partitioned_sink(
-            schema=schema,
+        subject = build_partitioned_path(
+            schema,
+            schema.get("x-partition-fields") or [],
             date_fn=lambda: datetime(2024, 3, 11),
         )
         with pytest.raises(DateutilParserError):
@@ -323,7 +307,10 @@ def test_partitioned_path_parser_error_when_date_format_unparseable() -> None:
 def test_partitioned_path_current_key_empty_before_first_write() -> None:
     """WHAT: Before calling process_record, current_key is empty (or as specified by base contract).
     WHY: Property contract for GCSSink.key_name delegation after task 06."""
-    subject = build_partitioned_sink()
+    subject = build_partitioned_path(
+        _DEFAULT_PARTITIONED_SCHEMA,
+        _DEFAULT_PARTITIONED_SCHEMA.get("x-partition-fields") or [],
+    )
     assert subject.current_key == ""
 
 
@@ -337,10 +324,12 @@ def test_partitioned_path_current_key_equals_key_after_write() -> None:
         "target_gcs.paths.partitioned.smart_open.open",
         return_value=mock_handle,
     ) as mock_open:
-        subject = build_partitioned_sink(
+        subject = build_partitioned_path(
+            _DEFAULT_PARTITIONED_SCHEMA,
+            _DEFAULT_PARTITIONED_SCHEMA.get("x-partition-fields") or [],
             time_fn=lambda: fixed_ts,
             date_fn=lambda: fixed_dt,
         )
         subject.process_record({"id": 1, "region": "eu", "dt": "2024-03-11"}, {})
-    expected_key = _key_from_open_call(mock_open.call_args)
+    expected_key = key_from_open_call(mock_open.call_args[0])
     assert subject.current_key == expected_key
