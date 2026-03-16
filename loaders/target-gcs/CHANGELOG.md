@@ -43,6 +43,7 @@
   - Task 01: Add `tests/test_helpers.py` with `key_from_open_call(call_args)` to extract GCS key from smart_open.open positional args; unit tests in `test_test_helpers.py`.
   - Task 02: Add `tests/conftest.py` with constants (SAMPLE_CONFIG, FIXED_DATE, DEFAULT_STREAM_NAME), fixtures (sample_config, fixed_time_fn, fixed_date_fn, fixed_date, mock_storage_client, mock_open_handle, patch_all_pattern_modules), factory helpers (build_sink, build_simple_path, build_dated_path, build_partitioned_path), and GCSTargetWithMockStorage for test_target.
   - Task 03: Refactor `tests/unit/test_target.py` to import SAMPLE_CONFIG and GCSTargetWithMockStorage from conftest; remove local definitions; use get_target_test_class(..., config=SAMPLE_CONFIG). All test names and assertions unchanged.
+  - Task 04: Refactor `tests/unit/test_sinks.py` to use conftest and test_helpers; remove local _patch_all_pattern_modules, build_sink, _key_from_open_call, FIXED_DATE; use patch_all_pattern_modules fixture and key_from_open_call(mock_open.call_args[0]) / key_from_open_call(c[0]) for call_args_list. All test names and assertions unchanged.
 
 ### Changed
 

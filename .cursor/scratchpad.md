@@ -3,7 +3,7 @@
 ## Feature: target-gcs-conftest-restructure
 
 - **Pipeline State:** Phase 4 (Per-task planning) complete; Phase 5 (Implementation) in progress.
-- **Task Completion Status:** Task 01-create-test-helpers completed, tests passing. Task 02-create-conftest completed, tests passing. Task 03-refactor-test-target completed, tests passing.
+- **Task Completion Status:** Task 01-create-test-helpers completed, tests passing. Task 02-create-conftest completed, tests passing. Task 04-refactor-test-sinks completed, tests passing. Task 03-refactor-test-target completed, tests passing.
 - **Task count:** 8.
 - **Execution Order:** 01-create-test-helpers.md, 02-create-conftest.md, 03-refactor-test-target.md, 04-refactor-test-sinks.md, 05-refactor-test-simple.md, 06-refactor-test-dated.md, 07-refactor-test-partitioned.md, 08-optional-refactor-test-base.md.
 - **Plan location:** `_features/target-gcs-conftest-restructure/plans/master/` (overview.md, architecture.md, interfaces.md, implementation.md, testing.md, dependencies.md, documentation.md).
