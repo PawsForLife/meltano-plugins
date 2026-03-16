@@ -15,6 +15,10 @@
 
 ### Added
 
+- **mock-gcs-storage-client** — Recording in-memory GCS client for tests so smart_open is not patched; assert on stored content and paths.
+  - Add `tests/fixtures/recording_gcs_client.py` with `RecordingGCSClient`, `RecordingBucket`, `RecordingBlob` implementing the interface used by smart_open's GCS backend; `get_written_content(bucket, key)` and `get_written_paths()` for test assertions.
+  - Add `recording_storage_client` fixture in conftest; unit tests in `tests/unit/fixtures/test_recording_gcs_client.py`.
+  - Add integration test in `test_simple.py`: SimplePath with recording client (no patch), assert path and content via `get_written_content` and `get_written_paths`.
 - **readme-and-docs-structure** — Separate user and developer docs; developer guide in plugin docs. Details: [readme-and-docs-structure.md](../../_archive/readme-and-docs-structure/readme-and-docs-structure.md).
   - Add developer guide at `docs/DEVELOPMENT.md` (task 01).
   - README: remove inline Developer Resources; add link to docs/DEVELOPMENT.md (task 03).

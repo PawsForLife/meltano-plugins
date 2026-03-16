@@ -6,13 +6,14 @@ Black-box: assert on keys passed to open, record count per file (via keys), and 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
-
-from target_gcs.paths.simple import SimplePath
 
 from ...conftest import build_simple_path
 from ...test_helpers import key_from_open_call
 
+if TYPE_CHECKING:
+    from tests.fixtures.recording_gcs_client import RecordingGCSClient
 
 # --- Key generation (single path) ---
 
@@ -181,3 +182,32 @@ def test_simple_path_current_key_equals_key_passed_to_open_after_one_record() ->
         subject.process_record({"id": 1}, {})
         opened_key = key_from_open_call(mock_open.call_args[0])
         assert subject.current_key == opened_key
+
+
+# --- Recording client integration (no patch; real smart_open) ---
+
+
+def test_simple_path_with_recording_client_stores_path_and_content(
+    recording_storage_client: RecordingGCSClient,
+) -> None:
+    """WHAT: SimplePath with recording_storage_client writes through real smart_open; path and content are readable via get_written_paths and get_written_content.
+    WHY: Validates recording client works end-to-end with path code; no smart_open patch."""
+    fixed_ts = 12345.0
+    fixed_dt = datetime(2024, 3, 11)
+    subject = build_simple_path(
+        time_fn=lambda: fixed_ts,
+        date_fn=lambda: fixed_dt,
+        storage_client=recording_storage_client,
+    )
+    subject.process_record({"id": 1, "name": "a"}, {})
+    subject.process_record({"id": 2, "name": "b"}, {})
+    subject.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) >= 1
+    bucket, key = paths[0]
+    assert bucket == "test-bucket"
+    assert key == "my_stream/2024-03-11/12345.jsonl"
+    content = recording_storage_client.get_written_content(bucket, key)
+    assert content is not None
+    assert b'{"id":1,"name":"a"}' in content or b'{"id":1,"name":"a"}' in content
+    assert b'{"id":2,"name":"b"}' in content or b'{"id":2,"name":"b"}' in content

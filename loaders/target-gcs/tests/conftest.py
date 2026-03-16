@@ -3,6 +3,8 @@
 Canonical approach:
 - Use the mock_storage_client fixture or pass it into build_sink / path builders when
   building targets or paths that need a mock GCS client.
+- Use recording_storage_client for tests that use real smart_open with an in-memory
+  GCS client (no patch); assert on get_written_content and get_written_paths.
 - Use the patch_all_pattern_modules fixture for sink tests that need a patched
   environment (smart_open.open and Client); path tests may use per-pattern patches or
   this fixture.
@@ -23,6 +25,8 @@ import pytest
 from target_gcs.paths import DatedPath, PartitionedPath, SimplePath
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
+
+from tests.fixtures.recording_gcs_client import RecordingGCSClient
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -74,6 +78,12 @@ def mock_storage_client() -> MagicMock:
 def mock_open_handle() -> MagicMock:
     """Mock return value of smart_open.open for tests that assert on writes or key args."""
     return MagicMock()
+
+
+@pytest.fixture
+def recording_storage_client() -> RecordingGCSClient:
+    """In-memory GCS client for tests that use real smart_open; assert via get_written_content and get_written_paths."""
+    return RecordingGCSClient()
 
 
 @pytest.fixture
