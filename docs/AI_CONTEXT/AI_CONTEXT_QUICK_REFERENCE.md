@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.2 |
-| Last Updated | 2026-03-12 |
+| Version | 1.4 |
+| Last Updated | 2026-03-16 |
 | Tags | quick-reference, meltano, singer, sdk, taps, targets, python |
-| Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, entry points, data flow), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, config file, state file, Catalog, streams), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) |
+| Cross-References | [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) (architecture, entry points, data flow), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, config file, state file, Catalog, streams), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md) (code patterns), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md) (loader: GCS sink, paths, config) |
 
 ---
 
@@ -36,6 +36,8 @@ Plugins are **custom** (not on Meltano Hub or PyPI). Install via Meltano by edit
 | Config | Per-plugin `pyproject.toml` (no repo root `pyproject.toml`) |
 
 Activate venv before commands: `source .venv/bin/activate` from the plugin directory. Use project dependency files; do not install ad hoc with `pip install ...`.
+
+**target-gcs (loader):** GCS uses Application Default Credentials. For a key file, set `GOOGLE_APPLICATION_CREDENTIALS`. Config file: `bucket_name` (required), `key_prefix`, optional `hive_partitioned`, `max_records_per_file`. See [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md).
 
 ---
 
@@ -125,7 +127,7 @@ cat stream.jsonl | target-gcs --config config.json
 ## Core Interfaces (Quick View)
 
 - **restful-api-tap:** Subclasses `singer_sdk.Tap`; stream logic in `DynamicStream`; auth via `get_authenticator`; uses `singer_sdk.typing` for schema.
-- **target-gcs:** Subclasses `singer_sdk.target_base.Target`; `GCSSink` (RecordSink) writes to GCS; config: `bucket_name`, `key_prefix`, `key_naming_convention`.
+- **target-gcs:** Subclasses `singer_sdk.target_base.Target`; `GCSSink` (RecordSink) writes to GCS; config: `bucket_name`, `key_prefix`.
 
 Both follow the Singer spec (stdout/stdin JSONL, Discovery, sync). See [AI_CONTEXT_REPOSITORY.md](AI_CONTEXT_REPOSITORY.md) for data flow.
 

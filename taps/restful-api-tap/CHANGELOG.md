@@ -4,6 +4,12 @@
 
 ## [1.6.1] - 2026-03-12
 
+### Added
+
+- **readme-and-docs-structure** — Separate user and developer docs; developer guide in plugin docs. Details: [readme-and-docs-structure.md](../../_archive/readme-and-docs-structure/readme-and-docs-structure.md).
+  - Add developer guide at `docs/DEVELOPMENT.md` (task 02).
+  - README: remove inline Developer Resources; add link to docs/DEVELOPMENT.md (task 04).
+
 ### Changed
 
 - Updated type hints to Python 3.12 style (built-in generics and pipe unions).

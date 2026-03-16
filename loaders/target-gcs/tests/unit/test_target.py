@@ -1,32 +1,25 @@
 """Tests the Singer target (target-gcs) using the built-in SDK standard target tests.
 
-Uses sample config file contents for target configuration.
+Uses the same config as the sample_config fixture (get_target_test_class requires a
+config dict at class-definition time, so the value is defined here).
 """
 
 from typing import Any, cast
-from unittest.mock import MagicMock
 
 from singer_sdk.testing import get_target_test_class
 from singer_sdk.testing.factory import BaseTestClass
 
-from target_gcs.target import GCSTarget
+from ..conftest import GCSTargetWithRecordingStorage
 
-# Minimal config for SDK template tests; matches test_sinks and test_partition_key_generation.
-SAMPLE_CONFIG: dict[str, Any] = {"bucket_name": "test-bucket"}
-
-
-class GCSTargetWithMockStorage(GCSTarget):
-    """Target subclass that injects a mock GCS client so tests run without ADC."""
-
-    def __init__(self, *, config=None, **kwargs):
-        super().__init__(config=config, **kwargs)
-        self._storage_client = MagicMock()
-
+# Config for SDK target test class; matches sample_config fixture value.
+_TARGET_TEST_CONFIG: dict[str, Any] = {"bucket_name": "test-bucket"}
 
 # Run standard built-in target tests from the SDK (class-based; pytest discovers test methods).
 StandardTargetTests = cast(
     type[BaseTestClass],
-    get_target_test_class(target_class=GCSTargetWithMockStorage, config=SAMPLE_CONFIG),
+    get_target_test_class(
+        target_class=GCSTargetWithRecordingStorage, config=_TARGET_TEST_CONFIG
+    ),
 )
 
 
