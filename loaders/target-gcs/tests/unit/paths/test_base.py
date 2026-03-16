@@ -287,6 +287,7 @@ def test_filename_for_current_file_returns_timestamp_jsonl(
 ) -> None:
     """WHAT: With time_fn=lambda: 12345, filename_for_current_file returns '12345.jsonl'.
     WHY: Core filename contract uses FILENAME_TEMPLATE with timestamp only (no chunk_index)."""
+
     def time_fn() -> float:
         return 12345.0
 
@@ -308,6 +309,7 @@ def test_filename_for_current_file_uses_injected_time_fn(
 ) -> None:
     """WHAT: Deterministic time_fn yields predictable filename; asserts DI for deterministic tests.
     WHY: Tests must be deterministic; time_fn injection enables this."""
+
     def time_fn() -> float:
         return 99999.0
 
