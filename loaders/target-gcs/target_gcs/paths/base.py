@@ -132,9 +132,10 @@ class BasePathPattern(abc.ABC):
         """Rotate to new chunk when max_records_per_file is reached.
 
         When max_records_per_file > 0 and _records_written_in_current_file >= limit,
-        flushes and closes the handle and resets record count. Next filename_for_current_file()
-        yields a new timestamp (timestamp-only chunking; no chunk_index).
-        No-op when max_records_per_file is 0 or missing.
+        flushes and closes the handle (setting _current_handle to None), and resets
+        record count. The next process_record will then open a new handle. Next
+        filename_for_current_file() yields a new timestamp (timestamp-only chunking;
+        no chunk_index). No-op when max_records_per_file is 0 or missing.
         """
         max_records = self.config.get("max_records_per_file", 0)
         if max_records <= 0:
