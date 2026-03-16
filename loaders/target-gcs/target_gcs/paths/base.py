@@ -32,22 +32,18 @@ class BasePathPattern(abc.ABC):
 
     def __init__(
         self,
+        *,
         stream_name: str,
         config: dict[str, Any],
-        *,
+        extraction_date: datetime,
         time_fn: Callable[[], float] | None = None,
-        date_fn: Callable[[], datetime] | None = None,
-        storage_client: Any | None = None,
-        extraction_date: datetime | None = None,
+        storage_client: Any,
     ) -> None:
         self.stream_name = stream_name
         self.config = config
         self._time_fn = time_fn
-        self._date_fn = date_fn
         self._storage_client = storage_client
-        self._extraction_date = extraction_date or (
-            date_fn() if date_fn else datetime.today()
-        )
+        self._extraction_date = extraction_date
         self._current_handle: FileIO | None = None
         self._key_name: str = ""
         self._records_written_in_current_file: int = 0
@@ -55,9 +51,7 @@ class BasePathPattern(abc.ABC):
 
     @property
     def storage_client(self) -> Client:
-        """Resolved storage client; creates default Client when not injected."""
-        if self._storage_client is None:
-            self._storage_client = Client()
+        """Storage client (GCS Client or test double); required at construction, never None."""
         return self._storage_client
 
     def apply_key_prefix_and_normalize(self, base: str) -> str:

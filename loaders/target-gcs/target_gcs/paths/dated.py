@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import smart_open
@@ -19,19 +20,17 @@ class DatedPath(BasePathPattern):
 
     def __init__(
         self,
+        *,
         stream_name: str,
         config: dict[str, Any],
-        *,
+        extraction_date: datetime,
         time_fn: Any = None,
-        date_fn: Any = None,
-        storage_client: Any = None,
-        extraction_date: Any = None,
+        storage_client: Any,
     ) -> None:
         super().__init__(
             stream_name=stream_name,
             config=config,
             time_fn=time_fn,
-            date_fn=date_fn,
             storage_client=storage_client,
             extraction_date=extraction_date,
         )

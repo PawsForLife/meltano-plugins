@@ -8,6 +8,7 @@ partition; ParserError from unparseable date is propagated.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import smart_open
@@ -30,15 +31,14 @@ class PartitionedPath(BasePathPattern):
 
     def __init__(
         self,
+        *,
         stream_name: str,
         schema: dict[str, Any],
         config: dict[str, Any],
         partition_fields: list[str],
-        *,
+        extraction_date: datetime,
         time_fn: Any = None,
-        date_fn: Any = None,
-        storage_client: Any = None,
-        extraction_date: Any = None,
+        storage_client: Any,
     ) -> None:
 
         # Validate the Partition Fields
@@ -57,7 +57,6 @@ class PartitionedPath(BasePathPattern):
             stream_name=stream_name,
             config=config,
             time_fn=time_fn,
-            date_fn=date_fn,
             storage_client=storage_client,
             extraction_date=extraction_date,
         )

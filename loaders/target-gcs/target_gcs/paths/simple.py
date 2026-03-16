@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 import smart_open
@@ -11,10 +13,38 @@ from target_gcs.paths.base import BasePathPattern
 
 
 class SimplePath(BasePathPattern):
-    """Non-hive-partitioned pattern: one path per stream, one handle, rotation at max_records_per_file (timestamp-only)."""
+    """SimplePath pattern: one path per stream, one file handle, with optional rotation at max_records_per_file.
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    This pattern does not use hive partitioning. All records for a stream are written to the same path
+    (optionally chunked by file size/record limit).
+
+    Args:
+        stream_name (str): Name of the stream (used as path key prefix).
+        config (dict[str, Any]): Target or path configuration, containing at least "bucket_name".
+        time_fn (Callable[[], float], optional): Function returning the current timestamp as float. Defaults to None.
+        storage_client (Any): Required GCS client or test double for writing files; cannot be None.
+        extraction_date (datetime): Extraction date for path formatting; must be a datetime, cannot be None.
+
+    Attributes:
+        _path (str): The computed path for the stream and extraction date (format: "{stream}/{date}").
+    """
+
+    def __init__(
+        self,
+        *,
+        stream_name: str,
+        config: dict[str, Any],
+        extraction_date: datetime,
+        time_fn: Callable[[], float] | None = None,
+        storage_client: Any,
+    ) -> None:
+        super().__init__(
+            stream_name=stream_name,
+            config=config,
+            time_fn=time_fn,
+            storage_client=storage_client,
+            extraction_date=extraction_date,
+        )
         date_fmt = self.config.get("date_format", "%Y-%m-%d")
         date_str = self._extraction_date.strftime(date_fmt)
         self._path = PATH_SIMPLE.format(stream=self.stream_name, date=date_str)

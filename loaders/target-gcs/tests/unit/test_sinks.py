@@ -3,16 +3,13 @@
 import re
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
 
 import orjson
 import pytest
 
 from target_gcs.sinks import GCSSink
 from target_gcs.target import GCSTarget
-
-from ..conftest import FIXED_DATE, build_sink
-from ..test_helpers import key_from_open_call
+from tests.fixtures.recording_gcs_client import RecordingGCSClient
 
 
 def test_public_api_imports_succeed():
@@ -33,30 +30,49 @@ def test_public_api_imports_succeed():
     assert PathType is not None
 
 
-def test_extraction_timestamp_is_unix_time(patch_all_pattern_modules):
+def test_extraction_timestamp_is_unix_time(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Key name after first write matches stream/date/timestamp.jsonl pattern. WHAT: key_name reflects pattern current key. WHY: Regression for simple path key shape (split-path-filename)."""
-    subject = build_sink()
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    subject = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     subject.process_record({"id": 1}, {})
     assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/\d+\.jsonl", subject.key_name)
 
 
-def test_key_shape_matches_constants(patch_all_pattern_modules):
+def test_key_shape_matches_constants(
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Key format matches {prefix}/{stream}/{path}/{timestamp}.jsonl for each pattern (SimplePath, DatedPath, PartitionedPath).
     WHAT: key_name structure aligns with PATH_SIMPLE, PATH_DATED, PATH_PARTITIONED and FILENAME_TEMPLATE constants.
     WHY: Regression guard that sink delegates to patterns and key shape is fixed by constants (no key_naming_convention)."""
-    fixed_ts = 99999.0
 
     def time_fn():
-        return fixed_ts
-
-    def date_fn():
-        return FIXED_DATE
+        return 99999.0
 
     # SimplePath: stream/date/timestamp.jsonl
-    sink = build_sink(
-        config={"hive_partitioned": False},
+    config = {"bucket_name": "test-bucket", "hive_partitioned": False}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
         time_fn=time_fn,
-        date_fn=date_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record({"id": 1}, {})
     assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/99999\.jsonl", sink.key_name), (
@@ -64,11 +80,16 @@ def test_key_shape_matches_constants(patch_all_pattern_modules):
     )
 
     # DatedPath: stream/year=X/month=Y/day=Z/timestamp.jsonl
-    sink = build_sink(
-        config={"hive_partitioned": True},
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
         schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
         time_fn=time_fn,
-        date_fn=date_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record({"id": 1}, {})
     assert re.match(
@@ -81,11 +102,16 @@ def test_key_shape_matches_constants(patch_all_pattern_modules):
         "properties": {"r": {"type": "string"}},
         "required": ["r"],
     }
-    sink = build_sink(
-        config={"hive_partitioned": True},
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
         schema=schema,
+        key_properties=[],
+        storage_client=recording_storage_client,
         time_fn=time_fn,
-        date_fn=date_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record({"id": 1, "r": "x"}, {})
     assert re.match(r"my_stream/r=x/99999\.jsonl", sink.key_name), (
@@ -93,35 +119,90 @@ def test_key_shape_matches_constants(patch_all_pattern_modules):
     )
 
 
-def test_key_name_includes_prefix_when_provided(patch_all_pattern_modules):
+def test_key_name_includes_prefix_when_provided(
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Key name includes key_prefix when provided. WHAT: key_name reflects prefix. WHY: Config key_prefix must appear in written key."""
-    subject = build_sink({"key_prefix": "asdf"})
+    config = {"bucket_name": "test-bucket", "key_prefix": "asdf"}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    subject = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     subject.process_record({"id": 1}, {})
     assert re.match(r"asdf/my_stream", subject.key_name)
 
 
-def test_key_name_does_not_start_with_slash(patch_all_pattern_modules):
+def test_key_name_does_not_start_with_slash(
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Key name never starts with leading slash. WHAT: key_name is normalized. WHY: GCS key shape requirement."""
-    subject = build_sink({"key_prefix": "/asdf"})
+    config = {"bucket_name": "test-bucket", "key_prefix": "/asdf"}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    subject = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     subject.process_record({"id": 1}, {})
     assert not subject.key_name.startswith("/")
 
 
-def test_key_name_uses_injectable_time_fn_when_provided(patch_all_pattern_modules):
+def test_key_name_uses_injectable_time_fn_when_provided(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Key name uses injectable time when time_fn is provided so tests can assert key content without flakiness.
     WHAT: key_name uses time_fn for extraction_timestamp when passed to GCSSink. WHY: deterministic key assertions in tests."""
-    fixed_ts = 12345.0
-    subject = build_sink(time_fn=lambda: fixed_ts)
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    subject = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     subject.process_record({"id": 1}, {})
     assert "12345" in subject.key_name
 
 
-def test_sink_accepts_date_fn_and_stores_it():
-    """Sink stores and uses injectable date_fn when provided. WHAT: date_fn is injectable for run-date.
-    WHY: Deterministic tests for partition fallback and key names in later tasks."""
-    subject = build_sink(date_fn=lambda: FIXED_DATE)
-    assert subject._date_fn is not None
-    assert subject._date_fn() == FIXED_DATE
+def test_sink_accepts_extraction_date_and_uses_it(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
+    """Sink stores and uses injectable extraction_date when provided. WHAT: extraction_date is injectable for run-date.
+    WHY: Deterministic tests for partition fallback and key names."""
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    subject = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
+    assert subject._extraction_date is not None
+    assert subject._extraction_date == fixed_date
 
 
 def test_config_schema_excludes_key_naming_convention():
@@ -212,32 +293,24 @@ def test_config_validates_with_hive_partitioned():
     assert target_omitted.config.get("hive_partitioned") is False
 
 
-def test_gcs_client_created_without_credentials_path(patch_all_pattern_modules):
-    """Sink must use Client() (ADC) only; no explicit credentials path passed from config file. WHAT: Client created with no args. WHY: ADC only."""
-    _, mock_client = patch_all_pattern_modules
-    sink = build_sink()
-    sink.process_record({"id": 1}, {})
-    mock_client.assert_called_once_with()
-
-
-def test_gcs_client_uses_adc_when_google_application_credentials_set(
-    patch_all_pattern_modules,
+def test_one_key_and_one_handle_when_chunking_disabled(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
 ):
-    """When GOOGLE_APPLICATION_CREDENTIALS is set, the sink's client is still created with no path (ADC honours env)."""
-    _, mock_client = patch_all_pattern_modules
-    with patch.dict("os.environ", {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/dummy"}):
-        sink = build_sink()
-        sink.process_record({"id": 1}, {})
-    mock_client.assert_called_once_with()
-
-
-def test_one_key_and_one_handle_when_chunking_disabled(patch_all_pattern_modules):
     """When max_records_per_file is unset or 0, multiple records use a single key and a single handle (no rotation).
     Backward compatibility: existing behaviour must be unchanged when the option is off."""
-    mock_open, _ = patch_all_pattern_modules
-    mock_handle = MagicMock()
-    mock_open.return_value = mock_handle
-    sink = build_sink()
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     context = {}
     key_after_first = None
     for i in range(5):
@@ -245,18 +318,34 @@ def test_one_key_and_one_handle_when_chunking_disabled(patch_all_pattern_modules
         if i == 0:
             key_after_first = sink.key_name
         key_after_last = sink.key_name
+    sink.close()
     assert key_after_first == key_after_last, (
         "key_name must stay stable when chunking is disabled"
     )
-    assert mock_open.call_count == 1, (
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 1, (
         "exactly one file handle must be opened for the stream when chunking is off"
     )
 
 
-def test_key_has_no_chunk_index_when_chunking_disabled(patch_all_pattern_modules):
+def test_key_has_no_chunk_index_when_chunking_disabled(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """When chunking is disabled, the key must not contain the literal {chunk_index} and must match stream/date/timestamp.jsonl pattern.
     Key format uses path + filename (split-path-filename)."""
-    sink = build_sink()
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     sink.process_record({"id": 1}, {})
     assert "{chunk_index}" not in sink.key_name, (
         "key must not contain chunk_index token when chunking is disabled"
@@ -266,54 +355,80 @@ def test_key_has_no_chunk_index_when_chunking_disabled(patch_all_pattern_modules
     )
 
 
-def test_chunking_rotation_at_threshold(patch_all_pattern_modules):
+def test_chunking_rotation_at_threshold(
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Rotation after N records: when max_records_per_file is N, after N records the sink closes the current file and opens a new one; the record that would exceed the limit is written to the new file. Core chunking requirement."""
-    mock_open, _ = patch_all_pattern_modules
-    mock_handles = [MagicMock(), MagicMock()]
-    mock_open.side_effect = mock_handles
-    # get_chunk_format_map is called per record and on rotate; provide enough timestamps.
+    config = {"bucket_name": "test-bucket", "max_records_per_file": 2}
     timestamps = iter([1000.0, 1001.0, 1002.0, 1003.0])
 
     def time_fn():
         return next(timestamps)
 
-    sink = build_sink(
-        config={"max_records_per_file": 2},
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
         time_fn=time_fn,
+        extraction_date=fixed_date,
     )
     context = {}
     for i in range(3):
         sink.process_record({"id": i, "name": f"record_{i}"}, context)
-    assert mock_open.call_count == 2, (
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 2, (
         "exactly two file handles must be opened after writing 3 records with max_records_per_file=2"
     )
-    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
+    keys = [p[1] for p in paths]
     assert keys[0] != keys[1], "first and second key must differ after rotation"
-    third_record_payload = b'{"id":2,"name":"record_2"}\n'
-    second_handle_writes = [c[0][0] for c in mock_handles[1].write.call_args_list]
-    assert third_record_payload in second_handle_writes, (
+    bucket0, key0 = paths[0]
+    bucket1, key1 = paths[1]
+    content1 = recording_storage_client.get_written_content(bucket1, key1)
+    assert content1 is not None
+    assert b'"id":2,"name":"record_2"' in content1, (
         "the third record must be written to the second (new) file"
     )
 
 
-def test_chunking_record_integrity_no_duplicate_or_dropped(patch_all_pattern_modules):
+def test_chunking_record_integrity_no_duplicate_or_dropped(
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Every record written exactly once: with chunking enabled, all records are written to GCS with no duplicates or drops. Correctness of the pipeline."""
-    mock_open, _ = patch_all_pattern_modules
-    write_payloads = []
+    config = {"bucket_name": "test-bucket", "max_records_per_file": 10}
+    timestamps = iter([1000.0 + i for i in range(30)])
 
-    def capture_write(data):
-        write_payloads.append(data)
+    def time_fn():
+        return next(timestamps)
 
-    mock_handles = [MagicMock() for _ in range(4)]
-    for h in mock_handles:
-        h.write.side_effect = capture_write
-    mock_open.side_effect = mock_handles
-    sink = build_sink(config={"max_records_per_file": 10})
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=time_fn,
+        extraction_date=fixed_date,
+    )
     for i in range(25):
         sink.process_record({"id": i, "name": f"row_{i}"}, {})
-    assert mock_open.call_count == 3, (
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 3, (
         "25 records with max_records_per_file=10 must produce 3 files (10+10+5)"
     )
+    write_payloads: list[bytes] = []
+    for bucket, key in paths:
+        content = recording_storage_client.get_written_content(bucket, key)
+        assert content is not None
+        write_payloads.extend(content.split(b"\n"))
+    write_payloads = [p for p in write_payloads if p.strip()]
     assert len(write_payloads) == 25, "exactly 25 write calls must occur"
     records = [orjson.loads(p.strip()) for p in write_payloads]
     ids = [r["id"] for r in records]
@@ -322,35 +437,60 @@ def test_chunking_record_integrity_no_duplicate_or_dropped(patch_all_pattern_mod
     )
 
 
-def test_record_with_decimal_serializes_to_valid_json(patch_all_pattern_modules):
+def test_record_with_decimal_serializes_to_valid_json(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Record containing decimal.Decimal is written as valid JSONL with the numeric value as a JSON number.
     Regression guard: orjson does not natively serialize Decimal; the sink will use a default callback (later task).
     WHAT: process_record accepts a record with Decimal and writes JSONL where the value is a number. WHY: prevent regression when adding Decimal support."""
-    mock_open, _ = patch_all_pattern_modules
-    write_payloads = []
-
-    def capture_write(data):
-        write_payloads.append(data)
-
-    mock_handle = MagicMock()
-    mock_handle.write.side_effect = capture_write
-    mock_open.return_value = mock_handle
-    sink = build_sink()
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     record = {"id": 1, "score": Decimal("12.34")}
     sink.process_record(record, {})
-
-    assert len(write_payloads) >= 1, "at least one line must be written"
-    decoded = orjson.loads(write_payloads[-1].strip())
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) >= 1, "at least one line must be written"
+    bucket, key = paths[0]
+    content = recording_storage_client.get_written_content(bucket, key)
+    assert content is not None
+    lines = [line for line in content.split(b"\n") if line.strip()]
+    assert len(lines) >= 1
+    decoded = orjson.loads(lines[-1].strip())
     assert decoded["score"] == 12.34, (
         "Decimal must appear in written JSON as a numeric value equal to float(Decimal)"
     )
 
 
-def test_non_serializable_non_decimal_type_raises_type_error(patch_all_pattern_modules):
+def test_non_serializable_non_decimal_type_raises_type_error(
+    sample_config: dict,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Record containing a non-JSON-serializable value that is not Decimal raises TypeError when process_record runs.
     Documents the contract that only Decimal is coerced to float; other non-serializable types must raise TypeError
     so unknown types are not silently coerced. Black-box: asserts only that TypeError is raised."""
-    sink = build_sink()
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     record = {"id": 1, "bad": object()}
     context = {}
     with pytest.raises(TypeError):
@@ -360,122 +500,201 @@ def test_non_serializable_non_decimal_type_raises_type_error(patch_all_pattern_m
 # --- Hive partition init validation (sink integration) ---
 
 
-def test_sink_init_hive_partitioned_invalid_x_partition_fields_raises_value_error():
+def test_sink_init_hive_partitioned_invalid_x_partition_fields_raises_value_error(
+    recording_storage_client: RecordingGCSClient,
+):
     """Sink init with hive_partitioned true and x-partition-fields containing a field not in schema properties raises ValueError.
     WHAT: Invalid x-partition-fields (e.g. 'missing' not in properties) is rejected at init. WHY: Fail fast so users get a clear config/schema error."""
-    config = {"hive_partitioned": True}
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {"x-partition-fields": ["missing"], "properties": {}, "required": []}
     with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
+        target = GCSTarget(config=config, storage_client=recording_storage_client)
+        GCSSink(
+            target=target,
+            stream_name="my_stream",
+            schema=schema,
+            key_properties=[],
+            storage_client=recording_storage_client,
+        )
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "missing" in msg
     assert "not in schema" in msg or "required" in msg.lower()
 
 
-def test_hive_partitioned_set_field_missing_raises_value_error():
+def test_hive_partitioned_set_field_missing_raises_value_error(
+    recording_storage_client: RecordingGCSClient,
+):
     """hive_partitioned true with x-partition-fields listing a field missing from schema must raise ValueError at sink init."""
-    config = {"hive_partitioned": True}
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {"x-partition-fields": ["dt"], "properties": {"id": {}}, "required": []}
     with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
+        target = GCSTarget(config=config, storage_client=recording_storage_client)
+        GCSSink(
+            target=target,
+            stream_name="my_stream",
+            schema=schema,
+            key_properties=[],
+            storage_client=recording_storage_client,
+        )
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "dt" in msg
 
 
-def test_hive_partitioned_set_field_null_only_raises_value_error():
+def test_hive_partitioned_set_field_null_only_raises_value_error(
+    recording_storage_client: RecordingGCSClient,
+):
     """hive_partitioned true with null-only type for a partition field must raise ValueError so the field is not usable."""
-    config = {"hive_partitioned": True}
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "null"}},
         "required": ["dt"],
     }
     with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
+        target = GCSTarget(config=config, storage_client=recording_storage_client)
+        GCSSink(
+            target=target,
+            stream_name="my_stream",
+            schema=schema,
+            key_properties=[],
+            storage_client=recording_storage_client,
+        )
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "dt" in msg
 
 
-def test_hive_partitioned_set_field_not_required_raises_value_error():
+def test_hive_partitioned_set_field_not_required_raises_value_error(
+    recording_storage_client: RecordingGCSClient,
+):
     """hive_partitioned true with partition field not in required must raise ValueError so partition keys are always present."""
-    config = {"hive_partitioned": True}
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": [],
     }
     with pytest.raises(ValueError) as exc_info:
-        build_sink(config=config, schema=schema)
+        target = GCSTarget(config=config, storage_client=recording_storage_client)
+        GCSSink(
+            target=target,
+            stream_name="my_stream",
+            schema=schema,
+            key_properties=[],
+            storage_client=recording_storage_client,
+        )
     msg = str(exc_info.value)
     assert "my_stream" in msg
     assert "dt" in msg
 
 
-def test_hive_partitioned_valid_schema_constructs_successfully():
+def test_hive_partitioned_valid_schema_constructs_successfully(
+    recording_storage_client: RecordingGCSClient,
+):
     """hive_partitioned true with valid x-partition-fields (field in properties, required, non-null) allows sink construction."""
-    config = {"hive_partitioned": True}
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(config=config, schema=schema)
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema=schema,
+        key_properties=[],
+        storage_client=recording_storage_client,
+    )
     assert sink.stream_name == "my_stream"
 
 
-def test_hive_partitioned_unset_constructs_successfully():
+def test_hive_partitioned_unset_constructs_successfully(
+    sample_config: dict,
+    recording_storage_client: RecordingGCSClient,
+):
     """When hive_partitioned is false or unset, sink must construct successfully with any schema; no regression when option is unset."""
-    config = {}
     schema = {"properties": {"id": {}}}
-    sink = build_sink(config=config, schema=schema)
+    target = GCSTarget(config=sample_config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema=schema,
+        key_properties=[],
+        storage_client=recording_storage_client,
+    )
     assert sink.stream_name == "my_stream"
 
 
-# --- Key/path behaviour (black-box: keys and observable handle behaviour only) ---
+# --- Key/path behaviour (black-box: keys via recording client) ---
 
 
 def test_hive_partitioned_false_key_has_no_record_driven_partition_segments(
-    patch_all_pattern_modules,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
 ):
     """With hive_partitioned false, process_record produces a key without partition segments derived from record data (flat or existing behaviour).
     WHAT: Key does not contain year=.../month=.../day=... from record. WHY: Regression guard for non-Hive mode."""
-    mock_open, _ = patch_all_pattern_modules
-    sink = build_sink(config={"hive_partitioned": False})
+    config = {"bucket_name": "test-bucket", "hive_partitioned": False}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
+        schema={"properties": {}},
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
     sink.process_record({"id": 1, "created_at": "2024-03-11", "region": "eu"}, {})
-    key = key_from_open_call(mock_open.call_args[0])
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 1
+    key = paths[0][1]
     assert "year=2024" not in key or "month=03" not in key or "day=11" not in key, (
         "key must not contain Hive partition segments from record when hive_partitioned is false"
     )
 
 
 def test_hive_partitioned_true_no_x_partition_fields_key_contains_extraction_date(
-    patch_all_pattern_modules,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
 ):
-    """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the extraction date segment from date_fn.
-    WHAT: Key contains year=.../month=.../day=... from date_fn. WHY: Extraction date path when schema has no partition fields."""
-    mock_open, _ = patch_all_pattern_modules
-    sink = build_sink(
-        config={"hive_partitioned": True},
+    """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the extraction date segment.
+    WHAT: Key contains year=.../month=.../day=... from extraction_date. WHY: Extraction date path when schema has no partition fields."""
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
         schema={"properties": {}},
-        date_fn=lambda: FIXED_DATE,
-        time_fn=lambda: 11111.0,
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record({"id": 1, "name": "any"}, {})
-    key = key_from_open_call(mock_open.call_args[0])
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 1
+    key = paths[0][1]
     assert "year=2024" in key and "month=03" in key and "day=11" in key, (
-        "key must contain extraction date segment from date_fn when hive_partitioned true and no x-partition-fields"
+        "key must contain extraction date segment when hive_partitioned true and no x-partition-fields"
     )
 
 
 def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_segments(
-    patch_all_pattern_modules,
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
 ):
     """With hive_partitioned true and x-partition-fields [r, d], record with r='x' and d=datetime produces key with literal 'x' and date segment in order.
     WHAT: Key contains literal segment and year=2024/month=03/day=11 in schema order. WHY: Schema-driven partition path in key."""
-    mock_open, _ = patch_all_pattern_modules
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["r", "d"],
         "properties": {
@@ -484,17 +703,24 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
         },
         "required": ["r", "d"],
     }
-    sink = build_sink(
-        config={"hive_partitioned": True},
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
         schema=schema,
-        date_fn=lambda: FIXED_DATE,
-        time_fn=lambda: 22222.0,
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record(
         {"id": 1, "r": "x", "d": datetime(2024, 3, 11)},
         {},
     )
-    key = key_from_open_call(mock_open.call_args[0])
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 1
+    key = paths[0][1]
     literal_segment = "r=x"
     date_segment = "year=2024/month=03/day=11"
     assert literal_segment in key, (
@@ -508,26 +734,35 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
     )
 
 
-def test_partition_change_closes_handle_two_distinct_keys(patch_all_pattern_modules):
+def test_partition_change_closes_handle_two_distinct_keys(
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+):
     """Two records with different partition paths produce two open calls and two distinct keys (handle closed and reopened).
     WHAT: Observable behaviour: two keys, two open calls. WHY: Black-box guard for partition-change handle lifecycle."""
-    mock_open, _ = patch_all_pattern_modules
-    mock_open.side_effect = [MagicMock(), MagicMock()]
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["dt"],
         "properties": {"dt": {"type": "string"}},
         "required": ["dt"],
     }
-    sink = build_sink(
-        config={"hive_partitioned": True},
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="my_stream",
         schema=schema,
-        date_fn=lambda: FIXED_DATE,
-        time_fn=lambda: 33333.0,
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
     )
     sink.process_record({"dt": "2024-03-10", "id": 1}, {})
     sink.process_record({"dt": "2024-03-11", "id": 2}, {})
-    assert mock_open.call_count == 2
-    keys = [key_from_open_call(c[0]) for c in mock_open.call_args_list]
+    sink.close()
+    paths = recording_storage_client.get_written_paths()
+    assert len(paths) == 2
+    keys = [p[1] for p in paths]
     assert keys[0] != keys[1], (
         "two distinct keys must be used when partition path changes"
     )

@@ -1,5 +1,6 @@
 """Singer target implementation that reads Singer messages from stdin and loads data into Google Cloud Storage (GCS) as the destination. Configuration is supplied via a config file; the target may participate in state file handling per the Singer spec."""
 
+from google.cloud.storage import Client
 from singer_sdk import typing as th
 from singer_sdk.target_base import Target
 
@@ -12,9 +13,12 @@ class GCSTarget(Target):
     name = "target-gcs"
 
     def __init__(self, *, config=None, **kwargs):
-        """Initialize the target and set _storage_client for optional injection (e.g. tests)."""
+        """Initialize the target; create GCS client or use injected one (e.g. tests)."""
+        storage_client = kwargs.pop("storage_client", None)
         super().__init__(config=config, **kwargs)
-        self._storage_client = None
+        self._storage_client = (
+            storage_client if storage_client is not None else Client()
+        )
 
     config_jsonschema = th.PropertiesList(
         th.Property("bucket_name", th.StringType, required=True),
@@ -36,7 +40,7 @@ class GCSTarget(Target):
     default_sink_class = GCSSink
 
     def get_sink(self, stream_name, *, record=None, schema=None, key_properties=None):
-        """Return a sink for the stream; create one with storage_client when needed."""
+        """Return a sink for the stream; create one with the target's GCS client when needed."""
         _ = record
         if schema is None:
             return self._sinks_active[stream_name]
@@ -61,7 +65,7 @@ class GCSTarget(Target):
         return existing_sink
 
     def _add_sink_with_client(self, stream_name, schema, key_properties):
-        """Create a sink with storage_client and register it (used by get_sink)."""
+        """Create a sink with the target's GCS client and register it (used by get_sink)."""
         sink_class = self.get_sink_class(stream_name=stream_name)
         sink = sink_class(
             target=self,

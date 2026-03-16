@@ -10,7 +10,7 @@ from .paths import BasePathPattern, DatedPath, PartitionedPath, SimplePath
 
 
 class GCSSink(RecordSink):
-    """GCS sink implementing RecordSink (one record at a time). Selects one of SimplePath, DatedPath, or PartitionedPath from config and schema and delegates process_record and close to that pattern. Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed."""
+    """GCS sink implementing RecordSink (one record at a time). Selects one of SimplePath, DatedPath, or PartitionedPath from config and schema and delegates process_record and close to that pattern. Handles one stream; writes records to the destination. Sink drain (flush/close) is performed when the sink is closed. Provides extraction_date from datetime.today() when not injected (e.g. for tests)."""
 
     max_size = 1000  # Max records to write in one batch
 
@@ -20,10 +20,9 @@ class GCSSink(RecordSink):
         stream_name,
         schema,
         key_properties,
-        *,
+        storage_client: Any,
         time_fn: Callable[[], float] | None = None,
-        date_fn: Callable[[], datetime] | None = None,
-        storage_client: Any | None = None,
+        extraction_date: datetime | None = None,
     ):
         super().__init__(
             target=target,
@@ -33,9 +32,10 @@ class GCSSink(RecordSink):
         )
         self._target_ref = target  # Keep reference for pattern constructors (SDK may not expose .target).
         self._time_fn: Callable[[], float] | None = time_fn
-        self._date_fn: Callable[[], datetime] | None = date_fn
-        self._extraction_date = self._date_fn() if self._date_fn else datetime.today()
-        self._storage_client: Any | None = storage_client
+        self._storage_client: Any = storage_client
+        self._extraction_date: datetime = (
+            extraction_date if extraction_date is not None else datetime.today()
+        )
 
         # Select extraction pattern: hive_partitioned false/unset → SimplePath;
         # hive_partitioned true + non-empty x-partition-fields → PartitionedPath;
@@ -54,7 +54,6 @@ class GCSSink(RecordSink):
                     stream_name=self.stream_name,
                     config=config,
                     time_fn=self._time_fn,
-                    date_fn=self._date_fn,
                     storage_client=self._storage_client,
                     extraction_date=self._extraction_date,
                 ),
@@ -68,7 +67,6 @@ class GCSSink(RecordSink):
                     config=config,
                     partition_fields=cast(list[str], x_partition_fields),
                     time_fn=self._time_fn,
-                    date_fn=self._date_fn,
                     storage_client=self._storage_client,
                     extraction_date=self._extraction_date,
                 ),
@@ -80,7 +78,6 @@ class GCSSink(RecordSink):
                     stream_name=self.stream_name,
                     config=config,
                     time_fn=self._time_fn,
-                    date_fn=self._date_fn,
                     storage_client=self._storage_client,
                     extraction_date=self._extraction_date,
                 ),
