@@ -1,9 +1,19 @@
 """RecordSink implementation for the GCS target. Each sink handles one stream, receiving SCHEMA, RECORD, and STATE messages from the target and writing record data to the destination (GCS). The sink uses the config file for bucket and key settings. On close or when the target drains the sink (sink drain), buffered data is flushed to the destination."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, cast
 
+from dateutil import parser as dateutil_parser
+from dateutil.parser import ParserError as DateutilParserError
+from singer_sdk.helpers._compat import time_fromisoformat
+from singer_sdk.helpers._typing import (
+    DatetimeErrorTreatmentEnum,
+    get_datelike_property_type,
+    handle_invalid_timestamp_in_record,
+)
 from singer_sdk.sinks import RecordSink
 
 from .paths import BasePathPattern, DatedPath, PartitionedPath, SimplePath
@@ -105,3 +115,56 @@ class GCSSink(RecordSink):
     def output_format(self) -> str:
         """Output file format; currently only jsonl is supported."""
         return "jsonl"
+
+    def _parse_timestamps_in_record(
+        self,
+        record: dict,
+        schema: dict,
+        treatment: DatetimeErrorTreatmentEnum,
+    ) -> None:
+        """Parse date/time strings with dateutil so non-ISO formats (e.g. 'YYYY-MM-DD HH:MM:SS UTC') are accepted.
+
+        Overrides SDK default (fromisoformat-only) to align with partition path parsing.
+        Unparseable values are handled via handle_invalid_timestamp_in_record (per treatment).
+        """
+        for key, value in record.items():
+            additional_properties = schema.get("additionalProperties", False)
+            if key not in schema["properties"]:
+                if (
+                    value is not None
+                    and not additional_properties
+                    and key not in self._warned_missing_fields
+                ):
+                    self.logger.warning("No schema for record field '%s'", key)
+                    self._warned_missing_fields.add(key)
+                continue
+
+            if datelike_type := get_datelike_property_type(schema["properties"][key]):
+                date_val = value
+                try:
+                    if value is not None:
+                        if datelike_type == "time":
+                            date_val = time_fromisoformat(date_val)
+                        elif datelike_type in ("date", "date-time"):
+                            if isinstance(value, str):
+                                parsed = dateutil_parser.parse(value)
+                                date_val = (
+                                    parsed.date()
+                                    if datelike_type == "date"
+                                    else parsed
+                                )
+                            else:
+                                date_val = value
+                        else:
+                            date_val = value
+                except (ValueError, DateutilParserError) as ex:
+                    date_val = handle_invalid_timestamp_in_record(
+                        record,
+                        [key],
+                        value,
+                        datelike_type,
+                        ex,
+                        treatment,
+                        self.logger,
+                    )
+                record[key] = date_val

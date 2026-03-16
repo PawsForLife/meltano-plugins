@@ -9,6 +9,8 @@
 
 ### Fixed
 
+- **fix-dateutils-record-timestamps** — Details: [fix-dateutils-record-timestamps.md](../../_archive/fix-dateutils-record-timestamps/fix-dateutils-record-timestamps.md)
+  - Record timestamp parsing now uses python-dateutil for string values so non-ISO formats (e.g. `YYYY-MM-DD HH:MM:SS UTC`) are accepted; fixes sync failures when taps emit such date strings.
 - **target-gcs:** `date_as_partition` now raises `TypeError` for unsupported `field_value` types (e.g. int) instead of relying on undefined-name behaviour; test expects only `TypeError`.
 - **target-gcs:** BasePathPattern: memoize `filename_for_current_file()` in `_current_filename` on first call to avoid drifting `_key_name` and collisions; clear cache in `flush_and_close_handle()` so new names are minted after rotation/close; use millisecond precision (`int(time_fn()*1000)`) instead of `round(time_fn())` to avoid reuse across fast rotations.
 - **target-gcs:** DatedPath: compute filename/key and set `_key_name` only when opening a new handle so current key stays tied to the open file.
