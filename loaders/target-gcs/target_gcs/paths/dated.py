@@ -40,10 +40,10 @@ class DatedPath(BasePathPattern):
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
         """Rotate if at limit, ensure handle open, write record as JSONL, set current key."""
         self.maybe_rotate_if_at_limit()
-        filename = self.filename_for_current_file()
-        key = self.full_key(self._path, filename)
-        self._key_name = key
         if self._current_handle is None:
+            filename = self.filename_for_current_file()
+            key = self.full_key(self._path, filename)
+            self._key_name = key
             uri = f"gs://{self.bucket_name}/{key}"
             self._current_handle = smart_open.open(
                 uri,

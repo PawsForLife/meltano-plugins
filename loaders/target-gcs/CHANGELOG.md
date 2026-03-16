@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **target-gcs:** DatedPath: compute filename/key and set `_key_name` only when opening a new handle so current key stays tied to the open file.
 - **target-gcs:** Config-validation tests (max_records_per_file, hive_partitioned) now inject `recording_storage_client` into GCSTarget so tests run without ADC.
 - **target-gcs:** Define `max_records` in `_process_record_hive_partitioned` so chunked record count increment runs correctly (regression from rotate refactor).
 - **target-gcs:** `date_as_partition` in `_partitioned/string_functions.py` now returns the formatted date string instead of `None` (split-path-filename task 02).
