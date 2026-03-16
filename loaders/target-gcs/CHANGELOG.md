@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **target-gcs:** Split `test_sinks.py` (768 lines) into package `tests/unit/test_sinks/` with focused modules under the 500-line cap: `test_key_naming.py`, `test_config_schema.py`, `test_chunking.py`, `test_serialization.py`, `test_hive_validation.py`, `test_partitioning.py`; fixtures remain in `tests/conftest.py`, test discovery unchanged.
+
 ### Fixed
 
 - **target-gcs:** Config-validation tests (max_records_per_file, hive_partitioned) now inject `recording_storage_client` into GCSTarget so tests run without ADC.
