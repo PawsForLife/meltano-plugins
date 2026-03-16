@@ -53,9 +53,9 @@ def test_date_as_partition_returns_formatted_string_for_parseable_string() -> No
 
 
 def test_date_as_partition_invalid_type_raises() -> None:
-    """WHAT: date_as_partition raises when field_value is neither datetime/date nor str.
-    WHY: Invalid types cannot be formatted; explicit failure is preferable to implicit NameError."""
-    with pytest.raises((ValueError, TypeError, NameError)):
+    """WHAT: date_as_partition raises TypeError when field_value is neither datetime/date nor str.
+    WHY: Invalid types cannot be formatted; explicit TypeError enforces a clear contract."""
+    with pytest.raises(TypeError):
         date_as_partition("dt", 12345)
 
 

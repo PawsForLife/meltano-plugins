@@ -11,6 +11,8 @@ def date_as_partition(field_name: str, field_value: str) -> str:
         date_value = field_value
     elif isinstance(field_value, str):
         date_value = dateutil_parser.parse(field_value)
+    else:
+        raise TypeError("unsupported field_value type")
     return date_value.strftime(DEFAULT_PARTITION_DATE_FORMAT)
 
 

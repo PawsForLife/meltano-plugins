@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- **target-gcs:** `date_as_partition` now raises `TypeError` for unsupported `field_value` types (e.g. int) instead of relying on undefined-name behaviour; test expects only `TypeError`.
 - **target-gcs:** BasePathPattern: memoize `filename_for_current_file()` in `_current_filename` on first call to avoid drifting `_key_name` and collisions; clear cache in `flush_and_close_handle()` so new names are minted after rotation/close; use millisecond precision (`int(time_fn()*1000)`) instead of `round(time_fn())` to avoid reuse across fast rotations.
 - **target-gcs:** DatedPath: compute filename/key and set `_key_name` only when opening a new handle so current key stays tied to the open file.
 - **target-gcs:** Config-validation tests (max_records_per_file, hive_partitioned) now inject `recording_storage_client` into GCSTarget so tests run without ADC.
