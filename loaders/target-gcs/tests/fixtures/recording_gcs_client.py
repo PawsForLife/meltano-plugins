@@ -8,7 +8,7 @@ without patching smart_open. For test use only.
 from __future__ import annotations
 
 import io
-from typing import Any, IO
+from typing import IO, Any
 
 # In-memory store: (bucket_name, key) -> blob bytes.
 # Write-open order recorded for get_written_paths().

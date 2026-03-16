@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|--------|
-| Version | 1.4 |
-| Last Updated | 2026-03-13 |
+| Version | 1.5 |
+| Last Updated | 2026-03-16 |
 | Tags | architecture, repository, meltano, singer, taps, targets, monorepo |
-| Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config/state/Catalog) |
+| Cross-References | [AI_CONTEXT_QUICK_REFERENCE.md](AI_CONTEXT_QUICK_REFERENCE.md), [AI_CONTEXT_PATTERNS.md](AI_CONTEXT_PATTERNS.md), [AI_CONTEXT_restful-api-tap.md](AI_CONTEXT_restful-api-tap.md), [AI_CONTEXT_target-gcs.md](AI_CONTEXT_target-gcs.md), [GLOSSARY_MELTANO_SINGER.md](GLOSSARY_MELTANO_SINGER.md) (tap, target, streams, config file, state file, Catalog) |
 
 ---
 
@@ -45,18 +45,26 @@ meltano-plugins/
 ├── loaders/
 │   └── target-gcs/               # Target (loader) package
 │       ├── target_gcs/           # Source package
-│       │   ├── target.py         # Target class, CLI entry
+│       │   ├── target.py         # GCSTarget, CLI entry
 │       │   ├── sinks.py         # GCSSink, batch writes
 │       │   ├── constants.py     # Config defaults
 │       │   ├── paths/           # Key naming (base, simple, dated, partitioned)
-│       │   │   ├── base.py
-│       │   │   ├── simple.py
-│       │   │   ├── dated.py
+│       │   │   ├── base.py      # BasePathPattern
+│       │   │   ├── simple.py    # SimplePath
+│       │   │   ├── dated.py     # DatedPath
 │       │   │   ├── partitioned.py
-│       │   │   └── _partitioned/ # Hive/string helpers
-│       │   └── helpers/         # Partition schema, JSON parsing
+│       │   │   ├── _types.py    # PathType
+│       │   │   └── _partitioned/  # hive, string_functions, validators
+│       │   └── helpers/         # partition_schema, json_parsing
 │       ├── tests/
-│       │   └── unit/             # Mirrors source path (paths/, helpers/)
+│       │   ├── conftest.py
+│       │   ├── unit/             # Mirrors source path
+│       │   │   ├── paths/       # test_base, test_simple, test_dated, test_partitioned, _partitioned/
+│       │   │   ├── helpers/
+│       │   │   ├── fixtures/    # recording GCS client
+│       │   │   ├── test_target.py
+│       │   │   └── test_sinks.py
+│       │   └── fixtures/
 │       ├── pyproject.toml
 │       ├── install.sh
 │       └── meltano.yml
@@ -89,7 +97,7 @@ meltano-plugins/
 └── CHANGELOG.md
 ```
 
-Placeholders `{context_docs_dir}`, `{features_dir}`, `{bugs_dir}`, `{archive_dir}` are defined in `.cursor/CONVENTIONS.md` (defaults: `docs/AI_CONTEXT`, `_features`, `_bugs`, `_archive`). **Test layout**: target-gcs uses `tests/unit/` mirroring source path (`tests/unit/paths/`, `tests/unit/helpers/`); restful-api-tap uses a flat `tests/` with `test_*.py` per module. See CONVENTIONS for `test_{module}.py` naming and `conftest.py`/`files/` usage.
+Placeholders `{context_docs_dir}`, `{features_dir}`, `{bugs_dir}`, `{archive_dir}` are defined in `.cursor/CONVENTIONS.md` (defaults: `docs/AI_CONTEXT`, `_features`, `_bugs`, `_archive`). **Test layout**: target-gcs uses `tests/unit/` mirroring source path (`tests/unit/paths/`, `tests/unit/helpers/`), plus `tests/unit/fixtures/` and top-level `test_target.py`/`test_sinks.py`; restful-api-tap uses a flat `tests/` with `test_*.py` per module. See CONVENTIONS for `test_{module}.py` naming and `conftest.py`/`files/` usage.
 
 ---
 

@@ -7,8 +7,6 @@ Black-box: assert on get_written_content and get_written_paths only.
 
 from __future__ import annotations
 
-import pytest
-
 from tests.fixtures.recording_gcs_client import (
     RecordingGCSClient,
 )
