@@ -34,7 +34,7 @@ def test_path_from_path_simple_constant(
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
     bucket, key = paths[0]
-    assert key == "my_stream/2024-03-11/12345.jsonl"
+    assert key == "my_stream/2024-03-11/12345000.jsonl"
 
 
 def test_filename_is_timestamp_jsonl(
@@ -60,9 +60,9 @@ def test_filename_is_timestamp_jsonl(
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
     key = paths[0][1]
-    assert key.endswith("/99999.jsonl")
+    assert key.endswith("/99999000.jsonl")
     filename = key.split("/")[-1]
-    assert filename == "99999.jsonl"
+    assert filename == "99999000.jsonl"
 
 
 def test_uses_date_format_from_config(
@@ -84,7 +84,7 @@ def test_uses_date_format_from_config(
     subject.close()
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
-    assert paths[0][1] == "my_stream/2024/12345.jsonl"
+    assert paths[0][1] == "my_stream/2024/12345000.jsonl"
 
 
 # --- One handle (no chunking) ---
@@ -253,7 +253,7 @@ def test_simple_path_with_recording_client_stores_path_and_content(
     assert len(paths) >= 1
     bucket, key = paths[0]
     assert bucket == "test-bucket"
-    assert key == "my_stream/2024-03-11/12345.jsonl"
+    assert key == "my_stream/2024-03-11/12345000.jsonl"
     content = recording_storage_client.get_written_content(bucket, key)
     assert content is not None
     assert b'"id":1,"name":"a"' in content

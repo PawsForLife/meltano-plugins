@@ -85,7 +85,7 @@ def test_filename_is_timestamp_jsonl(
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
     key = paths[0][1]
-    assert key.endswith("77777.jsonl")
+    assert key.endswith("77777000.jsonl")
     assert "-0" not in key and "-1" not in key
 
 

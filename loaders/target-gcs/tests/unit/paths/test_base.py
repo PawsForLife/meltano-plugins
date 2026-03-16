@@ -285,8 +285,8 @@ def test_filename_for_current_file_returns_timestamp_jsonl(
     fixed_date: datetime,
     recording_storage_client: RecordingGCSClient,
 ) -> None:
-    """WHAT: With time_fn=lambda: 12345, filename_for_current_file returns '12345.jsonl'.
-    WHY: Core filename contract uses FILENAME_TEMPLATE with timestamp only (no chunk_index)."""
+    """WHAT: With time_fn=lambda: 12345, filename uses millisecond timestamp '12345000.jsonl'.
+    WHY: Core filename contract uses FILENAME_TEMPLATE; subsecond precision avoids collisions."""
 
     def time_fn() -> float:
         return 12345.0
@@ -299,7 +299,7 @@ def test_filename_for_current_file_returns_timestamp_jsonl(
         extraction_date=fixed_date,
     )
     result = subject.filename_for_current_file()
-    assert result == "12345.jsonl"
+    assert result == "12345000.jsonl"
 
 
 def test_filename_for_current_file_uses_injected_time_fn(
@@ -307,7 +307,7 @@ def test_filename_for_current_file_uses_injected_time_fn(
     fixed_date: datetime,
     recording_storage_client: RecordingGCSClient,
 ) -> None:
-    """WHAT: Deterministic time_fn yields predictable filename; asserts DI for deterministic tests.
+    """WHAT: Deterministic time_fn yields predictable filename (millisecond ts); asserts DI.
     WHY: Tests must be deterministic; time_fn injection enables this."""
 
     def time_fn() -> float:
@@ -321,7 +321,34 @@ def test_filename_for_current_file_uses_injected_time_fn(
         extraction_date=fixed_date,
     )
     result = subject.filename_for_current_file()
-    assert result == "99999.jsonl"
+    assert result == "99999000.jsonl"
+
+
+def test_filename_for_current_file_memoizes_until_flush(
+    sample_config: dict,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+) -> None:
+    """WHAT: Repeated calls to filename_for_current_file return the same value until flush.
+    WHY: Memoization keeps _key_name stable for the same open file and avoids drifting/collisions."""
+
+    def time_fn() -> float:
+        return 11111.0
+
+    subject = _MinimalPattern(
+        stream_name="my_stream",
+        config=sample_config,
+        time_fn=time_fn,
+        storage_client=recording_storage_client,
+        extraction_date=fixed_date,
+    )
+    first = subject.filename_for_current_file()
+    second = subject.filename_for_current_file()
+    assert first == second == "11111000.jsonl"
+    subject.flush_and_close_handle()
+    assert subject._current_filename is None
+    after_flush = subject.filename_for_current_file()
+    assert after_flush == "11111000.jsonl"
 
 
 # --- full_key ---
@@ -393,5 +420,5 @@ def test_maybe_rotate_resets_records_no_chunk_index(
     assert subject._current_handle is None
     assert subject._records_written_in_current_file == 0
     fn = subject.filename_for_current_file()
-    assert fn == "2001.jsonl"
+    assert fn == "2001000.jsonl"
     assert "chunk" not in fn and "-0" not in fn and "-1" not in fn

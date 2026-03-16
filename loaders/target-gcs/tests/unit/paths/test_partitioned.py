@@ -306,7 +306,8 @@ def test_chunking_within_partition(
         "hive_partitioned": True,
         "max_records_per_file": 2,
     }
-    timestamps = iter([5000.0, 5000.0, 5001.0])
+    # One timestamp per file: first open and after rotate (memoization caches until flush).
+    timestamps = iter([5000.0, 5001.0])
     schema = {
         "x-partition-fields": ["region"],
         "properties": {"region": {"type": "string"}},
@@ -348,7 +349,8 @@ def test_partitioned_path_rotation_at_limit_within_partition(
         "hive_partitioned": True,
         "max_records_per_file": 2,
     }
-    timestamps = iter([3000.0, 3000.0, 3001.0, 3001.0])
+    # One timestamp per file: first open and after rotate (memoization caches until flush).
+    timestamps = iter([3000.0, 3001.0])
     schema = {
         "x-partition-fields": ["region"],
         "properties": {"region": {"type": "string"}},

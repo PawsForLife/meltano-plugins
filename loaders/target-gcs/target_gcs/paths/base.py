@@ -45,6 +45,7 @@ class BasePathPattern(abc.ABC):
         self._storage_client = storage_client
         self._extraction_date = extraction_date
         self._current_handle: FileIO | None = None
+        self._current_filename: str | None = None
         self._key_name: str = ""
         self._records_written_in_current_file: int = 0
         self.bucket_name: str = config.get("bucket_name", "") or ""
@@ -77,13 +78,19 @@ class BasePathPattern(abc.ABC):
     def filename_for_current_file(self) -> str:
         """Return filename for current file using FILENAME_TEMPLATE with timestamp only.
 
-        Uses injected time_fn when provided for deterministic tests.
+        Memoizes the name in _current_filename on first call so _key_name stays stable
+        for the same open file. Uses millisecond precision to avoid collisions on fast
+        rotation. Injected time_fn enables deterministic tests.
 
         Returns:
-            Filename string (e.g. '12345.jsonl').
+            Filename string (e.g. '12345000.jsonl' with millisecond timestamp).
         """
+        if self._current_filename is not None:
+            return self._current_filename
         time_fn = self._time_fn or time.time
-        return FILENAME_TEMPLATE.format(timestamp=round(time_fn()))
+        ts_ms = int(time_fn() * 1000)
+        self._current_filename = FILENAME_TEMPLATE.format(timestamp=ts_ms)
+        return self._current_filename
 
     def full_key(self, path: str, filename: str) -> str:
         """Join path and filename, apply key_prefix, and normalize.
@@ -148,10 +155,12 @@ class BasePathPattern(abc.ABC):
     def flush_and_close_handle(self) -> None:
         """Flush and close the current write handle; set _current_handle to None.
 
-        Safe when handle has no flush attribute (only flush if hasattr).
+        Clears _current_filename so the next filename_for_current_file() mints a new
+        name for the subsequent open. Safe when handle has no flush (only flush if hasattr).
         """
         if self._current_handle is not None:
             if hasattr(self._current_handle, "flush"):
                 self._current_handle.flush()
             self._current_handle.close()
             self._current_handle = None
+        self._current_filename = None

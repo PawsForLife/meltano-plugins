@@ -71,7 +71,7 @@ def test_key_shape_matches_constants(
         extraction_date=fixed_date,
     )
     sink.process_record({"id": 1}, {})
-    assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/99999\.jsonl", sink.key_name), (
+    assert re.match(r"my_stream/\d{4}-\d{2}-\d{2}/99999000\.jsonl", sink.key_name), (
         "SimplePath key must match stream/date/timestamp.jsonl"
     )
 
@@ -89,7 +89,7 @@ def test_key_shape_matches_constants(
     )
     sink.process_record({"id": 1}, {})
     assert re.match(
-        r"my_stream/year=\d+/month=\d+/day=\d+/99999\.jsonl", sink.key_name
+        r"my_stream/year=\d+/month=\d+/day=\d+/99999000\.jsonl", sink.key_name
     ), "DatedPath key must match stream/hive_path/timestamp.jsonl"
 
     # PartitionedPath: stream/field=value/.../timestamp.jsonl
@@ -110,7 +110,7 @@ def test_key_shape_matches_constants(
         extraction_date=fixed_date,
     )
     sink.process_record({"id": 1, "r": "x"}, {})
-    assert re.match(r"my_stream/r=x/99999\.jsonl", sink.key_name), (
+    assert re.match(r"my_stream/r=x/99999000\.jsonl", sink.key_name), (
         "PartitionedPath key must match stream/hive_path/timestamp.jsonl"
     )
 
