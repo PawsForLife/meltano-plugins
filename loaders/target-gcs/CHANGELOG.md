@@ -2,29 +2,27 @@
 
 ## [Unreleased]
 
-### Changed
-
-- **target-gcs:** Split `test_sinks.py` (768 lines) into package `tests/unit/test_sinks/` with focused modules under the 500-line cap: `test_key_naming.py`, `test_config_schema.py`, `test_chunking.py`, `test_serialization.py`, `test_hive_validation.py`, `test_partitioning.py`; fixtures remain in `tests/conftest.py`, test discovery unchanged.
-- **target-gcs:** Docstring for `maybe_rotate_if_at_limit`: state explicitly that at limit the handle is closed and `_current_handle` is set to None so the next write opens a new handle.
-
-### Fixed
-
-- **fix-dateutils-record-timestamps** — Details: [fix-dateutils-record-timestamps.md](../../_archive/fix-dateutils-record-timestamps/fix-dateutils-record-timestamps.md)
-  - Record timestamp parsing now uses python-dateutil for string values so non-ISO formats (e.g. `YYYY-MM-DD HH:MM:SS UTC`) are accepted; fixes sync failures when taps emit such date strings.
-- **target-gcs:** `date_as_partition` now raises `TypeError` for unsupported `field_value` types (e.g. int) instead of relying on undefined-name behaviour; test expects only `TypeError`.
-- **target-gcs:** BasePathPattern: memoize `filename_for_current_file()` in `_current_filename` on first call to avoid drifting `_key_name` and collisions; clear cache in `flush_and_close_handle()` so new names are minted after rotation/close; use millisecond precision (`int(time_fn()*1000)`) instead of `round(time_fn())` to avoid reuse across fast rotations.
-- **target-gcs:** DatedPath: compute filename/key and set `_key_name` only when opening a new handle so current key stays tied to the open file.
-- **target-gcs:** Config-validation tests (max_records_per_file, hive_partitioned) now inject `recording_storage_client` into GCSTarget so tests run without ADC.
-- **target-gcs:** Define `max_records` in `_process_record_hive_partitioned` so chunked record count increment runs correctly (regression from rotate refactor).
-- **target-gcs:** `date_as_partition` in `_partitioned/string_functions.py` now returns the formatted date string instead of `None` (split-path-filename task 02).
-
-### Removed
-
-- **split-path-filename (task 03):** `key_naming_convention` removed from config; key shape is now fixed by internal constants. Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md).
-- **target-gcs-function-name-alignment:** Removed dead helper `get_partition_path_from_record` and its tests; sink uses only `get_partition_path_from_schema_and_record` (x-partition-fields). Dropped export from `target_gcs.helpers`. See [_archive/target-gcs-function-name-alignment](../../_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md).
-- **Tests:** Removed two redundant tests: duplicate "valid hive schema constructs" in test_sinks (`test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds`; kept `test_hive_partitioned_valid_schema_constructs_successfully`) and duplicate "fallback date in key when no x-partition-fields" in test_partition_key_generation (`test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date`; coverage retained in test_sinks).
+## [3.0.0] - 2026-03-12
 
 ### Added
+
+- **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
+  - Add unit tests for validate_partition_date_field_schema.
+  - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
+  - Add sink integration tests for partition_date_field validation (build_sink extended with optional schema/stream_name; tests for missing field, null-only, integer, valid string, unset; ValueError message asserts stream and field name).
+  - Call validate_partition_date_field_schema in GCSSink.__init__ when partition_date_field is set; misconfiguration (missing or non–date-parseable field) is caught at sink init.
+  - Document partition_date_field validation in AI context and changelogs (init-time check, ValueError with stream/field/reason; helper in target_gcs.helpers.partition_schema).
+  - Require partition_date_field to be in schema `required`: validator raises if `schema.required` is not a list or does not contain the field.
+
+- **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
+  - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
+  - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
+  - Add TDD test that unparseable partition timestamp raises (no silent fallback); marked xfail until Task 05.
+  - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
+  - Implement partition path dateutil parsing: string timestamps parsed with dateutil.parser.parse (no tzinfos); unparseable raises ParserError; unknown timezone surfaces UnknownTimezoneWarning; xfail removed from partition path tests.
+  - Sink exception handling: in _process_record_partition_by_field, catch ParserError from get_partition_path_from_record and re-raise so the run fails visibly when a record has an unparseable partition date (no silent skip).
+  - Integration tests for partition key: record with dateutil-parsable non-ISO partition value (e.g. "2024/03/11") produces key containing expected partition path; unparseable partition field leads to ParserError from process_record.
+  - Documentation: AI context (docs/AI_CONTEXT/AI_CONTEXT_target-gcs.md) updated to describe partition path resolution with dateutil (python-dateutil), ParserError for unparseable values (no silent fallback), and UnknownTimezoneWarning for unsupported timezone; aligned Public Interfaces, GCSSink record processing, and Partition-by-field behaviour sections.
 
 - **mock-gcs-storage-client** — Recording in-memory GCS client for tests so smart_open is not patched; assert on stored content and paths.
   - Add `tests/fixtures/recording_gcs_client.py` with `RecordingGCSClient`, `RecordingBucket`, `RecordingBlob` implementing the interface used by smart_open's GCS backend; `get_written_content(bucket, key)` and `get_written_paths()` for test assertions.
@@ -64,6 +62,13 @@
   - Task 07: Refactor `tests/unit/paths/test_partitioned.py` to use conftest `build_partitioned_path` and test_helpers `key_from_open_call`; remove local `build_partitioned_sink` and `_key_from_open_call`; keep per-test patch of `target_gcs.paths.partitioned.smart_open.open`. All test names and assertions unchanged.
 
 ### Changed
+
+- **AI context (target-gcs)** — Partition-date-field validation docs: document that the partition field must be in `schema["required"]`, that non-list `schema["required"]` is rejected, and that failures raise `ValueError` with stream name, field name, and reason.
+- **dateutils-partition-timestamps** — Add types-python-dateutil to dev dependencies for mypy.
+- Updated type hints to Python 3.12 style (built-in generics and pipe unions).
+- **target-gcs:** Split `test_sinks.py` (768 lines) into package `tests/unit/test_sinks/` with focused modules under the 500-line cap: `test_key_naming.py`, `test_config_schema.py`, `test_chunking.py`, `test_serialization.py`, `test_hive_validation.py`, `test_partitioning.py`; fixtures remain in `tests/conftest.py`, test discovery unchanged.
+- **target-gcs:** Docstring for `maybe_rotate_if_at_limit`: state explicitly that at limit the handle is closed and `_current_handle` is set to None so the next write opens a new handle.
+
 
 - **split-path-filename** — Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md)
   - Task 01: Add `PATH_SIMPLE`, `PATH_DATED`, `PATH_PARTITIONED`, `FILENAME_TEMPLATE`; remove `DEFAULT_KEY_NAMING_CONVENTION`, `DEFAULT_KEY_NAMING_CONVENTION_HIVE`; update `paths/__init__.py` exports.
@@ -106,33 +111,22 @@
 - **Tests (task 08):** Sink and key-generation black-box tests: hive_partitioned false/true key behaviour, fallback date path, x-partition-fields literal+date segments, partition-change handle lifecycle; test_partition_key_generation migrated from partition_date_field to hive_partitioned + x-partition-fields; added fallback path, multiple streams order, ParserError for date-format unparseable.
 - **Schema-driven Hive partitioning (task 09):** Meltano and README — plugin definition and docs: add `hive_partitioned` setting (boolean, default false); remove `partition_date_field` and `partition_date_format` from meltano.yml; README config table and Hive section document `hive_partitioned` and `x-partition-fields` (path order, validation, literal sanitization, removal of old settings); examples use `hive_partitioned` and `x-partition-fields`. See [README](README.md) for usage.
 
-## [3.0.0] - 2026-03-12
+### Fixed
 
-### Added
+- **fix-dateutils-record-timestamps** — Details: [fix-dateutils-record-timestamps.md](../../_archive/fix-dateutils-record-timestamps/fix-dateutils-record-timestamps.md)
+  - Record timestamp parsing now uses python-dateutil for string values so non-ISO formats (e.g. `YYYY-MM-DD HH:MM:SS UTC`) are accepted; fixes sync failures when taps emit such date strings.
+- **target-gcs:** `date_as_partition` now raises `TypeError` for unsupported `field_value` types (e.g. int) instead of relying on undefined-name behaviour; test expects only `TypeError`.
+- **target-gcs:** BasePathPattern: memoize `filename_for_current_file()` in `_current_filename` on first call to avoid drifting `_key_name` and collisions; clear cache in `flush_and_close_handle()` so new names are minted after rotation/close; use millisecond precision (`int(time_fn()*1000)`) instead of `round(time_fn())` to avoid reuse across fast rotations.
+- **target-gcs:** DatedPath: compute filename/key and set `_key_name` only when opening a new handle so current key stays tied to the open file.
+- **target-gcs:** Config-validation tests (max_records_per_file, hive_partitioned) now inject `recording_storage_client` into GCSTarget so tests run without ADC.
+- **target-gcs:** Define `max_records` in `_process_record_hive_partitioned` so chunked record count increment runs correctly (regression from rotate refactor).
+- **target-gcs:** `date_as_partition` in `_partitioned/string_functions.py` now returns the formatted date string instead of `None` (split-path-filename task 02).
 
-- **Partition field schema validation** — Details: [target-gcs-partition-field-validation.md](../../_archive/target-gcs-partition-field-validation/target-gcs-partition-field-validation.md)
-  - Add unit tests for validate_partition_date_field_schema.
-  - Implement validate_partition_date_field_schema in partition_schema.py; export from target_gcs.helpers.
-  - Add sink integration tests for partition_date_field validation (build_sink extended with optional schema/stream_name; tests for missing field, null-only, integer, valid string, unset; ValueError message asserts stream and field name).
-  - Call validate_partition_date_field_schema in GCSSink.__init__ when partition_date_field is set; misconfiguration (missing or non–date-parseable field) is caught at sink init.
-  - Document partition_date_field validation in AI context and changelogs (init-time check, ValueError with stream/field/reason; helper in target_gcs.helpers.partition_schema).
-  - Require partition_date_field to be in schema `required`: validator raises if `schema.required` is not a list or does not contain the field.
+### Removed
 
-- **dateutils-partition-timestamps** — Details: [dateutils-partition-timestamps.md](../../_archive/dateutils-partition-timestamps/dateutils-partition-timestamps.md)
-  - Add python-dateutil dependency (>=2.8.1) for partition path parsing.
-  - Add TDD tests for dateutil-only partition date formats (slash, RFC-style, long month); marked xfail until Task 05.
-  - Add TDD test that unparseable partition timestamp raises (no silent fallback); marked xfail until Task 05.
-  - Add TDD test that unsupported timezone in partition timestamp surfaces visibility (warning or error); marked xfail until Task 05.
-  - Implement partition path dateutil parsing: string timestamps parsed with dateutil.parser.parse (no tzinfos); unparseable raises ParserError; unknown timezone surfaces UnknownTimezoneWarning; xfail removed from partition path tests.
-  - Sink exception handling: in _process_record_partition_by_field, catch ParserError from get_partition_path_from_record and re-raise so the run fails visibly when a record has an unparseable partition date (no silent skip).
-  - Integration tests for partition key: record with dateutil-parsable non-ISO partition value (e.g. "2024/03/11") produces key containing expected partition path; unparseable partition field leads to ParserError from process_record.
-  - Documentation: AI context (docs/AI_CONTEXT/AI_CONTEXT_target-gcs.md) updated to describe partition path resolution with dateutil (python-dateutil), ParserError for unparseable values (no silent fallback), and UnknownTimezoneWarning for unsupported timezone; aligned Public Interfaces, GCSSink record processing, and Partition-by-field behaviour sections.
-
-### Changed
-
-- **AI context (target-gcs)** — Partition-date-field validation docs: document that the partition field must be in `schema["required"]`, that non-list `schema["required"]` is rejected, and that failures raise `ValueError` with stream name, field name, and reason.
-- **dateutils-partition-timestamps** — Add types-python-dateutil to dev dependencies for mypy.
-- Updated type hints to Python 3.12 style (built-in generics and pipe unions).
+- **split-path-filename (task 03):** `key_naming_convention` removed from config; key shape is now fixed by internal constants. Details: [split-path-filename.md](../../_archive/split-path-filename/split-path-filename.md).
+- **target-gcs-function-name-alignment:** Removed dead helper `get_partition_path_from_record` and its tests; sink uses only `get_partition_path_from_schema_and_record` (x-partition-fields). Dropped export from `target_gcs.helpers`. See [_archive/target-gcs-function-name-alignment](../../_archive/target-gcs-function-name-alignment/target-gcs-function-name-alignment.md).
+- **Tests:** Removed two redundant tests: duplicate "valid hive schema constructs" in test_sinks (`test_sink_init_hive_partitioned_valid_x_partition_fields_succeeds`; kept `test_hive_partitioned_valid_schema_constructs_successfully`) and duplicate "fallback date in key when no x-partition-fields" in test_partition_key_generation (`test_hive_partitioned_true_without_x_partition_fields_key_contains_fallback_date`; coverage retained in test_sinks).
 
 ### Breaking
 
