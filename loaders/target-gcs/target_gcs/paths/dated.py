@@ -40,6 +40,9 @@ class DatedPath(BasePathPattern):
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:
         """Rotate if at limit, ensure handle open, write record as JSONL, set current key."""
         self.maybe_rotate_if_at_limit()
+        # File path only changes when we open a new handle: first write, or after rotation
+        # (maybe_rotate_if_at_limit sets _current_handle to None at limit). Compute
+        # filename/key and _key_name only here so current_key stays tied to the open file.
         if self._current_handle is None:
             filename = self.filename_for_current_file()
             key = self.full_key(self._path, filename)
