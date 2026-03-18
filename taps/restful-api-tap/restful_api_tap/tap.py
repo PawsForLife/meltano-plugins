@@ -443,6 +443,15 @@ class RestfulApiTap(Tap):
         description="When true, the stream is declared sorted by replication_key; "
         "enables resumable state if the sync is interrupted.",
     )
+    # Override partition_fields in stream schema: no default so tap-level fallback works
+    stream_properties.wrapped["partition_fields"] = th.Property(
+        "partition_fields",
+        th.ArrayType(th.StringType),
+        required=False,
+        description="Field names for Hive-style partitioning (e.g. for target-gcs). "
+        "Injected into schema as x-partition-fields in SCHEMA messages. "
+        "Stream-level overrides top-level.",
+    )
     stream_properties.append(
         th.Property(
             "name", th.StringType, required=True, description="Name of the stream."
@@ -477,7 +486,7 @@ class RestfulApiTap(Tap):
     def discover_streams(self) -> list[DynamicStream]:  # type: ignore
         """Build the list of streams for Discovery. Returns stream instances used to build the catalog.
 
-        Resolves stream-level `is_sorted` with tap-level fallback and passes to DynamicStream.
+        Resolves stream-level `is_sorted` and `partition_fields` with tap-level fallback and passes to DynamicStream.
 
         Returns:
             List of DynamicStream instances.

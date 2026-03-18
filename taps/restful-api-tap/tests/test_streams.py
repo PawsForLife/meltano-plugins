@@ -251,6 +251,32 @@ def test_partition_fields_absent_when_empty_or_missing(requests_mock):
     assert "x-partition-fields" not in schema or schema.get("x-partition-fields") == []
 
 
+def test_partition_fields_tap_level_fallback(requests_mock):
+    """Tap-level partition_fields with stream omitting partition_fields yields x-partition-fields from tap.
+
+    Ensures tap-level partition_fields is used when a stream does not specify it,
+    so tap-wide partition fields can be configured once at top level.
+    """
+    cfg = config(
+        extras={
+            "partition_fields": ["region", "dt"],
+            "streams": [
+                {
+                    "name": "inherits_partition_fields",
+                    "path": "/path_test",
+                    "records_path": "$.records[*]",
+                    "primary_keys": ["key1"],
+                }
+            ],
+        }
+    )
+    setup_api(requests_mock, url_path("/path_test"))
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
+    streams = tap.discover_streams()
+    assert len(streams) >= 1
+    assert streams[0].schema.get("x-partition-fields") == ["region", "dt"]
+
+
 def test_partition_fields_stream_override_top_level(requests_mock):
     """Stream-level partition_fields overrides top-level (multi-stream independence)."""
     cfg = config()
@@ -271,12 +297,14 @@ def test_partition_fields_multi_stream_each_gets_own(requests_mock):
             "name": "stream_a",
             "path": "/path_a",
             "primary_keys": ["key1"],
+            "records_path": "$.records[*]",
             "partition_fields": ["region", "dt"],
         },
         {
             "name": "stream_b",
             "path": "/path_b",
             "primary_keys": ["key1"],
+            "records_path": "$.records[*]",
         },
     ]
     setup_api(requests_mock, url_path="https://example.com/path_a")
