@@ -38,6 +38,32 @@ def test_is_sorted_true(requests_mock: Any) -> None:
     assert streams[0].is_sorted is True
 
 
+def test_is_sorted_tap_level_fallback(requests_mock: Any) -> None:
+    """Tap-level is_sorted true with stream omitting is_sorted yields stream.is_sorted True.
+
+    Ensures tap-level is_sorted is used when a stream does not specify it,
+    so tap-wide sorted streams can be configured once at top level.
+    """
+    cfg = config(
+        extras={
+            "is_sorted": True,
+            "streams": [
+                {
+                    "name": "inherits_sorted",
+                    "path": "/path_test",
+                    "records_path": "$.records[*]",
+                    "primary_keys": ["key1"],
+                }
+            ],
+        }
+    )
+    setup_api(requests_mock, url_path("/path_test"))
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
+    streams = tap.discover_streams()
+    assert len(streams) >= 1
+    assert streams[0].is_sorted is True
+
+
 def test_is_sorted_omitted(requests_mock: Any) -> None:
     """Config with is_sorted omitted yields stream.is_sorted False (default).
 

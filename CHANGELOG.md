@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-03-18
+
+### Changed
+
+- **restful-api-tap** — Released 1.7.0: stream-level `partition_fields` config for Hive-style partitioning (`x-partition-fields` in SCHEMA messages).
+
 ## 2026-03-16
 
 ### Changed

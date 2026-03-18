@@ -40,6 +40,18 @@ def test_schema_from_object():
     assert s0.schema == BASIC_SCHEMA
 
 
+def test_config_schema_includes_partition_fields():
+    """Tap config schema exposes partition_fields (stream-level, array of strings)."""
+    schema = RestfulApiTap.config_jsonschema
+    assert "properties" in schema
+    assert "partition_fields" in schema["properties"]
+    prop = schema["properties"]["partition_fields"]
+    assert prop.get("default") == []
+    assert prop.get("type") == "array" or (
+        isinstance(prop.get("type"), list) and "array" in prop.get("type", [])
+    )
+
+
 def test_config_schema_includes_flatten_records():
     """Assert the tap's config file schema exposes flatten_records with default false.
 
