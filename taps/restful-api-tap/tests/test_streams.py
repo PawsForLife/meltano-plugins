@@ -284,9 +284,10 @@ def test_partition_fields_multi_stream_each_gets_own(requests_mock):
     tap = RestfulApiTap(config=cfg, parse_env_config=True)
     streams = tap.discover_streams()
     assert streams[0].schema.get("x-partition-fields") == ["region", "dt"]
-    assert "x-partition-fields" not in streams[1].schema or streams[1].schema.get(
-        "x-partition-fields"
-    ) == []
+    assert (
+        "x-partition-fields" not in streams[1].schema
+        or streams[1].schema.get("x-partition-fields") == []
+    )
 
 
 def test_pagination_style_default(requests_mock):
