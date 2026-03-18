@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-03-18
+
+### Added
+
+- **partition-fields-stream-config** — Stream-level `partition_fields` config option. When set (array of property names), the tap injects `x-partition-fields` into the schema emitted in SCHEMA messages so downstream loaders (e.g. target-gcs with `hive_partitioned: true`) can use Hive-style partitioning. Stream-level overrides top-level; each stream in a multi-stream config can have its own partition fields. See [docs/PARTITION_FIELDS_STREAM_CONFIG.md](../../docs/PARTITION_FIELDS_STREAM_CONFIG.md).
+
 ## [1.6.1] - 2026-03-12
 
 ### Added

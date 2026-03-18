@@ -12,8 +12,10 @@ from typing import Any, Generator, Iterable, cast
 from urllib.parse import parse_qs, parse_qsl, urlparse
 
 import requests
+import singer_sdk.singerlib as singer
 from singer_sdk.helpers import types
 from singer_sdk.helpers.jsonpath import extract_jsonpath
+from singer_sdk.mapper import RemoveRecordTransform
 from singer_sdk.pagination import (
     BaseHATEOASPaginator,
     HeaderLinkPaginator,
@@ -83,6 +85,7 @@ class DynamicStream(RestApiStream):
         store_raw_json_message: bool | None = False,
         flatten_records: bool = False,
         is_sorted: bool = False,
+        partition_fields: list[str] | None = None,
         authenticator: object | None = None,
     ) -> None:
         """Class initialization.
@@ -122,9 +125,15 @@ class DynamicStream(RestApiStream):
                 Default False.
             is_sorted: when True, stream is declared sorted by replication_key
                 for resumable state. Default False.
+            partition_fields: field names for Hive-style partitioning; injected
+                into schema as x-partition-fields for downstream targets.
             authenticator: see tap.py
 
         """
+        fields = partition_fields if partition_fields is not None else []
+        if fields:
+            schema = dict(schema)
+            schema["x-partition-fields"] = list(fields)
         super().__init__(tap=tap, name=tap.name, schema=schema)
 
         self.name = name
@@ -237,6 +246,30 @@ class DynamicStream(RestApiStream):
     def is_sorted(self) -> bool:
         """Whether the stream is declared sorted by replication_key for resumable state."""
         return self._is_sorted
+
+    def _generate_schema_messages(
+        self,
+    ) -> Generator[singer.SchemaMessage, None, None]:
+        """Generate schema messages, ensuring x-partition-fields is included when set.
+
+        The SDK mapper uses catalog schema (which strips x-partition-fields via
+        Schema.from_dict). Override to merge x-partition-fields from self.schema
+        into the emitted schema so downstream targets (e.g. target-gcs) receive it.
+        """
+        x_partition_fields = self.schema.get("x-partition-fields")
+        bookmark_keys = [self.replication_key] if self.replication_key else None
+        for stream_map in self.stream_maps:
+            if isinstance(stream_map, RemoveRecordTransform):
+                continue
+            schema = dict(stream_map.transformed_schema)
+            if x_partition_fields:
+                schema["x-partition-fields"] = list(x_partition_fields)
+            yield singer.SchemaMessage(
+                stream_map.stream_alias,
+                schema,
+                stream_map.transformed_key_properties,
+                bookmark_keys,
+            )
 
     @property
     def http_headers(self) -> dict:

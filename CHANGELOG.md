@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-03-18
+
+### Added
+
+- **plugin-tag-on-release** — CI workflow that creates version tags (`{plugin}/v{version}`) for each plugin when its `pyproject.toml` changes on merge to `release`. Uses matrix over discovered plugins; skips if tag exists.
+
+### Changed
+
+- **restful-api-tap** — Released 1.7.0: stream-level `partition_fields` config for Hive-style partitioning (`x-partition-fields` in SCHEMA messages).
+
 ## 2026-03-16
 
 ### Changed
