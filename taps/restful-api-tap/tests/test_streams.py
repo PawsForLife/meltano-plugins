@@ -225,6 +225,70 @@ def test_flatten_records_stream_override_top_level_true_stream_false(requests_mo
     assert "name" in schema["properties"]["user"]["properties"]
 
 
+def test_partition_fields_injected_into_schema_when_stream_has_partition_fields(
+    requests_mock,
+):
+    """Stream schema includes x-partition-fields when stream config has partition_fields.
+
+    Ensures partition_fields from stream config is injected into the schema dict
+    so downstream targets (e.g. target-gcs) receive it in SCHEMA messages.
+    """
+    cfg = config()
+    cfg["streams"][0]["partition_fields"] = ["region", "dt"]
+    setup_api(requests_mock)
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
+    stream = tap.discover_streams()[0]
+    schema = stream.schema
+    assert schema.get("x-partition-fields") == ["region", "dt"]
+
+
+def test_partition_fields_absent_when_empty_or_missing(requests_mock):
+    """Stream schema has no x-partition-fields when partition_fields is empty or missing."""
+    setup_api(requests_mock)
+    tap = RestfulApiTap(config=config(), parse_env_config=True)
+    stream = tap.discover_streams()[0]
+    schema = stream.schema
+    assert "x-partition-fields" not in schema or schema.get("x-partition-fields") == []
+
+
+def test_partition_fields_stream_override_top_level(requests_mock):
+    """Stream-level partition_fields overrides top-level (multi-stream independence)."""
+    cfg = config()
+    cfg["partition_fields"] = ["top_level_field"]
+    cfg["streams"][0]["partition_fields"] = ["stream_a_field"]
+    setup_api(requests_mock)
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
+    stream = tap.discover_streams()[0]
+    schema = stream.schema
+    assert schema.get("x-partition-fields") == ["stream_a_field"]
+
+
+def test_partition_fields_multi_stream_each_gets_own(requests_mock):
+    """Multi-stream: each stream gets its own partition_fields; stream A has, B has none."""
+    cfg = config()
+    cfg["streams"] = [
+        {
+            "name": "stream_a",
+            "path": "/path_a",
+            "primary_keys": ["key1"],
+            "partition_fields": ["region", "dt"],
+        },
+        {
+            "name": "stream_b",
+            "path": "/path_b",
+            "primary_keys": ["key1"],
+        },
+    ]
+    setup_api(requests_mock, url_path="https://example.com/path_a")
+    setup_api(requests_mock, url_path="https://example.com/path_b")
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
+    streams = tap.discover_streams()
+    assert streams[0].schema.get("x-partition-fields") == ["region", "dt"]
+    assert "x-partition-fields" not in streams[1].schema or streams[1].schema.get(
+        "x-partition-fields"
+    ) == []
+
+
 def test_pagination_style_default(requests_mock):
     """Stream returns all records across pages when pagination uses next_page token."""
 
