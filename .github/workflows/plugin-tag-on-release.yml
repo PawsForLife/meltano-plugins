@@ -1,0 +1,58 @@
+# Create version tags for each plugin when its pyproject.toml changes on merge to release.
+# Tag format: {plugin-name}/v{version} (e.g. restful-api-tap/v1.7.0). Skips if tag exists.
+name: Plugin tag on release
+
+on:
+  push:
+    branches: [release]
+    paths:
+      - "taps/**/pyproject.toml"
+      - "loaders/**/pyproject.toml"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.discover.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run plugin package discovery and set matrix output
+        id: discover
+        run: |
+          echo "packages<<EOF" >> "$GITHUB_OUTPUT"
+          python scripts/list_packages.py --json . >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+  tag:
+    needs: discover
+    strategy:
+      matrix: ${{ fromJson(needs.discover.outputs.packages) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version and create tag
+        run: |
+          PLUGIN=$(echo "${{ matrix.path }}" | sed 's|.*/||')
+          VERSION=$(grep '^version = ' "${{ matrix.path }}/pyproject.toml" | cut -d'"' -f2)
+          TAG="${PLUGIN}/v${VERSION}"
+          git fetch --tags
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "${PLUGIN} ${VERSION}"
+          git push origin "$TAG"
