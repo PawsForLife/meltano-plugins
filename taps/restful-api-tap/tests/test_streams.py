@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pytest
 import requests
 
 from restful_api_tap.tap import RestfulApiTap
@@ -242,10 +243,18 @@ def test_partition_fields_injected_into_schema_when_stream_has_partition_fields(
     assert schema.get("x-partition-fields") == ["region", "dt"]
 
 
-def test_partition_fields_absent_when_empty_or_missing(requests_mock):
+@pytest.mark.parametrize(
+    "partition_fields_config", [None, []], ids=["missing", "empty"]
+)
+def test_partition_fields_absent_when_empty_or_missing(
+    requests_mock, partition_fields_config
+):
     """Stream schema has no x-partition-fields when partition_fields is empty or missing."""
+    cfg = config()
+    if partition_fields_config is not None:
+        cfg["streams"][0]["partition_fields"] = partition_fields_config
     setup_api(requests_mock)
-    tap = RestfulApiTap(config=config(), parse_env_config=True)
+    tap = RestfulApiTap(config=cfg, parse_env_config=True)
     stream = tap.discover_streams()[0]
     schema = stream.schema
     assert "x-partition-fields" not in schema or schema.get("x-partition-fields") == []
