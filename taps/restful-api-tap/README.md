@@ -341,6 +341,7 @@ The default response style for pagination is described below:
 There are additional request styles supported as follows for pagination.
 - `jsonpath_paginator` or `default` - This style obtains the token for the next page from a specific location in the response body via JSONPath notation. In many situations the `jsonpath_paginator` is a more appropriate paginator to the `hateoas_paginator`.
   - `next_page_token_path` - The jsonpath to next page token. Example: `"$['@odata.nextLink']"`, this locates the token returned via the Microsoft Graph API. Default `'$.next_page'` for the `jsonpath_paginator` paginator only otherwise None.
+  - `pagination_stop_on_duplicate_token` - When `true`, pagination stops if the next token equals the current token instead of raising a loop error. Default `false`. Use when the source repeats the last cursor (e.g. last record’s id) on the final page while still returning HTTP 200—common for cursor/`after`-style APIs such as Medallia sequence-id pagination.
 - `offset_paginator` or `style1` - This style uses URL parameters named offset and limit
   - `offset` is calculated from the previous response, or not set if there is no previous response
   - `pagination_page_size` - Sets a limit to number of records per page / response. Default `25` records.

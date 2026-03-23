@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-03-23
+
+### Fixed
+
+- **medallia-duplicate-pagination-token** — Optional `pagination_stop_on_duplicate_token` (default `false`): when `true`, JSONPath pagination ends cleanly if the API returns the same cursor as the previous request. The Singer SDK otherwise raises `RuntimeError: Loop detected in pagination`, which breaks Medallia/Stella-style `after` + last-record cursor flows.
+
 ## [1.7.0] - 2026-03-18
 
 ### Added

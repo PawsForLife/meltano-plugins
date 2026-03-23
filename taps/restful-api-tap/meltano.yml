@@ -34,6 +34,8 @@ plugins:
           kind: integer
         - name: pagination_next_page_param
           kind: string
+        - name: pagination_stop_on_duplicate_token
+          kind: boolean
         - name: pagination_limit_per_page_param
           kind: string
         - name: pagination_total_limit_param
