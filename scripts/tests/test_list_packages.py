@@ -62,6 +62,47 @@ def run_list_packages_json(root: Path) -> tuple[str, int]:
     return (result.stdout or "", result.returncode)
 
 
+def run_list_packages_json_git_filter(
+    root: Path, git_before: str, git_after: str
+) -> tuple[str, int]:
+    """
+    Run list_packages.py with --json, root, and git ref filters.
+
+    Returns (stdout, returncode). Used to assert version-diff matrix output in CI-like runs.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_SCRIPT),
+            "--json",
+            str(root.resolve()),
+            "--git-before",
+            git_before,
+            "--git-after",
+            git_after,
+        ],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    return (result.stdout or "", result.returncode)
+
+
+def _git(repo: Path, *args: str) -> None:
+    """Run git in repo with check=True (helper for test fixtures)."""
+    subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _pyproject_toml(version: str) -> str:
+    """Minimal pyproject body with project.version for git fixture commits."""
+    return f'[project]\nname = "fixture"\nversion = "{version}"\n'
+
+
 # --- Test cases (black box: assert only stdout and exit code) ---
 
 
@@ -195,3 +236,138 @@ def test_json_output_ends_with_newline_for_heredoc_compatibility(
     )
     data = json.loads(stdout.strip())
     assert "path" in data, f"Expected 'path' key in JSON, got {list(data)}"
+
+
+def test_git_version_filter_includes_only_packages_with_changed_version(
+    tmp_path: Path,
+) -> None:
+    """
+    With --git-before/--git-after, only packages whose project.version differs between refs appear
+    in the matrix JSON.
+
+    Why: release workflow path filters fire when any pyproject.toml changes; without this, unchanged
+    plugin versions would still be tagged. Matches CodeRabbit / CI expectation.
+    """
+    (tmp_path / "taps" / "bumped").mkdir(parents=True)
+    (tmp_path / "taps" / "same").mkdir(parents=True)
+    (tmp_path / "taps" / "bumped" / "pyproject.toml").write_text(
+        _pyproject_toml("1.0.0")
+    )
+    (tmp_path / "taps" / "same" / "pyproject.toml").write_text(_pyproject_toml("2.0.0"))
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "test@test.local")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "c1")
+    before = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    (tmp_path / "taps" / "bumped" / "pyproject.toml").write_text(
+        _pyproject_toml("1.0.1")
+    )
+    (tmp_path / "taps" / "same" / "pyproject.toml").write_text(_pyproject_toml("2.0.0"))
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "c2")
+    after = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+
+    stdout, returncode = run_list_packages_json_git_filter(tmp_path, before, after)
+    assert returncode == 0, f"stdout={stdout!r}"
+    data = json.loads(stdout)
+    assert data["path"] == ["taps/bumped"], (
+        f"Expected only bumped package, got {data['path']}"
+    )
+
+
+def test_git_version_filter_includes_package_new_in_after_ref(tmp_path: Path) -> None:
+    """
+    If pyproject.toml exists only in the after ref, the package is included (version changed from
+    absent to present).
+
+    Why: new plugins on release should get a tag when their first version is introduced.
+    """
+    (tmp_path / "taps" / "legacy").mkdir(parents=True)
+    (tmp_path / "taps" / "legacy" / "pyproject.toml").write_text(
+        _pyproject_toml("1.0.0")
+    )
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "test@test.local")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "c1")
+    before = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    (tmp_path / "taps" / "newpkg").mkdir(parents=True)
+    (tmp_path / "taps" / "newpkg" / "pyproject.toml").write_text(
+        _pyproject_toml("0.1.0")
+    )
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "c2")
+    after = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+
+    stdout, returncode = run_list_packages_json_git_filter(tmp_path, before, after)
+    assert returncode == 0, f"stdout={stdout!r}"
+    data = json.loads(stdout)
+    assert data["path"] == ["taps/newpkg"], (
+        f"Expected new package only, got {data['path']}"
+    )
+
+
+def test_git_version_filter_both_refs_required_together(tmp_path: Path) -> None:
+    """
+    Passing only one of --git-before / --git-after must fail: avoids ambiguous half-configured CI.
+    """
+    pkg = tmp_path / "p"
+    pkg.mkdir()
+    (pkg / "pyproject.toml").write_text(_pyproject_toml("1.0.0"))
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(_SCRIPT),
+            "--json",
+            str(tmp_path.resolve()),
+            "--git-before",
+            "abc",
+        ],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, "Expected failure when only --git-before is set"
+
+
+def test_git_version_filter_null_before_skips_filter_lists_all_discovered(
+    tmp_path: Path,
+) -> None:
+    """
+    An all-zero before SHA (GitHub push when creating a branch) skips version filtering; all
+    discovered packages are listed.
+
+    Why: git cannot resolve the parent commit locally; falling back preserves discoverability without
+    dropping new packages silently.
+    """
+    (tmp_path / "taps" / "bumped").mkdir(parents=True)
+    (tmp_path / "taps" / "same").mkdir(parents=True)
+    (tmp_path / "taps" / "bumped" / "pyproject.toml").write_text(
+        _pyproject_toml("1.0.1")
+    )
+    (tmp_path / "taps" / "same" / "pyproject.toml").write_text(_pyproject_toml("2.0.0"))
+
+    stdout, returncode = run_list_packages_json_git_filter(
+        tmp_path,
+        "0000000000000000000000000000000000000000",
+        "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    )
+    assert returncode == 0, f"stdout={stdout!r}"
+    data = json.loads(stdout)
+    assert data["path"] == ["taps/bumped", "taps/same"], (
+        f"Expected both packages when before is null SHA, got {data['path']}"
+    )

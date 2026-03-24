@@ -1,5 +1,5 @@
-# Create version tags for each plugin when its pyproject.toml changes on merge to release.
-# Tag format: {plugin-name}/v{version} (e.g. restful-api-tap/v1.7.0). Skips if tag exists.
+# Create version tags for plugins whose project.version changed on merge to release (path filter:
+# pyproject.toml under taps/loaders). Tag format: {plugin-name}/v{version}. Skips if tag exists.
 name: Plugin tag on release
 
 on:
@@ -16,6 +16,8 @@ jobs:
       packages: ${{ steps.discover.outputs.packages }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,7 +28,10 @@ jobs:
         id: discover
         run: |
           echo "packages<<EOF" >> "$GITHUB_OUTPUT"
-          python scripts/list_packages.py --json . >> "$GITHUB_OUTPUT"
+          python scripts/list_packages.py --json . \
+            --git-before "${{ github.event.before }}" \
+            --git-after "${{ github.sha }}" \
+            >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
   tag:
