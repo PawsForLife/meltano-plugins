@@ -379,6 +379,15 @@ class RestfulApiTap(Tap):
             "Defaults to None",
         ),
         th.Property(
+            "pagination_stop_on_duplicate_token",
+            th.BooleanType,
+            default=False,
+            required=False,
+            description="When true, JSONPath pagination stops if the next cursor "
+            "equals the current cursor instead of raising a loop error. Some "
+            "cursor APIs repeat the last token when there is no further page.",
+        ),
+        th.Property(
             "pagination_limit_per_page_param",
             th.StringType,
             default=None,
@@ -577,6 +586,10 @@ class RestfulApiTap(Tap):
                     ),
                     pagination_next_page_param=self.config.get(
                         "pagination_next_page_param"
+                    ),
+                    pagination_stop_on_duplicate_token=stream.get(
+                        "pagination_stop_on_duplicate_token",
+                        self.config.get("pagination_stop_on_duplicate_token", False),
                     ),
                     pagination_limit_per_page_param=self.config.get(
                         "pagination_limit_per_page_param"

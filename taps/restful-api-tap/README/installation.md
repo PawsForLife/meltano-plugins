@@ -1,10 +1,32 @@
-version: 1
-send_anonymous_usage_stats: false
+# Installation
+
+[← Overview](overview.md) · [Documentation index](index.md) · [Configuration →](configuration.md)
+
+### Install from this monorepo
+
+This tap is a **custom** plugin (not on the Meltano Hub or PyPI). To use it from this repo, add the following to your project's `meltano.yml`, then run `meltano install`. Use `namespace` and omit `variant`; use a plain `git+https://...` URL (not the `package @ url` form—see [repo root README](https://github.com/PawsForLife/meltano-plugins)#troubleshooting).
+
+```yaml
 plugins:
   extractors:
     - name: restful-api-tap
       namespace: restful_api_tap
-      executable: ./restful-api-tap.sh
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/restful-api-tap
+```
+
+For the full installation guide, troubleshooting, and the loader (target-gcs), see the [repo root README](https://github.com/PawsForLife/meltano-plugins) or [docs/monorepo](../../../docs/monorepo/README.md).
+
+### Generic Meltano setup
+
+If using via Meltano (e.g. from PyPI or another source), add the following lines to your `meltano.yml` file and run the following command:
+
+```yaml
+plugins:
+  extractors:
+    - name: restful-api-tap
+      namespace: restful_api_tap
+      pip_url: restful-api-tap
+      executable: restful-api-tap
       capabilities:
         - state
         - catalog
@@ -14,6 +36,8 @@ plugins:
           kind: string
         - name: next_page_token_path
           kind: string
+        - name: pagination_stop_on_duplicate_token
+          kind: boolean
         - name: pagination_request_style
           kind: string
         - name: pagination_response_style
@@ -28,22 +52,26 @@ plugins:
           kind: integer
         - name: store_raw_json_message
           kind: boolean
+        - name: flatten_records
+          kind: boolean
         - name: pagination_page_size
           kind: integer
         - name: pagination_results_limit
           kind: integer
         - name: pagination_next_page_param
           kind: string
-        - name: pagination_stop_on_duplicate_token
-          kind: boolean
         - name: pagination_limit_per_page_param
           kind: string
         - name: pagination_total_limit_param
           kind: string
         - name: pagination_initial_offset
           kind: integer
+        - name: offset_records_jsonpath
+          kind: string
         - name: streams
           kind: array
+        - name: name
+          kind: string
         - name: path
           kind: string
         - name: params
@@ -66,8 +94,6 @@ plugins:
           kind: string
         - name: source_search_query
           kind: string
-        - name: is_sorted
-          kind: boolean
         - name: auth_method
           kind: string
         - name: api_key
@@ -98,25 +124,10 @@ plugins:
           kind: integer
         - name: aws_credentials
           kind: object
-      config:
-        api_url: https://earthquake.usgs.gov/fdsnws
-        records_path: "$.features[*]"
-        streams:
-          - name: us_earthquakes
-            path: /event/1/query
-            params:
-              format: geojson
-              starttime: "2014-01-01"
-              endtime: "2014-01-02"
-              minmagnitude: 1
-            primary_keys:
-              - id
-            num_inference_records: 100
-      select:
-        - '*.*'
-  loaders:
-    - name: target-csv
-      variant: meltanolabs
-      pip_url: meltanolabs-target-csv
-      config:
-        output_path: output
+```
+
+```bash
+meltano install extractor restful-api-tap
+```
+
+[← Overview](overview.md) · [Documentation index](index.md) · [Configuration →](configuration.md)
