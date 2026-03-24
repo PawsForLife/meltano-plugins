@@ -3,7 +3,7 @@
 [← Examples](examples.md) · [Documentation index](index.md)
 
 
-You can run `restful-api-tap` by itself or in a pipeline using [Meltano](www.meltano.com). The tap reads a **config file** and optionally a **catalog** and **state file** for incremental runs.
+You can run `restful-api-tap` by itself or in a pipeline using [Meltano](https://www.meltano.com). The tap reads a **config file** and optionally a **catalog** and **state file** for incremental runs.
 
 ### Executing the Tap Directly
 
