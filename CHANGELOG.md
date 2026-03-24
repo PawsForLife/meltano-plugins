@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **restful-api-tap** — Typo in `README/pagination.md` (`offset_records_jsonpath`): "does not equal" for when record count differs from `pagination_page_size`.
 - **restful-api-tap** — Clarify placeholder instruction grammar in `README/examples.md` (sentence about `<removed .. >` markers).
 - **restful-api-tap** — Remove duplicated word in Complex Authentication sentence (`README/configuration.md`: "to be combined" with `auth_method`).
 
