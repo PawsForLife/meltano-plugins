@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **restful-api-tap** — Clarify placeholder instruction grammar in `README/examples.md` (sentence about `<removed .. >` markers).
 - **restful-api-tap** — Remove duplicated word in Complex Authentication sentence (`README/configuration.md`: "to be combined" with `auth_method`).
 
 ### Changed

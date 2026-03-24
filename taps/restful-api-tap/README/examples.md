@@ -4,7 +4,7 @@
 
 This section provides examples of settings for accessing different API's. The tap configuration examples are provided in the form of environment variables. You can supply a config file (e.g. [config.json](../config.sample.json)) instead of environment variables.
 
-Where config values have with `<removed .. >` replace the text with your Authentication and API config.
+Where config values are marked with `<removed .. >`, replace the text with your Authentication and API config.
 
 ### Microsoft Graph API v1.0
 
