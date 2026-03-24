@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **plugin-tag-on-release** — VERSION validation regex is end-anchored so only strict `x.y.z` forms pass (no trailing characters).
 - **plugin-tag-on-release** — Discovery lists only plugins whose `project.version` changed between `github.event.before` and `github.sha` (`scripts/list_packages.py` uses `git show` per package). Discover job checkout uses `fetch-depth: 0` so both commits exist. All-zero `before` skips filtering (branch creation push).
 
 ## 2026-03-18
