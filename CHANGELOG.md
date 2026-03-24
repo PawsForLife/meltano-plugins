@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-03-25
+
+### Changed
+
+- **restful-api-tap** — Documentation moved to `taps/restful-api-tap/README/` (`index.md` plus topic files) to meet the 500-line Markdown cap; root `README.md` is a short entry point. `pagination_stop_on_duplicate_token` is documented in the top-level config list and the generic Meltano settings example.
+
 ## 2026-03-24
 
 ### Fixed
