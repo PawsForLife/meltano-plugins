@@ -153,7 +153,7 @@ will overwrite their top-level counterparts except where noted below:
 
 #### Complex Authentication
 
-The previous section showed out of the box methods for a single factor of authentication e.g. x-api-key, basic or oauth. If the API requires multiple forms of authentication, you may need to pass some of the authentication methods via the headers to be be combined with the main auth_method.
+The previous section showed out of the box methods for a single factor of authentication e.g. x-api-key, basic or oauth. If the API requires multiple forms of authentication, you may need to pass some of the authentication methods via the headers to be combined with the main auth_method.
 
 Example:
 An API may use OAuth2 for authentication but also requires an X-API-KEY to be supplied as well. In this situation pass the X-API-KEY as part of the `headers` config, and the rest of the config should be set for OAuth e.g.

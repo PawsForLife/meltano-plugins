@@ -2,6 +2,10 @@
 
 ## 2026-03-25
 
+### Fixed
+
+- **restful-api-tap** — Remove duplicated word in Complex Authentication sentence (`README/configuration.md`: "to be combined" with `auth_method`).
+
 ### Changed
 
 - **restful-api-tap** — Documentation moved to `taps/restful-api-tap/README/` (`index.md` plus topic files) to meet the 500-line Markdown cap; root `README.md` is a short entry point. `pagination_stop_on_duplicate_token` is documented in the top-level config list and the generic Meltano settings example.
