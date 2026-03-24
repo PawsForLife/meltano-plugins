@@ -26,6 +26,7 @@ from singer_sdk.pagination import (
 
 from restful_api_tap.client import RestApiStream
 from restful_api_tap.pagination import (
+    DuplicateTokenStopsJSONPathPaginator,
     RestAPIBasePageNumberPaginator,
     RestAPIHeaderLinkPaginator,
     RestAPIOffsetPaginator,
@@ -87,6 +88,7 @@ class DynamicStream(RestApiStream):
         is_sorted: bool = False,
         partition_fields: list[str] | None = None,
         authenticator: object | None = None,
+        pagination_stop_on_duplicate_token: bool = False,
     ) -> None:
         """Class initialization.
 
@@ -128,6 +130,8 @@ class DynamicStream(RestApiStream):
             partition_fields: field names for Hive-style partitioning; injected
                 into schema as x-partition-fields for downstream targets.
             authenticator: see tap.py
+            pagination_stop_on_duplicate_token: when True, JSONPath pagination
+                stops if the next cursor equals the current one instead of raising.
 
         """
         fields = partition_fields if partition_fields is not None else []
@@ -187,6 +191,7 @@ class DynamicStream(RestApiStream):
             )  # Defaults to page_style url_params
 
         self.pagination_request_style = pagination_request_style
+        self.pagination_stop_on_duplicate_token = pagination_stop_on_duplicate_token
         self.pagination_results_limit = pagination_results_limit
         self.pagination_next_page_param = pagination_next_page_param
         self.pagination_limit_per_page_param = pagination_limit_per_page_param
@@ -346,11 +351,19 @@ class DynamicStream(RestApiStream):
             self.pagination_request_style == "jsonpath_paginator"
             or self.pagination_request_style == "default"
         ):
+            if self.pagination_stop_on_duplicate_token:
+                return DuplicateTokenStopsJSONPathPaginator(
+                    self.next_page_token_jsonpath
+                )
             return JSONPathPaginator(self.next_page_token_jsonpath)
         elif (
             self.pagination_request_style == "simple_header_paginator"
         ):  # Example Gitlab.com
             if self.next_page_token_jsonpath:
+                if self.pagination_stop_on_duplicate_token:
+                    return DuplicateTokenStopsJSONPathPaginator(
+                        self.next_page_token_jsonpath
+                    )
                 return JSONPathPaginator(self.next_page_token_jsonpath)
 
             return SimpleHeaderPaginator("X-Next-Page")
@@ -431,7 +444,17 @@ class DynamicStream(RestApiStream):
             # sent to the API. Assumes storing a bookmark (replication key value) and
             # querying records greater than that in subsequent runs. Configure the
             # appropriate source field and query template in the config file.
-            if self.source_search_field and self.source_search_query and last_run_date:
+            # Only apply source_search on the first request (no pagination token yet).
+            # If source_search_field matches pagination_next_page_param (e.g. both
+            # "after"), applying it again on page 2+ would overwrite the cursor with
+            # the run start bookmark and repeat the first page (Singer loop error).
+            use_source_search = (
+                self.source_search_field
+                and self.source_search_query
+                and last_run_date
+                and next_page_token is None
+            )
+            if use_source_search:
                 query_template = Template(self.source_search_query)
                 if self.use_request_body_not_params:
                     params[self.source_search_field] = json.loads(
@@ -441,7 +464,9 @@ class DynamicStream(RestApiStream):
                     params[self.source_search_field] = query_template.substitute(
                         last_run_date=last_run_date
                     )
-            else:
+            elif not (
+                self.source_search_field and self.source_search_query and last_run_date
+            ):
                 params["sort"] = "asc"
                 params["order_by"] = self.replication_key
 
@@ -485,7 +510,13 @@ class DynamicStream(RestApiStream):
             # to the API. Assumes storing a bookmark (replication key value) and
             # querying records greater than that in subsequent runs. Configure the
             # appropriate source field and query template in the config file.
-            if self.source_search_field and self.source_search_query and last_run_date:
+            use_source_search = (
+                self.source_search_field
+                and self.source_search_query
+                and last_run_date
+                and next_page_token is None
+            )
+            if use_source_search:
                 query_template = Template(self.source_search_query)
                 if self.use_request_body_not_params:
                     params[self.source_search_field] = json.loads(
@@ -495,7 +526,9 @@ class DynamicStream(RestApiStream):
                     params[self.source_search_field] = query_template.substitute(
                         last_run_date=last_run_date
                     )
-            else:
+            elif not (
+                self.source_search_field and self.source_search_query and last_run_date
+            ):
                 params["sort"] = "asc"
                 params["order_by"] = self.replication_key
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-03-25
+
+### Fixed
+
+- **restful-api-tap** — Meltano link in `README/usage.md` uses `https://www.meltano.com` so Markdown treats it as an external clickable URL.
+- **restful-api-tap** — Typo in `README/pagination.md` (`offset_records_jsonpath`): "does not equal" for when record count differs from `pagination_page_size`.
+- **restful-api-tap** — Clarify placeholder instruction grammar in `README/examples.md` (sentence about `<removed .. >` markers).
+- **restful-api-tap** — Remove duplicated word in Complex Authentication sentence (`README/configuration.md`: "to be combined" with `auth_method`).
+
+### Changed
+
+- **restful-api-tap** — Documentation moved to `taps/restful-api-tap/README/` (`index.md` plus topic files) to meet the 500-line Markdown cap; root `README.md` is a short entry point. `pagination_stop_on_duplicate_token` is documented in the top-level config list and the generic Meltano settings example.
+
+## 2026-03-24
+
+### Fixed
+
+- **script-tests** — Workflow creates a venv with `uv venv` before `uv pip install pytest` and runs tests with `uv run pytest` (uv requires an active venv for `uv pip install` by default).
+- **plugin-tag-on-release** — VERSION validation regex is end-anchored so only strict `x.y.z` forms pass (no trailing characters).
+- **plugin-tag-on-release** — Discovery lists only plugins whose `project.version` changed between `github.event.before` and `github.sha` (`scripts/list_packages.py` uses `git show` per package). Discover job checkout uses `fetch-depth: 0` so both commits exist. All-zero `before` skips filtering (branch creation push).
+
 ## 2026-03-18
 
 ### Added

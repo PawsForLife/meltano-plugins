@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **readme-split** — User README split into `README/index.md` and topic files (under 500 lines each). Top-level config and generic Meltano `settings` example now include `pagination_stop_on_duplicate_token` alongside other pagination fields.
+
+## [1.7.1] - 2026-03-24
+
+### Fixed
+
+- **medallia-duplicate-pagination-token** — Optional `pagination_stop_on_duplicate_token` (default `false`): when `true`, JSONPath pagination ends cleanly if the API returns the same cursor as the previous request. The Singer SDK otherwise raises `RuntimeError: Loop detected in pagination`, which breaks Medallia/Stella-style `after` + last-record cursor flows.
+
+- **source-search-first-page-only** — When `source_search_field` / `source_search_query` are set, those parameters apply only to the initial request (no pagination token). Later pages keep the API cursor instead of re-applying the run start bookmark, avoiding duplicated or mis-ordered rows during pagination.
+
 ## [1.7.0] - 2026-03-18
 
 ### Added

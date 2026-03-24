@@ -1,6 +1,6 @@
 """Pagination helpers for streams that request paged data from a REST API source and yield records (RECORD messages)."""
 
-from typing import Any, cast
+from typing import Any, cast, override
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -10,9 +10,35 @@ from singer_sdk.pagination import (
     BaseOffsetPaginator,
     BasePageNumberPaginator,
     HeaderLinkPaginator,
+    JSONPathPaginator,
 )
 
 from restful_api_tap.utils import unnest_dict
+
+
+class DuplicateTokenStopsJSONPathPaginator(JSONPathPaginator):
+    """JSONPath paginator that stops when the next token repeats the current token.
+
+    The Singer SDK raises ``RuntimeError`` when consecutive pagination tokens are
+    identical. Some cursor APIs return the same last-record cursor when there is no
+    further page; this class treats that as end of pagination.
+    """
+
+    @override
+    def advance(self, response: requests.Response) -> None:
+        """Advance page state; finish without error if the cursor does not change."""
+        self._page_count += 1
+        if not self.has_more(response):
+            self._finished = True
+            return
+        new_value = self.get_next(response)
+        if new_value and new_value == self._value:
+            self._finished = True
+            return
+        if not new_value:
+            self._finished = True
+        else:
+            self._value = new_value
 
 
 class RestAPIBasePageNumberPaginator(BasePageNumberPaginator):
