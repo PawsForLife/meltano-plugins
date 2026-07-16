@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
 import requests
-from singer_sdk.exceptions import RetriableAPIError
+from singer_sdk.exceptions import ConfigValidationError
 
-from tap_talon_one.streams import CampaignsStream, TalonOnePaginator
+from tap_talon_one.streams import TalonOnePaginator
 from tap_talon_one.tap import TalonOneTap
 
 
@@ -21,13 +22,15 @@ def config() -> dict[str, object]:
     }
 
 
-def test_campaigns_sync_retries_and_preserves_paging(requests_mock, capsys) -> None:
+def test_campaigns_sync_retries_and_preserves_paging(
+    requests_mock, capsys, monkeypatch
+) -> None:
     """Emit nested records after a Retry-After response and two stable pages."""
     url = "https://example.talon.one/v1/applications/42/campaigns"
     requests_mock.get(
         url,
         [
-            {"status_code": 429, "headers": {"Retry-After": "0"}},
+            {"status_code": 429, "headers": {"Retry-After": "7"}},
             {
                 "json": {
                     "data": [
@@ -44,6 +47,8 @@ def test_campaigns_sync_retries_and_preserves_paging(requests_mock, capsys) -> N
             {"json": {"data": [{"id": 3, "name": "Three"}], "hasMore": False}},
         ],
     )
+    waits: list[float] = []
+    monkeypatch.setattr("time.sleep", waits.append)
 
     TalonOneTap(config=config()).sync_all()
 
@@ -53,6 +58,7 @@ def test_campaigns_sync_retries_and_preserves_paging(requests_mock, capsys) -> N
     assert [request.qs["skip"] for request in requests_seen] == [["0"], ["0"], ["2"]]
     assert all(request.qs["pagesize"] == ["2"] for request in requests_seen)
     assert all(request.qs["sort"] == ["id"] for request in requests_seen)
+    assert waits == [7.0]
 
     messages = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     records = [message["record"] for message in messages if message["type"] == "RECORD"]
@@ -63,18 +69,6 @@ def test_campaigns_sync_retries_and_preserves_paging(requests_mock, capsys) -> N
     ]
 
 
-def test_retry_after_header_controls_wait() -> None:
-    """Use the rate-limit response's Retry-After duration."""
-    response = requests.Response()
-    response.status_code = 429
-    response.headers["Retry-After"] = "7"
-    stream = CampaignsStream(TalonOneTap(config=config()))
-    waits = stream.backoff_wait_generator()
-    next(waits)
-
-    assert waits.send(RetriableAPIError("rate limited", response)) == 7.0
-
-
 def test_paginator_stops_on_empty_data() -> None:
     """Avoid another request after an empty response page."""
     response = requests.Response()
@@ -82,6 +76,24 @@ def test_paginator_stops_on_empty_data() -> None:
     paginator = TalonOnePaginator(start_value=0, page_size=2)
 
     assert paginator.has_more(response) is False
+
+
+def test_paginator_rejects_invalid_data() -> None:
+    """Fail before paginating an invalid Talon.One envelope."""
+    response = requests.Response()
+    response._content = b'{"data": "not-a-list"}'
+    paginator = TalonOnePaginator(start_value=0, page_size=2)
+
+    with pytest.raises(ValueError, match="data must be a list"):
+        paginator.has_more(response)
+
+
+def test_config_rejects_plaintext_api_url() -> None:
+    """Never send a management key over plaintext HTTP."""
+    plaintext_config = config() | {"api_url": "http://example.talon.one"}
+
+    with pytest.raises(ConfigValidationError):
+        TalonOneTap(config=plaintext_config)
 
 
 def test_discovery_uses_static_schema_and_id_key() -> None:

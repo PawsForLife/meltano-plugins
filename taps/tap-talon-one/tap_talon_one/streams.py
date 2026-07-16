@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator, Mapping
-from typing import Any, cast
+from collections.abc import Generator, Iterable, Mapping
+from typing import Any, NotRequired, TypedDict, cast
 
 import requests
 from singer_sdk import typing as th
@@ -12,24 +12,29 @@ from singer_sdk.pagination import OffsetPaginator
 from singer_sdk.streams import RESTStream
 
 
+class TalonOnePage(TypedDict):
+    """Validated Talon.One list response envelope."""
+
+    data: list[dict[str, Any]]
+    hasMore: NotRequired[bool]
+    totalResultSize: NotRequired[int]
+
+
 class TalonOnePaginator(OffsetPaginator):
     """Advance Talon.One pageSize/skip pagination."""
 
     def has_more(self, response: requests.Response) -> bool:
         """Stop on hasMore false, the reported total, or an empty page."""
-        payload = cast(dict[str, Any], response.json())
-        records = payload.get("data", [])
-        if payload.get("hasMore") is False or not records:
+        page = _validated_page(response)
+        if page.get("hasMore") is False or not page["data"]:
             return False
 
-        total = payload.get("totalResultSize")
-        return not isinstance(total, int) or self.current_value + len(records) < total
+        total = page.get("totalResultSize")
+        return total is None or self.current_value + len(page["data"]) < total
 
 
 class TalonOneStream(RESTStream):
     """Base stream for the Talon.One Management API."""
-
-    records_jsonpath = "$.data[*]"
 
     @property
     def url_base(self) -> str:
@@ -58,6 +63,10 @@ class TalonOneStream(RESTStream):
             "skip": next_page_token or 0,
             "sort": "id",
         }
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
+        """Yield records from a validated Talon.One response envelope."""
+        yield from _validated_page(response)["data"]
 
     def backoff_wait_generator(self) -> Generator[float, None, None]:
         """Use Retry-After when Talon.One rate-limits a request."""
@@ -122,3 +131,28 @@ def _retry_after_seconds(exception: Any) -> float:
         return max(0.0, float(retry_after))
     except (TypeError, ValueError):
         return 2.0
+
+
+def _validated_page(response: requests.Response) -> TalonOnePage:
+    """Validate a Talon.One list response before using it."""
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Talon.One response must be an object")
+
+    records = payload.get("data")
+    if not isinstance(records, list) or not all(
+        isinstance(record, dict) for record in records
+    ):
+        raise ValueError("Talon.One response data must be a list of objects")
+
+    has_more = payload.get("hasMore")
+    if "hasMore" in payload and not isinstance(has_more, bool):
+        raise ValueError("Talon.One response hasMore must be a boolean")
+
+    total = payload.get("totalResultSize")
+    if "totalResultSize" in payload and (
+        not isinstance(total, int) or isinstance(total, bool)
+    ):
+        raise ValueError("Talon.One response totalResultSize must be an integer")
+
+    return cast(TalonOnePage, payload)

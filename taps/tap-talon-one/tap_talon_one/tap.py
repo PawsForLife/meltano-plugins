@@ -14,7 +14,7 @@ class TalonOneTap(Tap):
     config_jsonschema = th.PropertiesList(
         th.Property(
             "api_url",
-            th.StringType(pattern=r"^https?://"),
+            th.StringType(pattern=r"^https://"),
             required=True,
         ),
         th.Property(
