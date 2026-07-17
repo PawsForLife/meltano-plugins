@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterable, Mapping
+from datetime import timedelta
 from typing import Any, NotRequired, TypedDict, cast
 
 import requests
@@ -118,6 +119,54 @@ class CampaignsStream(TalonOneStream):
         """Set the Application-scoped campaigns endpoint."""
         super().__init__(tap)
         self.path = f"/v1/applications/{self.config['application_id']}/campaigns"
+
+
+class EventsStream(TalonOneStream):
+    """Incremental Talon.One application events."""
+
+    name = "events"
+    primary_keys = ("id",)
+    replication_key = "created"
+    is_sorted = True
+
+    schema = th.PropertiesList(
+        th.Property("id", th.IntegerType, required=True),
+        th.Property("created", th.DateTimeType, required=True),
+        th.Property("applicationId", th.IntegerType),
+        th.Property("sessionId", th.IntegerType),
+        th.Property("profileId", th.IntegerType),
+        th.Property("type", th.StringType),
+        th.Property("attributes", th.ObjectType(additional_properties=True)),
+        th.Property("effects", th.ArrayType(th.CustomType({}))),
+        th.Property("ruleFailureReasons", th.ArrayType(th.CustomType({}))),
+    ).to_dict()
+
+    def __init__(self, tap: Any) -> None:
+        """Set the Application-scoped events endpoint."""
+        super().__init__(tap)
+        self.path = f"/v1/applications/{self.config['application_id']}/events/no_total"
+        self._created_after: str | None = None
+
+    def get_url_params(
+        self,
+        context: Mapping[str, Any] | None,
+        next_page_token: int | None,
+    ) -> dict[str, Any]:
+        """Keep the initial extraction boundary stable across every page."""
+        if self._created_after is None:
+            starting_timestamp = self.get_starting_timestamp(context)
+            if starting_timestamp is None:
+                raise ValueError("Events require start_date or a Singer bookmark")
+            if self.get_context_state(context).get("replication_key_value"):
+                starting_timestamp -= timedelta(minutes=self.config["lookback_minutes"])
+            self._created_after = starting_timestamp.isoformat()
+
+        return {
+            "createdAfter": self._created_after,
+            "pageSize": self.config["page_size"],
+            "skip": next_page_token or 0,
+            "sort": "created",
+        }
 
 
 def _retry_after_seconds(exception: Any) -> float:

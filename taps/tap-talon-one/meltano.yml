@@ -17,3 +17,7 @@ plugins:
           kind: integer
         - name: page_size
           kind: integer
+        - name: start_date
+          kind: date_iso8601
+        - name: lookback_minutes
+          kind: integer
