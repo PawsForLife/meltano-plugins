@@ -98,8 +98,22 @@ class GCSSink(RecordSink):
         self._extraction_pattern.process_record(record=record, context=context)
 
     def close(self) -> None:
-        """Flush and close the pattern's write handle. Called on sink drain/teardown."""
+        """Flush and close the pattern's write handle.
+
+        Prefer :meth:`clean_up` in production paths: Singer SDK targets call
+        ``clean_up`` at end-of-pipe, not ``close``.
+        """
         self._extraction_pattern.close()
+
+    def clean_up(self) -> None:
+        """Finalize open GCS writes, then run RecordSink metric teardown.
+
+        Singer SDK ``Target.drain_all(is_endofpipe=True)`` invokes ``clean_up``
+        on each sink. Without closing the smart_open handle here, objects are
+        never committed to GCS (records appear processed; bucket stays empty).
+        """
+        self.close()
+        super().clean_up()
 
     @property
     def key_name(self) -> str:

@@ -1237,7 +1237,7 @@ wheels = [
 
 [[package]]
 name = "target-gcs"
-version = "3.0.0"
+version = "3.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "google-api-python-client" },
