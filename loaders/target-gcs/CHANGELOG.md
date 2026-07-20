@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-07-20
+
+### Fixed
+
+- **End-of-pipe GCS flush** — `GCSSink.clean_up()` now closes the open `smart_open` handle before metric teardown. Singer SDK calls `clean_up` (not `close`) at end-of-pipe; without this, records are processed but objects never commit (only Meltano state appears in the bucket).
+
 ## [3.0.0] - 2026-03-12
 
 ### Added
