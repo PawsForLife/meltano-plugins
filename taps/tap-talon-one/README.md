@@ -22,6 +22,7 @@ plugins:
 Do not set `variant` for this custom extractor. The tap supports Singer `--discover`, `--catalog`, and standard JSONL output for loaders such as `target-gcs`.
 
 The events stream resumes from its `created` Singer bookmark. On resumed runs, `lookback_minutes` rereads a small boundary window; downstream loaders should deduplicate those records by event `id`.
+`start_date` is only required for the first events sync; an existing Singer bookmark remains authoritative on resumed runs.
 
 ## Development
 
