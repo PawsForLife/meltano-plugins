@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterable, Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, NotRequired, TypedDict, cast
 
 import requests
@@ -154,10 +154,20 @@ class EventsStream(TalonOneStream):
     ) -> dict[str, Any]:
         """Keep the initial extraction boundary stable across every page."""
         if self._created_after is None:
-            starting_timestamp = self.get_starting_timestamp(context)
+            state = self.get_context_state(context)
+            bookmark = (
+                state.get("replication_key_value")
+                if state.get("replication_key") == self.replication_key
+                else None
+            )
+            starting_timestamp = (
+                datetime.fromisoformat(str(bookmark))
+                if bookmark is not None
+                else self.get_starting_timestamp(context)
+            )
             if starting_timestamp is None:
                 raise ValueError("Events require start_date or a Singer bookmark")
-            if self.get_context_state(context).get("replication_key_value"):
+            if bookmark is not None:
                 starting_timestamp -= timedelta(minutes=self.config["lookback_minutes"])
             self._created_after = starting_timestamp.isoformat()
 

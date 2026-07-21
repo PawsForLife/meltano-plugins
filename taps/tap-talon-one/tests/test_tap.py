@@ -129,9 +129,9 @@ def test_discovery_uses_static_schema_and_id_key() -> None:
 
 
 @pytest.mark.parametrize(
-    ("state", "expected_created_after"),
+    ("state", "start_date", "expected_created_after"),
     [
-        (None, "2026-07-01T00:00:00+00:00"),
+        (None, "2026-07-01T00:00:00Z", "2026-07-01T00:00:00+00:00"),
         (
             {
                 "bookmarks": {
@@ -141,12 +141,25 @@ def test_discovery_uses_static_schema_and_id_key() -> None:
                     }
                 }
             },
+            None,
+            "2026-07-10T09:55:00+00:00",
+        ),
+        (
+            {
+                "bookmarks": {
+                    "events": {
+                        "replication_key": "created",
+                        "replication_key_value": "2026-07-10T10:00:00Z",
+                    }
+                }
+            },
+            "2026-07-11T00:00:00Z",
             "2026-07-10T09:55:00+00:00",
         ),
     ],
 )
 def test_events_sync_uses_stable_incremental_window_and_max_bookmark(
-    requests_mock, capsys, state, expected_created_after
+    requests_mock, capsys, state, start_date, expected_created_after
 ) -> None:
     """Reuse one boundary across pages and advance state to the newest event."""
     requests_mock.get(
@@ -178,7 +191,13 @@ def test_events_sync_uses_stable_incremental_window_and_max_bookmark(
         ],
     )
 
-    TalonOneTap(config=config(), state=state).sync_all()
+    tap_config = config()
+    if start_date is None:
+        tap_config.pop("start_date")
+    else:
+        tap_config["start_date"] = start_date
+
+    TalonOneTap(config=tap_config, state=state).sync_all()
 
     event_requests = [
         request

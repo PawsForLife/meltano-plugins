@@ -41,7 +41,6 @@ class TalonOneTap(Tap):
                     r"(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
                 )
             ),
-            required=True,
         ),
         th.Property(
             "lookback_minutes",
