@@ -11,7 +11,7 @@ Monorepo of [Meltano](https://meltano.com/) / [Singer SDK](https://sdk.meltano.c
 | Plugin | Type | Description | Upstream source |
 |--------|------|-------------|-----------------|
 | **restful-api-tap** | Extractor (tap) | Singer tap that extracts from REST API sources; auto-discovered stream schemas. Supports multiple auth types (Basic, API Key, Bearer, OAuth, AWS). | [Widen/tap-rest-api-msdk](https://github.com/Widen/tap-rest-api-msdk) |
-| **tap-talon-one** | Extractor (tap) | Singer tap that extracts campaigns from the Talon.One Management API. | Pet Circle |
+| **tap-talon-one** | Extractor (tap) | Singer tap that extracts campaigns, events, and triggered effects from the Talon.One Management API. | Pet Circle |
 | **target-gcs** | Loader (target) | Singer target that loads data to Google Cloud Storage (destination). Writes JSONL to a configurable bucket with configurable key naming. | [Datateer/target-gcs](https://github.com/Datateer/target-gcs) |
 
 The upstream forks are heavily modified; Meltano uses the plugin names shown above.

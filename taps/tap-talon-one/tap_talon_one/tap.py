@@ -3,7 +3,12 @@
 from singer_sdk import Tap
 from singer_sdk import typing as th
 
-from tap_talon_one.streams import CampaignsStream, EventsStream, TalonOneStream
+from tap_talon_one.streams import (
+    CampaignsStream,
+    EventsStream,
+    ExportEffectsStream,
+    TalonOneStream,
+)
 
 
 class TalonOneTap(Tap):
@@ -47,11 +52,16 @@ class TalonOneTap(Tap):
             th.IntegerType(minimum=0),
             default=5,
         ),
+        th.Property(
+            "effects_window_minutes",
+            th.IntegerType(minimum=1),
+            default=1500,
+        ),
     ).to_dict()
 
     def discover_streams(self) -> list[TalonOneStream]:
         """Return the streams exposed by this tap."""
-        return [CampaignsStream(self), EventsStream(self)]
+        return [CampaignsStream(self), EventsStream(self), ExportEffectsStream(self)]
 
 
 if __name__ == "__main__":

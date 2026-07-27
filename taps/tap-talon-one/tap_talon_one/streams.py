@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from collections.abc import Generator, Iterable, Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, NotRequired, TypedDict, cast
 
 import requests
 from singer_sdk import typing as th
 from singer_sdk.exceptions import RetriableAPIError
-from singer_sdk.pagination import OffsetPaginator
+from singer_sdk.pagination import BaseAPIPaginator, OffsetPaginator, SinglePagePaginator
 from singer_sdk.streams import RESTStream
 
 
@@ -49,7 +51,7 @@ class TalonOneStream(RESTStream):
             "Authorization": f"ManagementKey-v1 {self.config['management_key']}",
         }
 
-    def get_new_paginator(self) -> TalonOnePaginator:
+    def get_new_paginator(self) -> BaseAPIPaginator:
         """Return a fresh offset paginator for each sync."""
         return TalonOnePaginator(start_value=0, page_size=self.config["page_size"])
 
@@ -177,6 +179,78 @@ class EventsStream(TalonOneStream):
             "skip": next_page_token or 0,
             "sort": "created",
         }
+
+
+class ExportEffectsStream(TalonOneStream):
+    """Full-table Talon.One triggered-effects CSV export over a frozen window.
+
+    The Analytics effects export returns ``application/csv`` instead of the JSON
+    list envelope, exposes no per-row cursor or stable sort, and is not paginated,
+    so it is a full-table stream. Each run re-reads a rolling
+    ``createdAfter``/``createdBefore`` window frozen once at run start; overlapping
+    runs are expected and downstream loaders deduplicate the overlap.
+    """
+
+    name = "export_effects"
+    primary_keys = ()
+    replication_method = "FULL_TABLE"
+
+    schema = {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {},
+    }
+
+    def __init__(self, tap: Any) -> None:
+        """Set the Application-scoped effects export endpoint."""
+        super().__init__(tap)
+        self.path = f"/v1/applications/{self.config['application_id']}/export_effects"
+        self._url_params: dict[str, Any] | None = None
+
+    @property
+    def http_headers(self) -> dict[str, str]:
+        """Request CSV alongside the inherited Management API authentication."""
+        return {**super().http_headers, "Accept": "application/csv"}
+
+    def get_new_paginator(self) -> SinglePagePaginator:
+        """Return a single-page paginator; the export is one unpaginated response."""
+        return SinglePagePaginator()
+
+    def get_url_params(
+        self,
+        context: Mapping[str, Any] | None,
+        next_page_token: int | None,
+    ) -> dict[str, Any]:
+        """Bound the export to a rolling window frozen once at run start."""
+        if self._url_params is None:
+            end = _utcnow().replace(microsecond=0)
+            start = end - timedelta(minutes=self.config["effects_window_minutes"])
+            self._url_params = {
+                "createdAfter": _rfc3339(start),
+                "createdBefore": _rfc3339(end),
+                "dateFormat": "ISO8601",
+            }
+        return self._url_params
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
+        """Yield one record per CSV row keyed by the export header."""
+        reader = csv.DictReader(io.StringIO(response.content.decode("utf-8-sig")))
+        for row in reader:
+            yield {key: value for key, value in row.items() if key is not None}
+
+
+def _utcnow() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime.
+
+    Wrapping ``datetime.now`` behind a module-level helper lets tests pin the
+    effects export window without asserting against the wall clock.
+    """
+    return datetime.now(UTC)
+
+
+def _rfc3339(value: datetime) -> str:
+    """Format a UTC datetime as a second-precision RFC3339 string ending in ``Z``."""
+    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _retry_after_seconds(exception: Any) -> float:

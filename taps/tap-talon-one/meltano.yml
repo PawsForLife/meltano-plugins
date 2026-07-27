@@ -21,3 +21,5 @@ plugins:
           kind: date_iso8601
         - name: lookback_minutes
           kind: integer
+        - name: effects_window_minutes
+          kind: integer
