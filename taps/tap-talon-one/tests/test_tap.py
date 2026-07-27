@@ -289,6 +289,29 @@ def test_effects_export_parses_csv_over_frozen_window(
     ]
 
 
+def test_effects_export_rejects_ragged_csv(requests_mock, monkeypatch) -> None:
+    """Reject the export instead of silently truncating a row with surplus cells."""
+    monkeypatch.setattr(
+        streams, "_utcnow", lambda: datetime(2026, 7, 23, 0, 0, 0, tzinfo=UTC)
+    )
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/campaigns",
+        json={"data": [], "hasMore": False},
+    )
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/events/no_total",
+        json={"data": [], "hasMore": False},
+    )
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/export_effects",
+        content=b"campaignId,ruleName\r\n7,Spring Sale,SURPLUS\r\n",
+        headers={"Content-Type": "application/csv"},
+    )
+
+    with pytest.raises(ValueError, match="more fields than the header"):
+        TalonOneTap(config=config()).sync_all()
+
+
 def test_effects_window_is_frozen_across_calls(monkeypatch) -> None:
     """Freeze the window at the first call so later wall-clock ticks are ignored."""
     ticks = iter(

@@ -27,7 +27,9 @@ Do not set `variant` for this custom extractor. The tap supports Singer `--disco
 The events stream resumes from its `created` Singer bookmark. On resumed runs, `lookback_minutes` rereads a small boundary window; downstream loaders should deduplicate those records by event `id`.
 `start_date` is only required for the first events sync; an existing Singer bookmark remains authoritative on resumed runs.
 
-The `export_effects` stream reads the Analytics effects export, which Talon.One returns as CSV. It has no per-row cursor, so it is full table over a rolling window: each run requests `[now - effects_window_minutes, now]` (frozen at run start) and emits one JSON record per CSV row. Runs overlap by design; downstream loaders deduplicate. `effects_window_minutes` defaults to 1500 (25 hours) so a daily schedule keeps a margin across daylight-saving changes.
+The `export_effects` stream reads the Analytics effects export, which Talon.One returns as CSV. It has no per-row cursor, so it is full table over a rolling window: each run requests `[now - effects_window_minutes, now]` (frozen at run start) and emits one JSON record per CSV row. `effects_window_minutes` defaults to 1500 (25 hours) so a daily schedule keeps a margin across daylight-saving changes.
+
+The export carries no primary key, so this stream declares none. Adjacent runs overlap by design and re-emit the same effects, but two identical rows are indistinguishable from a genuinely repeated effect — the tap cannot supply a lossless de-duplication key. Downstream consumers must choose a strategy that fits the data (for example, de-duplicating on the full row within a bounded window) or tolerate duplicates; do not assume the loader removes them automatically.
 
 ## Development
 

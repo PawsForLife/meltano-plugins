@@ -233,10 +233,20 @@ class ExportEffectsStream(TalonOneStream):
         return self._url_params
 
     def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
-        """Yield one record per CSV row keyed by the export header."""
+        """Yield one record per CSV row keyed by the export header.
+
+        A row with more fields than the header is malformed: ``DictReader``
+        collects the surplus cells under a ``None`` key. Rather than silently
+        drop them and emit a truncated record, reject the export so the anomaly
+        surfaces instead of corrupting downstream attribution.
+        """
         reader = csv.DictReader(io.StringIO(response.content.decode("utf-8-sig")))
         for row in reader:
-            yield {key: value for key, value in row.items() if key is not None}
+            if None in row:
+                raise ValueError(
+                    "export_effects CSV row has more fields than the header"
+                )
+            yield dict(row)
 
 
 def _utcnow() -> datetime:

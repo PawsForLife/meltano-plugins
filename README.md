@@ -97,7 +97,7 @@ To bootstrap all plugins and git hooks from the repository root:
 ## Directory layout
 
 - `taps/restful-api-tap/` — **restful-api-tap** (Singer tap for REST API sources; Meltano extractor (tap))
-- `taps/tap-talon-one/` — **tap-talon-one** (Singer tap for Talon.One campaigns; Meltano extractor (tap))
+- `taps/tap-talon-one/` — **tap-talon-one** (Singer tap for Talon.One campaigns, events, and triggered effects; Meltano extractor (tap))
 - `loaders/target-gcs/` — **target-gcs** (Singer target for GCS; Meltano loader (target))
 
 Each subdirectory is a standalone Python package with its own `pyproject.toml` and is installable via `pip` from that path.
