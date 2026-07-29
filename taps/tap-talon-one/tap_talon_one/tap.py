@@ -3,7 +3,14 @@
 from singer_sdk import Tap
 from singer_sdk import typing as th
 
-from tap_talon_one.streams import CampaignsStream, EventsStream, TalonOneStream
+from tap_talon_one.streams import (
+    ApplicationStream,
+    CampaignsStream,
+    CartItemFiltersStream,
+    EventsStream,
+    EventTypesStream,
+    TalonOneStream,
+)
 
 
 class TalonOneTap(Tap):
@@ -51,7 +58,13 @@ class TalonOneTap(Tap):
 
     def discover_streams(self) -> list[TalonOneStream]:
         """Return the streams exposed by this tap."""
-        return [CampaignsStream(self), EventsStream(self)]
+        return [
+            ApplicationStream(self),
+            CampaignsStream(self),
+            CartItemFiltersStream(self),
+            EventsStream(self),
+            EventTypesStream(self),
+        ]
 
 
 if __name__ == "__main__":
