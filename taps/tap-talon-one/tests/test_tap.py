@@ -1,4 +1,4 @@
-"""End-to-end checks for the campaigns stream."""
+"""End-to-end checks for the tap's streams."""
 
 from __future__ import annotations
 
@@ -24,15 +24,35 @@ def config() -> dict[str, object]:
     }
 
 
+def mock_all_stream_endpoints(requests_mock) -> None:
+    """Register empty responses for every stream so sync_all can run.
+
+    Register these first; a test's own matcher for the same URL takes
+    precedence because requests_mock evaluates matchers newest-first.
+    """
+    base = "https://example.talon.one/v1/applications/42"
+    requests_mock.get(base, json={"id": 42})
+    requests_mock.get(f"{base}/events/no_total", json={"data": [], "hasMore": False})
+    for suffix in ("campaigns", "cart_item_filters", "event_types"):
+        requests_mock.get(f"{base}/{suffix}", json={"data": [], "hasMore": False})
+
+
+def emitted_records(capsys, stream: str) -> list[dict[str, object]]:
+    """Return RECORD payloads for one stream from captured Singer output."""
+    messages = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    return [
+        message["record"]
+        for message in messages
+        if message["type"] == "RECORD" and message["stream"] == stream
+    ]
+
+
 def test_campaigns_sync_retries_and_preserves_paging(
     requests_mock, capsys, monkeypatch
 ) -> None:
     """Emit nested records after a Retry-After response and two stable pages."""
     url = "https://example.talon.one/v1/applications/42/campaigns"
-    requests_mock.get(
-        "https://example.talon.one/v1/applications/42/events/no_total",
-        json={"data": [], "hasMore": False},
-    )
+    mock_all_stream_endpoints(requests_mock)
     requests_mock.get(
         url,
         [
@@ -70,9 +90,7 @@ def test_campaigns_sync_retries_and_preserves_paging(
     assert all(request.qs["sort"] == ["id"] for request in requests_seen)
     assert waits == [7.0]
 
-    messages = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    records = [message["record"] for message in messages if message["type"] == "RECORD"]
-    assert records == [
+    assert emitted_records(capsys, "campaigns") == [
         {"id": 1, "name": "One", "referralSettings": {"nested": True}},
         {"id": 2, "name": "Two"},
         {"id": 3, "name": "Three"},
@@ -118,14 +136,35 @@ def test_config_rejects_invalid_incremental_settings(
         TalonOneTap(config=config() | {override: invalid_value})
 
 
-def test_discovery_uses_static_schema_and_id_key() -> None:
-    """Discover both static schemas without making a source request."""
-    campaigns, events = TalonOneTap(config=config()).discover_streams()
+def test_discovery_uses_static_schemas_and_keys() -> None:
+    """Discover every static schema without making a source request."""
+    streams = {
+        stream.name: stream
+        for stream in TalonOneTap(config=config()).discover_streams()
+    }
 
-    assert campaigns.primary_keys == events.primary_keys == ("id",)
-    assert "object" in campaigns.schema["properties"]["referralSettings"]["type"]
-    assert events.replication_key == "created"
-    assert "object" in events.schema["properties"]["attributes"]["type"]
+    assert set(streams) == {
+        "application",
+        "campaigns",
+        "cart_item_filters",
+        "events",
+        "event_types",
+    }
+    assert streams["event_types"].primary_keys == ("name",)
+    for name in sorted(set(streams) - {"event_types"}):
+        assert streams[name].primary_keys == ("id",)
+    for name in sorted(set(streams) - {"events"}):
+        assert streams[name].replication_method == "FULL_TABLE"
+    assert streams["events"].replication_key == "created"
+    assert (
+        "object"
+        in streams["campaigns"].schema["properties"]["referralSettings"]["type"]
+    )
+    assert "object" in streams["events"].schema["properties"]["attributes"]["type"]
+    assert (
+        "object"
+        in streams["application"].schema["properties"]["attributesSettings"]["type"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -162,10 +201,7 @@ def test_events_sync_uses_stable_incremental_window_and_max_bookmark(
     requests_mock, capsys, state, start_date, expected_created_after
 ) -> None:
     """Reuse one boundary across pages and advance state to the newest event."""
-    requests_mock.get(
-        "https://example.talon.one/v1/applications/42/campaigns",
-        json={"data": [], "hasMore": False},
-    )
+    mock_all_stream_endpoints(requests_mock)
     requests_mock.get(
         "https://example.talon.one/v1/applications/42/events/no_total",
         [
@@ -212,8 +248,90 @@ def test_events_sync_uses_stable_incremental_window_and_max_bookmark(
     assert all(request.qs["sort"] == ["created"] for request in event_requests)
 
     messages = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    records = [message["record"] for message in messages if message["type"] == "RECORD"]
+    records = [
+        message["record"]
+        for message in messages
+        if message["type"] == "RECORD" and message["stream"] == "events"
+    ]
     assert records[0]["attributes"] == {"source": {"nested": True}}
     assert messages[-1]["value"]["bookmarks"]["events"]["replication_key_value"] == (
         "2026-07-10T10:02:00Z"
     )
+
+
+def test_application_syncs_single_object_without_paging(requests_mock, capsys) -> None:
+    """Emit the Application singleton from one unpaginated, parameterless request."""
+    mock_all_stream_endpoints(requests_mock)
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42",
+        json={"id": 42, "name": "Dev", "loyaltyPrograms": [{"id": 9}]},
+    )
+
+    TalonOneTap(config=config()).sync_all()
+
+    requests_seen = [
+        request
+        for request in requests_mock.request_history
+        if request.path == "/v1/applications/42"
+    ]
+    assert len(requests_seen) == 1
+    assert requests_seen[0].qs == {}
+    assert requests_seen[0].headers["Authorization"] == "ManagementKey-v1 secret"
+
+    assert emitted_records(capsys, "application") == [
+        {"id": 42, "name": "Dev", "loyaltyPrograms": [{"id": 9}]}
+    ]
+
+
+def test_event_types_wraps_string_rows_and_omits_sort(requests_mock, capsys) -> None:
+    """Wrap plain string event types as records and page without a sort parameter."""
+    mock_all_stream_endpoints(requests_mock)
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/event_types",
+        [
+            {"json": {"data": ["session_created", "purchase"], "totalResultSize": 3}},
+            {"json": {"data": ["refund"], "totalResultSize": 3}},
+        ],
+    )
+
+    TalonOneTap(config=config()).sync_all()
+
+    requests_seen = [
+        request
+        for request in requests_mock.request_history
+        if request.path == "/v1/applications/42/event_types"
+    ]
+    assert [request.qs["skip"] for request in requests_seen] == [["0"], ["2"]]
+    assert all("sort" not in request.qs for request in requests_seen)
+
+    assert emitted_records(capsys, "event_types") == [
+        {"name": "session_created"},
+        {"name": "purchase"},
+        {"name": "refund"},
+    ]
+
+
+def test_cart_item_filters_cap_page_size_and_omit_sort(requests_mock, capsys) -> None:
+    """Cap requests and paginator advancement at the endpoint's pageSize limit."""
+    mock_all_stream_endpoints(requests_mock)
+    first_page = [{"id": index} for index in range(50)]
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/cart_item_filters",
+        [
+            {"json": {"data": first_page, "hasMore": True}},
+            {"json": {"data": [{"id": 50}], "hasMore": False}},
+        ],
+    )
+
+    TalonOneTap(config=config() | {"page_size": 1000}).sync_all()
+
+    requests_seen = [
+        request
+        for request in requests_mock.request_history
+        if request.path == "/v1/applications/42/cart_item_filters"
+    ]
+    assert [request.qs["skip"] for request in requests_seen] == [["0"], ["50"]]
+    assert all(request.qs["pagesize"] == ["50"] for request in requests_seen)
+    assert all("sort" not in request.qs for request in requests_seen)
+
+    assert len(emitted_records(capsys, "cart_item_filters")) == 51
