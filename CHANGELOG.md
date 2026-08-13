@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-13
+
+### Changed
+
+- **CodeRabbit** — Keep documentation and tap contracts reviewable, limit path exclusions to archived plans and temporary output, and retain the default public-repository quality and security checks.
+
 ## 2026-03-25
 
 ### Fixed

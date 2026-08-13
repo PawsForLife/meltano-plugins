@@ -4,18 +4,10 @@ inheritance: true
 
 reviews:
   profile: chill
-  slop_detection:
-    enabled: false
   path_filters:
     - "!_archive/**"
     - "!_features/**"
     - "!tmp/**"
-    - "!docs/**"
-    - "!**/docs/**"
-    - "!**/README/**"
-    - "!**/README.md"
-    - "!**/CHANGELOG.md"
-    - "!**/LICENSE"
   path_instructions:
     - path: "**/*"
       instructions: |
@@ -37,7 +29,3 @@ reviews:
       enabled: true
     trufflehog:
       enabled: true
-    osvScanner:
-      enabled: false
-    zizmor:
-      enabled: false
