@@ -3,7 +3,7 @@
 
 `restful-api-tap` is a Singer tap for generic REST APIs (Python package `restful_api_tap`). It supports schema auto-discovery, multiple authentication methods, and flexible pagination—including optional `pagination_stop_on_duplicate_token` for JSONPath pagination when APIs repeat the final cursor.
 
-**Requirements:** Python 3.12+.
+**Requirements:** Python 3.14+.
 
 ### Documentation
 

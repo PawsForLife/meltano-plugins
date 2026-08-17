@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Tooling
 
-Use the project's preferred languages, versions, and tooling as defined in project config (e.g. `pyproject.toml`, `package.json`, README). Common examples: Python (e.g. 3.12), Node.js, with linters and formatters (e.g. Ruff, MyPy for Python; ESLint/Prettier for Node).
+Use the project's preferred languages, versions, and tooling as defined in project config (e.g. `pyproject.toml`, `package.json`, README). Common examples: Python (e.g. 3.14), Node.js, with linters and formatters (e.g. Ruff, MyPy for Python; ESLint/Prettier for Node).
 
 # Environment
 

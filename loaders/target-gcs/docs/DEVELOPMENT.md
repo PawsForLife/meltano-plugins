@@ -4,7 +4,7 @@ Local setup, testing, and contribution for the target-gcs Singer target (Meltano
 
 ## Requirements
 
-- **Python 3.12+**
+- **Python 3.14+**
 - **uv** for dependency management; lockfile is `uv.lock`
 - **Ruff** and **mypy** for linting, formatting, and type checking
 

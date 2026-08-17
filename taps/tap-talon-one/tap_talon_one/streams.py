@@ -82,7 +82,7 @@ class TalonOneStream(RESTStream):
         """Yield records from a validated Talon.One response envelope."""
         yield from _validated_page(response, record_type=self.record_type)["data"]
 
-    def backoff_wait_generator(self) -> Generator[float, None, None]:
+    def backoff_wait_generator(self) -> Generator[float]:
         """Use Retry-After when Talon.One rate-limits a request."""
         return self.backoff_runtime(value=_retry_after_seconds)
 
@@ -355,7 +355,7 @@ def _retry_after_seconds(exception: Any) -> float:
         return 2.0
     try:
         return max(0.0, float(retry_after))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 2.0
 
 

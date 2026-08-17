@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Run plugin package discovery and set matrix output
         id: discover
@@ -45,14 +45,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install UV
         uses: astral-sh/setup-uv@v8.3.2
 
       - name: Create venv and install dependencies
         run: |
-          uv venv --python 3.12
+          uv venv --python 3.14
           uv sync --extra dev
 
       - name: Ruff check
