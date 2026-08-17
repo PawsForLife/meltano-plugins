@@ -38,7 +38,7 @@ printf "\n${GREEN}Cleanup complete${NC}\n"
 
 # Create venv and install project (editable, including dev dependencies)
 printf "\n${GREEN}Creating virtual environment...${NC}\n"
-uv venv || { printf "\n${RED}Failed to create virtual environment${NC}\n"; exit 1; }
+uv venv --python 3.14 || { printf "\n${RED}Failed to create virtual environment${NC}\n"; exit 1; }
 source .venv/bin/activate || { printf "\n${RED}Failed to activate virtual environment${NC}\n"; exit 1; }
 if [[ -z "${VIRTUAL_ENV}" ]]; then
   printf "\n${RED}Virtual environment activation failed${NC}\n"

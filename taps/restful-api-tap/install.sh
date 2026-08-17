@@ -44,7 +44,7 @@ fi
 
 # Create and activate virtual environment
 printf "\n${GREEN}Creating virtual environment...${NC}\n"
-uv venv --python 3.12 || { printf "\n${RED}Failed to create virtual environment${NC}\n"; exit 1; }
+uv venv --python 3.14 || { printf "\n${RED}Failed to create virtual environment${NC}\n"; exit 1; }
 source .venv/bin/activate || { printf "\n${RED}Failed to activate virtual environment${NC}\n"; exit 1; }
 
 # Verify virtual environment activation

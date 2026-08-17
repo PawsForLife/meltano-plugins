@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- Python 3.14 is now the minimum supported runtime; uv, Ruff, mypy, tox, and local setup target 3.14.
+
 ### Changed
 
 - **readme-split** — User README split into `README/index.md` and topic files (under 500 lines each). Top-level config and generic Meltano `settings` example now include `pagination_stop_on_duplicate_token` alongside other pagination fields.
+
+### Removed
+
+- The obsolete Poetry lock; `uv.lock` is the only dependency lock.
 
 ## [1.7.1] - 2026-03-24
 
