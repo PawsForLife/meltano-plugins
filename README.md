@@ -11,7 +11,7 @@ Monorepo of [Meltano](https://meltano.com/) / [Singer SDK](https://sdk.meltano.c
 | Plugin | Type | Description | Upstream source |
 |--------|------|-------------|-----------------|
 | **restful-api-tap** | Extractor (tap) | Singer tap that extracts from REST API sources; auto-discovered stream schemas. Supports multiple auth types (Basic, API Key, Bearer, OAuth, AWS). | [Widen/tap-rest-api-msdk](https://github.com/Widen/tap-rest-api-msdk) |
-| **tap-talon-one** | Extractor (tap) | Singer tap that extracts campaigns from the Talon.One Management API. | Pet Circle |
+| **tap-talon-one** | Extractor (tap) | Singer tap that extracts campaigns, incremental events, and application config/reference data (application settings, cart item filters, event types) from the Talon.One Management API. | Pet Circle |
 | **target-gcs** | Loader (target) | Singer target that loads data to Google Cloud Storage (destination). Writes JSONL to a configurable bucket with configurable key naming. | [Datateer/target-gcs](https://github.com/Datateer/target-gcs) |
 
 The upstream forks are heavily modified; Meltano uses the plugin names shown above.
@@ -97,7 +97,7 @@ To bootstrap all plugins and git hooks from the repository root:
 ## Directory layout
 
 - `taps/restful-api-tap/` — **restful-api-tap** (Singer tap for REST API sources; Meltano extractor (tap))
-- `taps/tap-talon-one/` — **tap-talon-one** (Singer tap for Talon.One campaigns; Meltano extractor (tap))
+- `taps/tap-talon-one/` — **tap-talon-one** (Singer tap for Talon.One campaigns, events, and application config/reference data; Meltano extractor (tap))
 - `loaders/target-gcs/` — **target-gcs** (Singer target for GCS; Meltano loader (target))
 
 Each subdirectory is a standalone Python package with its own `pyproject.toml` and is installable via `pip` from that path.

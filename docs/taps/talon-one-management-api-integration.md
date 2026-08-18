@@ -1,6 +1,6 @@
 # Talon.One Management API integration: campaigns and events extraction
 
-**Scope:** `tap-talon-one`, Python 3.12, Talon.One Management API campaigns and application events.
+**Scope:** `tap-talon-one`, Python 3.14, Talon.One Management API campaigns and application events.
 
 **Bottom line:** The tap matches Talon.One's documented authentication, endpoints, response envelopes, pagination, and filtering contract. The Management API is limited to three requests per second per endpoint, so the tap relies on Singer SDK retries and Talon.One's `Retry-After` response when throttled.
 
@@ -8,7 +8,7 @@
 
 - A Talon.One Management API key permitted to read campaigns and application events.
 - The Talon.One deployment base URL and Application ID.
-- Python 3.12 or later.
+- Python 3.14 or later.
 
 ```bash
 pip install "git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/tap-talon-one"

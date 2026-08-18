@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tap-talon-one"
-version = "0.1.1"
+version = "0.2.0"
 description = "Singer tap for the Talon.One Management API."
 readme = "README.md"
-requires-python = ">=3.12,<4"
+requires-python = ">=3.14,<4"
 license = "Apache-2.0"
 dependencies = [
     "requests>=2.32,<3",
@@ -31,13 +31,13 @@ packages = ["tap_talon_one"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["B", "C4", "E", "F", "I", "N", "SIM", "UP", "W"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true

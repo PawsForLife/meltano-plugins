@@ -1,6 +1,8 @@
 # tap-talon-one
 
-Singer SDK tap for campaign and incremental event extraction from the Talon.One Management API.
+Singer SDK tap for campaign, incremental event, and application config/reference extraction from the Talon.One Management API.
+
+Streams: `application` (singleton), `campaigns`, `cart_item_filters`, `events` (incremental), `event_types`. All streams except `events` are full-table.
 
 ## Meltano
 

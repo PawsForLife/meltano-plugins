@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+---
+inheritance: true
+
+reviews:
+  profile: chill
+  slop_detection:
+    enabled: false
+  path_filters:
+    - "!_archive/**"
+    - "!_features/**"
+    - "!tmp/**"
+    - "!docs/**"
+    - "!**/docs/**"
+    - "!**/README/**"
+    - "!**/README.md"
+    - "!**/CHANGELOG.md"
+    - "!**/LICENSE"
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Focus on functional correctness, regressions, configuration validity,
+        tests, typos, and compliance with the repository's agent rules.
+        These tools are internal and changes come from trusted maintainers, so
+        avoid generic hardening findings that require an untrusted contributor
+        or public caller. Always flag committed credentials, tokens, keys, or
+        other internal secrets.
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 1
+    ignore_title_keywords:
+      - "[skip review]"
+  tools:
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    osvScanner:
+      enabled: false
+    zizmor:
+      enabled: false
