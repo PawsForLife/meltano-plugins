@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-17
+
+### Changed
+
+- **Python 3.14 migration** — Plugin CI, release tagging, script tests, and current development documentation now use Python 3.14.
+
 ## 2026-08-13
 
 ### Changed

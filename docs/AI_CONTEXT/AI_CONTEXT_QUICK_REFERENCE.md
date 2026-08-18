@@ -27,8 +27,8 @@ Plugins are **custom** (not on Meltano Hub or PyPI). Install via Meltano by edit
 | Item | Value |
 |------|--------|
 | Language | Python |
-| restful-api-tap | `requires-python = ">=3.12"` |
-| target-gcs | `requires-python = ">=3.12,<4.0"` |
+| restful-api-tap | `requires-python = ">=3.14"` |
+| target-gcs | `requires-python = ">=3.14,<4.0"` |
 | Package manager | **uv** (venv, sync deps) |
 | Linter / formatter | **Ruff** |
 | Type checker | **MyPy** |
@@ -61,7 +61,7 @@ Per-plugin commands below are for working in a single plugin directory.
 | Action | Command |
 |--------|---------|
 | Bootstrap (venv, deps, lint, typecheck, test) | `./install.sh` |
-| Venv (Python 3.12) | `uv venv --python 3.12` |
+| Venv (Python 3.14) | `uv venv --python 3.14` |
 | Install deps (+ dev) | `uv sync --extra dev` |
 | Lint | `uv run ruff check .` |
 | Format check | `uv run ruff format --check` |

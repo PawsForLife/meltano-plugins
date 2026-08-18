@@ -19,10 +19,10 @@
 
 ## Environment & Versions
 
-- **Runtime:** Python 3.12+
+- **Runtime:** Python 3.14+
 - **Package manager:** `uv` (venv + sync)
 - **Config:** `pyproject.toml` — scripts, deps, ruff, mypy, pytest
-- **Venv:** `.venv` (create with `uv venv --python 3.12`; activate before commands)
+- **Venv:** `.venv` (create with `uv venv --python 3.14`; activate before commands)
 
 ---
 
