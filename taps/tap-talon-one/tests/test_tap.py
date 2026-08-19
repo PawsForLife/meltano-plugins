@@ -259,6 +259,36 @@ def test_events_sync_uses_stable_incremental_window_and_max_bookmark(
     )
 
 
+def test_events_sync_completes_unsorted_page_and_keeps_max_bookmark(
+    requests_mock, capsys
+) -> None:
+    """Finish syncing an out-of-order page and bookmark the maximum created."""
+    mock_all_stream_endpoints(requests_mock)
+    requests_mock.get(
+        "https://example.talon.one/v1/applications/42/events/no_total",
+        json={
+            "data": [
+                {"id": 1, "created": "2026-07-22T04:25:30Z"},
+                {"id": 2, "created": "2026-07-22T04:22:34Z"},
+            ],
+            "hasMore": False,
+        },
+    )
+
+    TalonOneTap(config=config()).sync_all()
+
+    messages = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    records = [
+        message["record"]
+        for message in messages
+        if message["type"] == "RECORD" and message["stream"] == "events"
+    ]
+    assert [record["id"] for record in records] == [1, 2]
+    assert messages[-1]["value"]["bookmarks"]["events"]["replication_key_value"] == (
+        "2026-07-22T04:25:30Z"
+    )
+
+
 def test_application_syncs_single_object_without_paging(requests_mock, capsys) -> None:
     """Emit the Application singleton from one unpaginated, parameterless request."""
     mock_all_stream_endpoints(requests_mock)
