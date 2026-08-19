@@ -137,9 +137,12 @@ class CampaignsStream(TalonOneStream):
 class EventsStream(TalonOneStream):
     """Incremental Talon.One application events.
 
-    Requests ask for ``sort=created``, but the API can return neighbouring
-    records slightly out of order, so the stream must not claim the sorted
-    guarantee; the SDK tracks the maximum bookmark across the run instead.
+    Must not claim the sorted-stream guarantee: resumed runs rewind
+    ``createdAfter`` by ``lookback_minutes``, so the first records returned
+    are older than the saved bookmark by design and the SDK would abort on
+    them. Requests still ask for ``sort=created``, but correctness does not
+    depend on the API honouring it; the SDK tracks the maximum bookmark
+    across the run instead.
     """
 
     name = "events"
