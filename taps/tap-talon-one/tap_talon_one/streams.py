@@ -135,12 +135,20 @@ class CampaignsStream(TalonOneStream):
 
 
 class EventsStream(TalonOneStream):
-    """Incremental Talon.One application events."""
+    """Incremental Talon.One application events.
+
+    Must not claim the sorted-stream guarantee: resumed runs rewind
+    ``createdAfter`` by ``lookback_minutes``, so the first records returned
+    are older than the saved bookmark by design and the SDK would abort on
+    them. Requests still ask for ``sort=created``, but correctness does not
+    depend on the API honouring it; the SDK tracks the maximum bookmark
+    across the run instead.
+    """
 
     name = "events"
     primary_keys = ("id",)
     replication_key = "created"
-    is_sorted = True
+    is_sorted = False
 
     schema = th.PropertiesList(
         th.Property("id", th.IntegerType, required=True),

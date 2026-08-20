@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tap-talon-one"
-version = "0.2.0"
+version = "0.2.1"
 description = "Singer tap for the Talon.One Management API."
 readme = "README.md"
 requires-python = ">=3.14,<4"
