@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bootstrap all plugins by running each plugin's install.sh; discovery via list_packages.py.
-# Ensures pre-commit is available and installs only the pre-push hook (checks run on push, not on commit).
+# Ensures pre-commit is available and installs the pre-push (plugin checks) and commit-msg (gitlint) hooks.
 # Exits on first failure: discovery, any package install, or pre-commit setup.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,11 +37,11 @@ if ! command -v pre-commit &>/dev/null; then
   fi
 fi
 
-# Install only the pre-push hook (checks run on push, not on commit). Uninstall pre-commit hook if present.
+# Install pre-push (plugin checks run on push, not on commit) and commit-msg (gitlint) hooks.
 cd "$ROOT"
 pre-commit uninstall 2>/dev/null || true
-pre-commit install --hook-type pre-push || {
-  echo "pre-commit install --hook-type pre-push failed." >&2
+pre-commit install --hook-type pre-push --hook-type commit-msg || {
+  echo "pre-commit install --hook-type pre-push --hook-type commit-msg failed." >&2
   exit 1
 }
 

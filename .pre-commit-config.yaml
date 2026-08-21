@@ -1,4 +1,5 @@
-# Root hook: runs plugin checks (ruff, mypy, pytest) via wrapper script.
+# Root hooks: plugin checks (ruff, mypy, pytest) on push; commit-message lint on commit-msg.
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: local
     hooks:
@@ -8,3 +9,9 @@ repos:
         language: system
         pass_filenames: false
         files: '^taps/|^loaders/'
+        stages: [pre-push]
+  - repo: https://github.com/jorisroovers/gitlint
+    rev: v0.19.1
+    hooks:
+      - id: gitlint
+        stages: [commit-msg]
