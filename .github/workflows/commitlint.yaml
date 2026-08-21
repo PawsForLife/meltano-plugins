@@ -1,0 +1,23 @@
+name: Lint Commit Messages
+on:
+  pull_request:
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    if: github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate relaxed commitlint config
+        run: |
+          cat > $GITHUB_WORKSPACE/commitlint.config.mjs << 'EOF'
+          const Configuration = {
+            extends: ['@commitlint/config-conventional'],
+            rules: {
+              'subject-case': [1, 'never'],
+            }
+          }
+          export default Configuration
+          EOF
+      - uses: wagoid/commitlint-github-action@v6
