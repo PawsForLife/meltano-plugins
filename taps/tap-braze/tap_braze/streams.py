@@ -18,30 +18,15 @@ from typing import Any
 import requests
 from singer_sdk import typing as th
 from singer_sdk.exceptions import RetriableAPIError
-from singer_sdk.pagination import (
-    BaseAPIPaginator,
-    PageNumberPaginator,
-    SinglePagePaginator,
-)
+from singer_sdk.pagination import PageNumberPaginator, SinglePagePaginator
 from singer_sdk.streams import RESTStream
 
-
-class BrazeListPaginator(PageNumberPaginator):
-    """Advance Braze 0-indexed ``page`` pagination.
-
-    Braze list endpoints return up to 100 records under a fixed key and an
-    empty array once exhausted; they send no ``hasMore`` flag or next-page
-    token, so termination is inferred from an empty records array.
-    """
-
-    def __init__(self, start_value: int, records_key: str) -> None:
-        """Remember which response key holds the records array."""
-        super().__init__(start_value)
-        self._records_key = records_key
-
-    def has_more(self, response: requests.Response) -> bool:
-        """Continue while the page carries records; stop on the empty page."""
-        return bool(_records(response, self._records_key))
+from tap_braze.models import (
+    CampaignDetailResponse,
+    CampaignListResponse,
+    CanvasDetailResponse,
+    CanvasListResponse,
+)
 
 
 class BrazeStream(RESTStream):
@@ -69,21 +54,27 @@ class BrazeStream(RESTStream):
 class BrazeListStream(BrazeStream):
     """Base full-table Braze list stream.
 
-    Subclasses set ``name``, ``path``, ``records_key`` (the response array that
-    holds the list rows and drives pagination), and ``schema``.
+    Subclasses set ``name``, ``path``, ``records_key`` (the model field holding
+    the list rows), ``list_model`` (the envelope model validated on each page),
+    and ``schema``.
     """
 
     primary_keys = ("id",)
     replication_method = "FULL_TABLE"
     records_key: str
+    list_model: type[CampaignListResponse | CanvasListResponse]
     # Braze list endpoints omit archived campaigns/canvases unless asked. This
     # tap replicates the full descriptive catalogue, so it opts archived rows
     # in; every parent id must reach its details call.
     include_archived = True
 
-    def get_new_paginator(self) -> BaseAPIPaginator:
-        """Return a fresh page-number paginator for each sync."""
-        return BrazeListPaginator(start_value=0, records_key=self.records_key)
+    def get_new_paginator(self) -> PageNumberPaginator:
+        """Page through the 0-indexed list until an empty page.
+
+        Braze sends no next-page flag, so pagination relies on the SDK halting
+        once :meth:`parse_response` yields no records for a page.
+        """
+        return PageNumberPaginator(start_value=0)
 
     def get_url_params(
         self,
@@ -97,8 +88,15 @@ class BrazeListStream(BrazeStream):
         return params
 
     def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
-        """Yield records from the stream's list envelope."""
-        yield from _records(response, self.records_key)
+        """Validate the list envelope into its model, then yield its records.
+
+        Loading the response into ``list_model`` requires the records key and
+        rejects a non-object row, so a malformed or key-less response is
+        rejected here rather than mistaken for an empty final page.
+        """
+        envelope = self.list_model.model_validate_json(response.content)
+        records: list[dict[str, Any]] = getattr(envelope, self.records_key)
+        yield from records
 
 
 class BrazeDetailsStream(BrazeStream):
@@ -107,13 +105,14 @@ class BrazeDetailsStream(BrazeStream):
     One request per parent id. The details payload does not echo the id, so it
     is injected from the parent context and used as the primary key. Subclasses
     set ``name``, ``path``, ``parent_stream_type``, ``id_param`` (the query
-    parameter naming the id), ``id_key`` (the injected context/record key), and
-    ``schema``.
+    parameter naming the id), ``id_key`` (the injected context/record key),
+    ``detail_model`` (the payload model validated on each call), and ``schema``.
     """
 
     replication_method = "FULL_TABLE"
     id_param: str
     id_key: str
+    detail_model: type[CampaignDetailResponse | CanvasDetailResponse]
 
     def get_new_paginator(self) -> SinglePagePaginator:
         """Return a single-page paginator; details is one object per id."""
@@ -132,12 +131,14 @@ class BrazeDetailsStream(BrazeStream):
         return {self.id_param: context[self.id_key]}
 
     def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
-        """Yield the single details object, dropping the API status envelope."""
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise ValueError(f"Braze {self.name} response must be an object")
-        payload.pop("message", None)
-        yield payload
+        """Validate the details payload into its model, then yield the record.
+
+        Loading the response into ``detail_model`` rejects a malformed payload
+        before it can reach ``post_process`` or the emitted record; the model
+        drops the API status envelope and keeps only the attributes it set.
+        """
+        detail = self.detail_model.model_validate_json(response.content)
+        yield detail.to_record()
 
     def post_process(
         self, row: dict[str, Any], context: Mapping[str, Any] | None = None
@@ -157,6 +158,7 @@ class CampaignsStream(BrazeListStream):
     name = "campaigns"
     path = "/campaigns/list"
     records_key = "campaigns"
+    list_model = CampaignListResponse
 
     schema = th.PropertiesList(
         th.Property("id", th.StringType, required=True),
@@ -179,6 +181,7 @@ class CanvasesStream(BrazeListStream):
     name = "canvases"
     path = "/canvas/list"
     records_key = "canvases"
+    list_model = CanvasListResponse
 
     schema = th.PropertiesList(
         th.Property("id", th.StringType, required=True),
@@ -203,6 +206,7 @@ class CampaignDetailsStream(BrazeDetailsStream):
     primary_keys = ("campaign_id",)
     id_param = "campaign_id"
     id_key = "campaign_id"
+    detail_model = CampaignDetailResponse
 
     schema = th.PropertiesList(
         th.Property("campaign_id", th.StringType, required=True),
@@ -237,6 +241,7 @@ class CanvasDetailsStream(BrazeDetailsStream):
     primary_keys = ("canvas_id",)
     id_param = "canvas_id"
     id_key = "canvas_id"
+    detail_model = CanvasDetailResponse
 
     schema = th.PropertiesList(
         th.Property("canvas_id", th.StringType, required=True),
@@ -299,22 +304,3 @@ def _parse_retry_after(retry_after: str) -> float:
         retry_at = retry_at.replace(tzinfo=UTC)
     delay = (retry_at - datetime.now(UTC)).total_seconds()
     return max(0.0, delay)
-
-
-def _records(response: requests.Response, records_key: str) -> list[Any]:
-    """Validate and return the records array from a Braze list envelope.
-
-    A successful list response must carry its records key. Treating a missing
-    key as an empty page would silently stop pagination and report success
-    without the records (or their details), so reject it instead.
-    """
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise ValueError("Braze response must be an object")
-    if records_key not in payload:
-        raise ValueError(f"Braze response missing required '{records_key}' key")
-
-    records = payload[records_key]
-    if not isinstance(records, list):
-        raise ValueError(f"Braze response {records_key} must be a list")
-    return records

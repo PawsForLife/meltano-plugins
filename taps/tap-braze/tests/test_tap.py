@@ -7,10 +7,11 @@ from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 
 import pytest
-import requests
+from pydantic import ValidationError
 from singer_sdk.exceptions import ConfigValidationError
 
-from tap_braze.streams import BrazeListPaginator, _parse_retry_after
+from tap_braze.models import CampaignDetailResponse, CampaignListResponse
+from tap_braze.streams import _parse_retry_after
 from tap_braze.tap import BrazeTap
 
 BASE = "https://rest.example.braze.com"
@@ -90,33 +91,42 @@ def test_config_requires_api_key() -> None:
         BrazeTap(config={"api_url": BASE})
 
 
-def test_paginator_stops_on_empty_data() -> None:
-    """Avoid another request after an empty list page."""
-    response = requests.Response()
-    response._content = b'{"campaigns": []}'
-    paginator = BrazeListPaginator(start_value=0, records_key="campaigns")
-
-    assert paginator.has_more(response) is False
+def test_list_model_accepts_empty_page() -> None:
+    """Load an empty final page into the envelope model without error."""
+    assert CampaignListResponse.model_validate({"campaigns": []}).campaigns == []
 
 
-def test_paginator_rejects_invalid_data() -> None:
-    """Fail before paginating an invalid Braze envelope."""
-    response = requests.Response()
-    response._content = b'{"campaigns": "not-a-list"}'
-    paginator = BrazeListPaginator(start_value=0, records_key="campaigns")
-
-    with pytest.raises(ValueError, match="campaigns must be a list"):
-        paginator.has_more(response)
-
-
-def test_paginator_rejects_missing_records_key() -> None:
+def test_list_model_rejects_missing_records_key() -> None:
     """Reject a list response missing its records key instead of stopping."""
-    response = requests.Response()
-    response._content = b'{"message": "success"}'
-    paginator = BrazeListPaginator(start_value=0, records_key="campaigns")
+    with pytest.raises(ValidationError):
+        CampaignListResponse.model_validate({"message": "success"})
 
-    with pytest.raises(ValueError, match="missing required 'campaigns' key"):
-        paginator.has_more(response)
+
+def test_list_model_rejects_non_list_records() -> None:
+    """Reject a list response whose records key is not an array."""
+    with pytest.raises(ValidationError):
+        CampaignListResponse.model_validate({"campaigns": "not-a-list"})
+
+
+def test_list_model_rejects_null_record_member() -> None:
+    """Reject a null row so a non-dict record can never be yielded."""
+    with pytest.raises(ValidationError):
+        CampaignListResponse.model_validate({"campaigns": [{"id": "1"}, None]})
+
+
+def test_detail_model_rejects_malformed_attribute() -> None:
+    """Reject a details payload whose attribute has the wrong shape."""
+    with pytest.raises(ValidationError):
+        CampaignDetailResponse.model_validate({"channels": "email"})
+
+
+def test_detail_model_drops_envelope_and_unset_fields() -> None:
+    """Emit only the attributes the payload set, without the status envelope."""
+    record = CampaignDetailResponse.model_validate(
+        {"message": "success", "name": "Detailed", "channels": ["email"]}
+    ).to_record()
+
+    assert record == {"name": "Detailed", "channels": ["email"]}
 
 
 def test_retry_after_parses_numeric_seconds() -> None:
