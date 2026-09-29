@@ -11,6 +11,8 @@ request via ``parent_stream_type`` + ``get_child_context``.
 from __future__ import annotations
 
 from collections.abc import Generator, Iterable, Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import requests
@@ -74,6 +76,10 @@ class BrazeListStream(BrazeStream):
     primary_keys = ("id",)
     replication_method = "FULL_TABLE"
     records_key: str
+    # Braze list endpoints omit archived campaigns/canvases unless asked. This
+    # tap replicates the full descriptive catalogue, so it opts archived rows
+    # in; every parent id must reach its details call.
+    include_archived = True
 
     def get_new_paginator(self) -> BaseAPIPaginator:
         """Return a fresh page-number paginator for each sync."""
@@ -84,8 +90,11 @@ class BrazeListStream(BrazeStream):
         context: Mapping[str, Any] | None,
         next_page_token: int | None,
     ) -> dict[str, Any]:
-        """Request the current 0-indexed page."""
-        return {"page": next_page_token or 0}
+        """Request the current 0-indexed page, including archived records."""
+        params: dict[str, Any] = {"page": next_page_token or 0}
+        if self.include_archived:
+            params["include_archived"] = "true"
+        return params
 
     def parse_response(self, response: requests.Response) -> Iterable[dict[str, Any]]:
         """Yield records from the stream's list envelope."""
@@ -252,26 +261,60 @@ class CanvasDetailsStream(BrazeDetailsStream):
     ).to_dict()
 
 
+_DEFAULT_RETRY_WAIT = 2.0
+
+
 def _retry_after_seconds(exception: Any) -> float:
-    """Read the numeric Retry-After header, falling back for other retries."""
+    """Return the Retry-After wait for a rate-limited request.
+
+    Falls back to a short default when the exception carries no usable
+    Retry-After header.
+    """
     if not isinstance(exception, RetriableAPIError) or exception.response is None:
-        return 2.0
+        return _DEFAULT_RETRY_WAIT
     retry_after = exception.response.headers.get("Retry-After")
     if retry_after is None:
-        return 2.0
+        return _DEFAULT_RETRY_WAIT
+    return _parse_retry_after(retry_after)
+
+
+def _parse_retry_after(retry_after: str) -> float:
+    """Parse a Retry-After value into seconds to wait.
+
+    RFC 9110 allows either delta-seconds or an HTTP-date; parse both, and use
+    the default only when neither yields a usable wait.
+    """
+    value = retry_after.strip()
     try:
-        return max(0.0, float(retry_after))
-    except TypeError, ValueError:
-        return 2.0
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        pass
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return _DEFAULT_RETRY_WAIT
+    if retry_at is None:
+        return _DEFAULT_RETRY_WAIT
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=UTC)
+    delay = (retry_at - datetime.now(UTC)).total_seconds()
+    return max(0.0, delay)
 
 
 def _records(response: requests.Response, records_key: str) -> list[Any]:
-    """Validate and return the records array from a Braze list envelope."""
+    """Validate and return the records array from a Braze list envelope.
+
+    A successful list response must carry its records key. Treating a missing
+    key as an empty page would silently stop pagination and report success
+    without the records (or their details), so reject it instead.
+    """
     payload = response.json()
     if not isinstance(payload, dict):
         raise ValueError("Braze response must be an object")
+    if records_key not in payload:
+        raise ValueError(f"Braze response missing required '{records_key}' key")
 
-    records = payload.get(records_key, [])
+    records = payload[records_key]
     if not isinstance(records, list):
         raise ValueError(f"Braze response {records_key} must be a list")
     return records

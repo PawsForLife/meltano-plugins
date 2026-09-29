@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 
 import pytest
 import requests
 from singer_sdk.exceptions import ConfigValidationError
 
-from tap_braze.streams import BrazeListPaginator
+from tap_braze.streams import BrazeListPaginator, _parse_retry_after
 from tap_braze.tap import BrazeTap
 
 BASE = "https://rest.example.braze.com"
@@ -107,6 +109,40 @@ def test_paginator_rejects_invalid_data() -> None:
         paginator.has_more(response)
 
 
+def test_paginator_rejects_missing_records_key() -> None:
+    """Reject a list response missing its records key instead of stopping."""
+    response = requests.Response()
+    response._content = b'{"message": "success"}'
+    paginator = BrazeListPaginator(start_value=0, records_key="campaigns")
+
+    with pytest.raises(ValueError, match="missing required 'campaigns' key"):
+        paginator.has_more(response)
+
+
+def test_retry_after_parses_numeric_seconds() -> None:
+    """Read a delta-seconds Retry-After value verbatim."""
+    assert _parse_retry_after("9") == 9.0
+
+
+def test_retry_after_parses_http_date() -> None:
+    """Compute the wait until an HTTP-date Retry-After value."""
+    retry_at = datetime.now(UTC) + timedelta(seconds=120)
+    wait = _parse_retry_after(format_datetime(retry_at, usegmt=True))
+
+    assert 90.0 <= wait <= 120.0
+
+
+def test_retry_after_past_http_date_is_not_negative() -> None:
+    """Clamp an already-elapsed HTTP-date to a zero wait."""
+    retry_at = datetime.now(UTC) - timedelta(seconds=60)
+    assert _parse_retry_after(format_datetime(retry_at, usegmt=True)) == 0.0
+
+
+def test_retry_after_falls_back_on_garbage() -> None:
+    """Fall back to the default when the value is neither number nor date."""
+    assert _parse_retry_after("not-a-date") == 2.0
+
+
 def test_campaigns_list_paginates_and_authenticates(requests_mock, capsys) -> None:
     """Page through campaigns with the bearer token until the empty page."""
     mock_all_stream_endpoints(requests_mock)
@@ -122,6 +158,9 @@ def test_campaigns_list_paginates_and_authenticates(requests_mock, capsys) -> No
 
     list_requests = requests_to(requests_mock, "/campaigns/list")
     assert [request.qs["page"] for request in list_requests] == [["0"], ["1"]]
+    assert all(
+        request.qs["include_archived"] == ["true"] for request in list_requests
+    )
     assert all(
         request.headers["Authorization"] == "Bearer secret" for request in list_requests
     )
