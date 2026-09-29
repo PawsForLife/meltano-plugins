@@ -292,11 +292,11 @@ def _parse_retry_after(retry_after: str) -> float:
     value = retry_after.strip()
     try:
         return max(0.0, float(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pass
     try:
         retry_at = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _DEFAULT_RETRY_WAIT
     if retry_at is None:
         return _DEFAULT_RETRY_WAIT

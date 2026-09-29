@@ -168,9 +168,7 @@ def test_campaigns_list_paginates_and_authenticates(requests_mock, capsys) -> No
 
     list_requests = requests_to(requests_mock, "/campaigns/list")
     assert [request.qs["page"] for request in list_requests] == [["0"], ["1"]]
-    assert all(
-        request.qs["include_archived"] == ["true"] for request in list_requests
-    )
+    assert all(request.qs["include_archived"] == ["true"] for request in list_requests)
     assert all(
         request.headers["Authorization"] == "Bearer secret" for request in list_requests
     )
