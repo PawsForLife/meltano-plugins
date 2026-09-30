@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git switch -c:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(gitlint:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv lock:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run --locked pytest:*)",
+      "Bash(uv run --no-project --with pytest pytest scripts/tests:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(scripts/run_plugin_checks.sh)",
+      "Bash(python3 scripts/list_packages.py:*)"
+    ],
+    "deny": [
+      "Read(./**/.env)",
+      "Read(./**/.env.*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '[ -f .pre-commit-config.yaml ] || exit 0; GIT_CONFIG_COUNT=0 uv tool run pre-commit install >&2'",
+            "timeout": 120,
+            "statusMessage": "Installing git hooks..."
+          }
+        ]
+      }
+    ]
+  }
+}
