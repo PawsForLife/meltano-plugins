@@ -9,8 +9,9 @@
     `/canvas/list`) with Braze 0-indexed page-number pagination. The lists request
     `include_archived=true` so archived campaigns/canvases reach their details
     call. Each page is loaded into a Pydantic envelope model that requires the
-    records key and rejects a non-object row, so a missing key or malformed page
-    is rejected rather than mistaken for an empty final page.
+    records key and validates each row (a required string `id` plus pass-through
+    attributes), so a missing key, malformed page or id-less row is rejected
+    rather than mistaken for an empty final page or failing later.
   - `campaign_details` and `canvas_details` full-table child streams
     (`/campaigns/details`, `/canvas/details`) that fan out one details request per
     parent id via the Singer SDK `parent_stream_type` + `get_child_context`

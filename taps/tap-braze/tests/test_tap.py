@@ -114,6 +114,32 @@ def test_list_model_rejects_null_record_member() -> None:
         CampaignListResponse.model_validate({"campaigns": [{"id": "1"}, None]})
 
 
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"name": "no-id"},  # missing id
+        {"id": None},  # null id
+        {"id": 123},  # non-string id
+    ],
+)
+def test_list_model_rejects_row_without_string_id(row: dict[str, object]) -> None:
+    """Reject a row whose required string id is missing, null or mistyped."""
+    with pytest.raises(ValidationError):
+        CampaignListResponse.model_validate({"campaigns": [row]})
+
+
+def test_list_model_row_keeps_extra_attributes() -> None:
+    """Keep a validated row's extra attributes alongside its id."""
+    envelope = CampaignListResponse.model_validate(
+        {"campaigns": [{"id": "1", "name": "One", "tags": ["a"]}]}
+    )
+    assert envelope.campaigns[0].model_dump(mode="json", exclude_unset=True) == {
+        "id": "1",
+        "name": "One",
+        "tags": ["a"],
+    }
+
+
 def test_detail_model_rejects_malformed_attribute() -> None:
     """Reject a details payload whose attribute has the wrong shape."""
     with pytest.raises(ValidationError):

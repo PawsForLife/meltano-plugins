@@ -19,12 +19,26 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
+class BrazeListRow(BaseModel):
+    """One Braze list row: a required string ``id`` plus its other attributes.
+
+    ``id`` is the primary key and the parent context each details call fans out
+    from, so a row missing it (or carrying a null/non-string ``id``) is rejected
+    at validation rather than failing later in ``get_child_context``. Unknown
+    attributes pass through unchanged.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+
+
 class CampaignListResponse(BaseModel):
     """The ``/campaigns/list`` envelope: a required array of campaign rows."""
 
     model_config = ConfigDict(extra="allow")
 
-    campaigns: list[dict[str, Any]]
+    campaigns: list[BrazeListRow]
 
 
 class CanvasListResponse(BaseModel):
@@ -32,7 +46,7 @@ class CanvasListResponse(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    canvases: list[dict[str, Any]]
+    canvases: list[BrazeListRow]
 
 
 class _DetailResponse(BaseModel):

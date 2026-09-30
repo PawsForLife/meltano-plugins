@@ -22,6 +22,7 @@ from singer_sdk.pagination import PageNumberPaginator, SinglePagePaginator
 from singer_sdk.streams import RESTStream
 
 from tap_braze.models import (
+    BrazeListRow,
     CampaignDetailResponse,
     CampaignListResponse,
     CanvasDetailResponse,
@@ -91,12 +92,16 @@ class BrazeListStream(BrazeStream):
         """Validate the list envelope into its model, then yield its records.
 
         Loading the response into ``list_model`` requires the records key and
-        rejects a non-object row, so a malformed or key-less response is
-        rejected here rather than mistaken for an empty final page.
+        validates each row (a required string ``id`` plus pass-through
+        attributes), so a malformed, key-less or id-less response is rejected
+        here rather than mistaken for an empty final page or failing later when
+        the child context is built. Validated rows are converted back to dicts
+        for emission.
         """
         envelope = self.list_model.model_validate_json(response.content)
-        records: list[dict[str, Any]] = getattr(envelope, self.records_key)
-        yield from records
+        rows: list[BrazeListRow] = getattr(envelope, self.records_key)
+        for row in rows:
+            yield row.model_dump(mode="json", exclude_unset=True)
 
 
 class BrazeDetailsStream(BrazeStream):
