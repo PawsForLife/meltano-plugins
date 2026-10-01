@@ -1,13 +1,13 @@
 name: Lint Commit Messages
 on:
   pull_request:
+    branches: [main]
 permissions:
   contents: read
   pull-requests: read
 jobs:
   commitlint:
     runs-on: ubuntu-latest
-    if: github.base_ref == 'main'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,4 +23,8 @@ jobs:
           }
           export default Configuration
           EOF
+      # Mirrors PawsForLife/puggle's commitlint-variant.yaml inline because this repo is public
+      # and cannot call that private workflow. Temporary: remove continue-on-error once the
+      # commit-lint rules are approved and followed.
       - uses: wagoid/commitlint-github-action@v6
+        continue-on-error: true
