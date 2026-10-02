@@ -7,14 +7,14 @@ from typing import Any
 
 import smart_open
 
-from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT, PATH_DATED
+from target_gcs.constants import PATH_DATED
 from target_gcs.paths.base import BasePathPattern
 
 
 class DatedPath(BasePathPattern):
     """Hive path from extraction date only; one handle per run; rotation at limit (timestamp-only).
 
-    Partition path is fixed for the run (extraction_date via DEFAULT_PARTITION_DATE_FORMAT).
+    Partition path is fixed for the run (extraction_date via hive_partition_date_format).
     Key = stream + partition_path + timestamp. Same rotate/write/close semantics as SimplePath.
     """
 
@@ -34,7 +34,7 @@ class DatedPath(BasePathPattern):
             storage_client=storage_client,
             extraction_date=extraction_date,
         )
-        hive_path: str = self._extraction_date.strftime(DEFAULT_PARTITION_DATE_FORMAT)
+        hive_path: str = self._extraction_date.strftime(self.hive_partition_date_format)
         self._path: str = PATH_DATED.format(stream=stream_name, hive_path=hive_path)
 
     def process_record(self, record: dict[str, Any], context: dict[str, Any]) -> None:

@@ -4,6 +4,7 @@ from google.cloud.storage import Client
 from singer_sdk import typing as th
 from singer_sdk.target_base import Target
 
+from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT
 from target_gcs.sinks import GCSSink
 
 
@@ -35,6 +36,13 @@ class GCSTarget(Target):
             required=False,
             default=False,
             description="When true, enable Hive partitioning from stream schema (x-partition-fields) or current date.",
+        ),
+        th.Property(
+            "hive_partition_date_format",
+            th.StringType,
+            required=False,
+            default=DEFAULT_PARTITION_DATE_FORMAT,
+            description="strftime pattern for Hive date partition segments; e.g. 'year=%Y/month=%m/day=%d' for the pre-4.0 layout.",
         ),
     ).to_dict()
     default_sink_class = GCSSink

@@ -1,0 +1,15 @@
+version: 1
+send_anonymous_usage_stats: false
+plugins:
+  extractors:
+    - name: tap-braze
+      namespace: tap_braze
+      pip_url: -e .
+      capabilities:
+        - catalog
+        - discover
+      settings:
+        - name: api_url
+          kind: string
+        - name: api_key
+          kind: password

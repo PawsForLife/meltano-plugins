@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-02
+
+### Changed
+
+- CI `commitlint.yaml` mirrors puggle's advisory `commitlint-variant.yaml` inline (`continue-on-error`); added `.no-mistakes.yaml` so pipeline commits use `chore(no-mistakes):`.
+- **AI context (target-gcs)** — Document the `hive_partition_date_format` setting and the `date=YYYY-MM-DD` default Hive date segment in target-gcs 4.0.0.
+
+## 2026-09-29
+
+### Added
+
+- **Commit-message linting** — CI `commitlint.yaml` (relaxed Conventional Commits, PRs into `main`) and a local gitlint `commit-msg` hook with `.gitlint`.
+- **Agent readiness** — `AGENTS.md` and `CLAUDE.md`; `.claude/settings.json` with a command allowlist and a `SessionStart` hook that installs the git hooks.
+- **Script tests on push** — a `pre-push` hook runs `scripts/tests` when `scripts/` changes.
+
+### Fixed
+
+- `install.sh` and `scripts/run_plugin_checks.sh` call `python3`, so they run where no `python` shim exists.
+
 ## 2026-08-17
 
 ### Changed

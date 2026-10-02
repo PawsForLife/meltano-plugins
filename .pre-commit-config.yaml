@@ -1,4 +1,4 @@
-# Root hook: runs plugin checks (ruff, mypy, pytest) via wrapper script.
+default_install_hook_types: [commit-msg, pre-push]
 repos:
   - repo: local
     hooks:
@@ -8,3 +8,17 @@ repos:
         language: system
         pass_filenames: false
         files: '^taps/|^loaders/'
+        stages: [pre-push]
+      - id: script-tests
+        name: Run script tests (pytest scripts/tests)
+        # git exports GIT_DIR to hooks, which would point the tests' temp repos at this one.
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE uv run --no-project --with pytest pytest scripts/tests -q
+        language: system
+        pass_filenames: false
+        files: '^scripts/'
+        stages: [pre-push]
+  - repo: https://github.com/jorisroovers/gitlint
+    rev: v0.19.1
+    hooks:
+      - id: gitlint
+        stages: [commit-msg]

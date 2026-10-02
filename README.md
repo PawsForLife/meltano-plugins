@@ -12,6 +12,7 @@ Monorepo of [Meltano](https://meltano.com/) / [Singer SDK](https://sdk.meltano.c
 |--------|------|-------------|-----------------|
 | **restful-api-tap** | Extractor (tap) | Singer tap that extracts from REST API sources; auto-discovered stream schemas. Supports multiple auth types (Basic, API Key, Bearer, OAuth, AWS). | [Widen/tap-rest-api-msdk](https://github.com/Widen/tap-rest-api-msdk) |
 | **tap-talon-one** | Extractor (tap) | Singer tap that extracts campaigns, incremental events, and application config/reference data (application settings, cart item filters, event types) from the Talon.One Management API. | Pet Circle |
+| **tap-braze** | Extractor (tap) | Singer tap that extracts Braze campaign and canvas details (attributes: type, schedule, channels, messages, tags, timestamps) from the Braze REST API, fanning one details call out per id from the list endpoints via the Singer SDK parent-child mechanism. | Pet Circle |
 | **target-gcs** | Loader (target) | Singer target that loads data to Google Cloud Storage (destination). Writes JSONL to a configurable bucket with configurable key naming. | [Datateer/target-gcs](https://github.com/Datateer/target-gcs) |
 
 The upstream forks are heavily modified; Meltano uses the plugin names shown above.
@@ -52,6 +53,16 @@ plugins:
       pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/tap-talon-one
 ```
 
+**Extractor (tap-braze):**
+
+```yaml
+plugins:
+  extractors:
+    - name: tap-braze
+      namespace: tap_braze
+      pip_url: git+https://github.com/PawsForLife/meltano-plugins.git#subdirectory=taps/tap-braze
+```
+
 **Loader (target-gcs):**
 
 ```yaml
@@ -89,8 +100,18 @@ pip_url: git+https://github.com/PawsForLife/meltano-plugins.git@v1.0.0#subdirect
 
 To bootstrap all plugins and git hooks from the repository root:
 
-- Run **`./install.sh`** — discovers plugins via `scripts/list_packages.py`, runs each plugin's `install.sh` (exits on first failure), installs pre-commit if not present, and runs `pre-commit install --hook-type pre-push` only (no commit hook). Run this at least once so each plugin has a `.venv`; the hook depends on it. Checks (ruff, mypy, pytest) run on **`git push`** only, not on commit.
-- To run all checks without pushing: **`pre-commit run --all-files`** (runs ruff, mypy, and pytest per plugin).
+- Run **`./install.sh`** — discovers plugins via `scripts/list_packages.py`, runs each plugin's `install.sh` (exits on first failure), installs pre-commit if not present, and runs `pre-commit install --hook-type pre-push --hook-type commit-msg`. Run this at least once so each plugin has a `.venv`; the hook depends on it. Checks (ruff, mypy, pytest) run on **`git push`** only, not on commit, and only when the pushed range touches `taps/`, `loaders/` or `scripts/`.
+- To run all checks without pushing: **`pre-commit run --all-files --hook-stage pre-push`** (ruff, mypy, and pytest per plugin, plus the `scripts/` tests). A plain `pre-commit run` skips them, because they run at the `pre-push` stage.
+
+### Commit messages
+
+This repo enforces [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`<type>(<scope>): <description>`, e.g. `feat(tap-talon-one): add campaigns stream (DNA-9537)`):
+
+- **CI:** the `Lint Commit Messages` workflow checks commits on PRs into `main` with rules mirroring puggle's shared variant (advisory for now; merge commits are ignored). Promotion PRs into `release` are deliberately not linted.
+- **Local:** a `commit-msg` gitlint hook rejects non-conventional messages (installed by `./install.sh`; config in `.gitlint`).
+- **PR titles:** merges use `PR_TITLE`, so the PR title lands in history — write it in Conventional Commits form with a trailing key, e.g. `feat: add campaigns stream (DNA-9537)`.
+
+See [Pet Circle commit-message linting](https://petcircle.atlassian.net/wiki/spaces/TEC/pages/2786427719) and `.cursor/commands/commit.md`.
 
 ---
 
@@ -98,6 +119,7 @@ To bootstrap all plugins and git hooks from the repository root:
 
 - `taps/restful-api-tap/` — **restful-api-tap** (Singer tap for REST API sources; Meltano extractor (tap))
 - `taps/tap-talon-one/` — **tap-talon-one** (Singer tap for Talon.One campaigns, events, and application config/reference data; Meltano extractor (tap))
+- `taps/tap-braze/` — **tap-braze** (Singer tap for Braze campaign and canvas details via parent-child list/details fan-out; Meltano extractor (tap))
 - `loaders/target-gcs/` — **target-gcs** (Singer target for GCS; Meltano loader (target))
 
 Each subdirectory is a standalone Python package with its own `pyproject.toml` and is installable via `pip` from that path.

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tap-braze"
+version = "0.1.0"
+description = "Singer tap for Braze campaign and canvas details."
+readme = "README.md"
+requires-python = ">=3.14,<4"
+license = "Apache-2.0"
+dependencies = [
+    "pydantic>=2.7,<3",
+    "requests>=2.32,<3",
+    "singer-sdk>=0.54,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10,<2",
+    "pytest>=8.2,<9",
+    "requests-mock>=1.12,<2",
+    "ruff>=0.8,<1",
+    "types-requests>=2.32,<3",
+]
+
+[project.scripts]
+tap-braze = "tap_braze.tap:BrazeTap.cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tap_braze"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["B", "C4", "E", "F", "I", "N", "SIM", "UP", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true

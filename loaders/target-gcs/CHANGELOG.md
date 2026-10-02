@@ -1,10 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [4.0.0] - 2026-10-02
 
 ### Breaking
 
+- **Hive date segments default to `date=YYYY-MM-DD`** — With `hive_partitioned: true`, the run-date fallback (DatedPath) and date-parseable `x-partition-fields` segments are now written as `date=2024-03-13` instead of `year=2024/month=03/day=13`. To keep the 3.x layout, set `hive_partition_date_format: "year=%Y/month=%m/day=%d"`.
 - Python 3.14 is now the minimum supported runtime; uv, Ruff, mypy, and local setup target 3.14.
+
+### Added
+
+- **`hive_partition_date_format` setting** — strftime pattern for Hive date segments (default `date=%Y-%m-%d`); applies to both the run-date fallback and date-parseable `x-partition-fields`.
 
 ## [3.0.1] - 2026-07-20
 

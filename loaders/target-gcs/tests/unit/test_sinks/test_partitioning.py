@@ -41,7 +41,7 @@ def test_hive_partitioned_true_no_x_partition_fields_key_contains_extraction_dat
     recording_storage_client: RecordingGCSClient,
 ) -> None:
     """With hive_partitioned true and no x-partition-fields, process_record produces a key containing the extraction date segment.
-    WHAT: Key contains year=.../month=.../day=... from extraction_date. WHY: Extraction date path when schema has no partition fields."""
+    WHAT: Key contains date=YYYY-MM-DD from extraction_date. WHY: Extraction date path when schema has no partition fields."""
     config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     target = GCSTarget(config=config, storage_client=recording_storage_client)
     sink = GCSSink(
@@ -57,10 +57,7 @@ def test_hive_partitioned_true_no_x_partition_fields_key_contains_extraction_dat
     sink.close()
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
-    key = paths[0][1]
-    assert "year=2024" in key and "month=03" in key and "day=11" in key, (
-        "key must contain extraction date segment when hive_partitioned true and no x-partition-fields"
-    )
+    assert paths == [("test-bucket", "my_stream/date=2024-03-11/12345000.jsonl")]
 
 
 def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_segments(
@@ -69,7 +66,7 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
     recording_storage_client: RecordingGCSClient,
 ) -> None:
     """With hive_partitioned true and x-partition-fields [r, d], record with r='x' and d=datetime produces key with literal 'x' and date segment in order.
-    WHAT: Key contains literal segment and year=2024/month=03/day=11 in schema order. WHY: Schema-driven partition path in key."""
+    WHAT: Key contains literal segment and date=2024-03-11 in schema order. WHY: Schema-driven partition path in key."""
     config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     schema = {
         "x-partition-fields": ["r", "d"],
@@ -96,18 +93,7 @@ def test_hive_partitioned_true_x_partition_fields_key_contains_literal_and_date_
     sink.close()
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
-    key = paths[0][1]
-    literal_segment = "r=x"
-    date_segment = "year=2024/month=03/day=11"
-    assert literal_segment in key, (
-        "key must contain literal partition segment (key=value) from record"
-    )
-    assert date_segment in key, "key must contain date partition segment"
-    idx_literal = key.index(literal_segment)
-    idx_date = key.index("year=2024")
-    assert idx_literal < idx_date, (
-        "literal segment must appear before date segment in key order"
-    )
+    assert paths == [("test-bucket", "my_stream/r=x/date=2024-03-11/12345000.jsonl")]
 
 
 def test_partition_change_closes_handle_two_distinct_keys(
@@ -142,3 +128,84 @@ def test_partition_change_closes_handle_two_distinct_keys(
     assert keys[0] != keys[1], (
         "two distinct keys must be used when partition path changes"
     )
+
+
+def test_hive_partition_date_format_override_reproduces_v3_layout(
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+) -> None:
+    """WHAT: hive_partition_date_format 'year=%Y/month=%m/day=%d' yields v3 keys for literal+date fields and the run-date fallback.
+    WHY: Existing extractions keep their layout by setting the override."""
+    config = {
+        "bucket_name": "test-bucket",
+        "hive_partitioned": True,
+        "hive_partition_date_format": "year=%Y/month=%m/day=%d",
+    }
+    partitioned_schema = {
+        "x-partition-fields": ["country", "event_date"],
+        "properties": {
+            "country": {"type": "string"},
+            "event_date": {"type": "string", "format": "date"},
+        },
+        "required": ["country", "event_date"],
+    }
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    for stream_name, schema, record in [
+        (
+            "events",
+            partitioned_schema,
+            {"country": "UK", "event_date": "2024-03-13"},
+        ),
+        ("snapshots", {"properties": {}}, {"id": 1}),
+    ]:
+        sink = GCSSink(
+            target=target,
+            stream_name=stream_name,
+            schema=schema,
+            key_properties=[],
+            storage_client=recording_storage_client,
+            time_fn=fixed_time_fn,
+            extraction_date=fixed_date,
+        )
+        sink.process_record(record, {})
+        sink.close()
+    assert recording_storage_client.get_written_paths() == [
+        ("test-bucket", "events/country=UK/year=2024/month=03/day=13/12345000.jsonl"),
+        ("test-bucket", "snapshots/year=2024/month=03/day=11/12345000.jsonl"),
+    ]
+
+
+def test_hive_partition_date_format_default_with_literal_and_date_fields(
+    fixed_time_fn: object,
+    fixed_date: datetime,
+    recording_storage_client: RecordingGCSClient,
+) -> None:
+    """WHAT: Without the override, literal then date fields yield field=value/date=YYYY-MM-DD.
+    WHY: date=YYYY-MM-DD is the 4.0 default for x-partition-fields date segments."""
+    config = {"bucket_name": "test-bucket", "hive_partitioned": True}
+    schema = {
+        "x-partition-fields": ["country", "event_date"],
+        "properties": {
+            "country": {"type": "string"},
+            "event_date": {"type": "string", "format": "date"},
+        },
+        "required": ["country", "event_date"],
+    }
+    target = GCSTarget(config=config, storage_client=recording_storage_client)
+    sink = GCSSink(
+        target=target,
+        stream_name="events",
+        schema=schema,
+        key_properties=[],
+        storage_client=recording_storage_client,
+        time_fn=fixed_time_fn,
+        extraction_date=fixed_date,
+    )
+    sink.process_record({"country": "UK", "event_date": "2024-03-13"}, {})
+    sink.process_record({"country": "AU", "event_date": "2024-03-14T10:00:00Z"}, {})
+    sink.close()
+    assert recording_storage_client.get_written_paths() == [
+        ("test-bucket", "events/country=UK/date=2024-03-13/12345000.jsonl"),
+        ("test-bucket", "events/country=AU/date=2024-03-14/12345000.jsonl"),
+    ]

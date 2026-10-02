@@ -2,6 +2,8 @@
 
 Review uncommitted files, ensure no unsafe files are included, and generate a Conventional Commits-formatted message. Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) spec. Reference `@commits` for spec details.
 
+> Conventional Commits are **enforced** in this repo: a local `commit-msg` gitlint hook (via `./install.sh`) and the `Lint Commit Messages` CI check on PRs into `main`. See [Pet Circle commit-message linting](https://petcircle.atlassian.net/wiki/spaces/TEC/pages/2786427719) and `CONTEXT.md`.
+
 ## Prerequisites
 
 - Git repository with uncommitted changes (staged or unstaged)

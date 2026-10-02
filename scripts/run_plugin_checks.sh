@@ -29,7 +29,7 @@ run_plugin() {
   .venv/bin/pytest
 }
 
-packages_output="$(python "$ROOT/scripts/list_packages.py" "$ROOT")"
+packages_output="$(python3 "$ROOT/scripts/list_packages.py" "$ROOT")"
 list_rc=$?
 if [[ $list_rc -ne 0 ]]; then
   echo "list_packages.py failed with exit code $list_rc" >&2
