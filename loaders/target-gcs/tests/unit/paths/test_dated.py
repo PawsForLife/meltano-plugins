@@ -35,7 +35,7 @@ def test_path_from_path_dated_constant(
     assert len(paths) == 1
     key = paths[0][1]
     assert key.startswith("my_stream/")
-    assert "year=2024/month=03/day=11" in key
+    assert "date=2024-03-11" in key
     assert "12345" in key
     assert key.endswith(".jsonl")
 
@@ -44,7 +44,7 @@ def test_hive_path_is_extraction_date_formatted(
     fixed_time_fn: Callable[[], float],
     recording_storage_client: RecordingGCSClient,
 ) -> None:
-    """WHAT: hive_path segment equals year=YYYY/month=MM/day=DD from extraction date.
+    """WHAT: hive_path segment equals date=YYYY-MM-DD from extraction date.
     WHY: Validates DatedPath semantics: partition path uses DEFAULT_PARTITION_DATE_FORMAT."""
     config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     extraction_date = datetime(2024, 6, 15)
@@ -59,7 +59,32 @@ def test_hive_path_is_extraction_date_formatted(
     subject.close()
     paths = recording_storage_client.get_written_paths()
     assert len(paths) == 1
-    assert "year=2024/month=06/day=15" in paths[0][1]
+    assert paths == [("test-bucket", "my_stream/date=2024-06-15/12345000.jsonl")]
+
+
+def test_hive_path_uses_hive_partition_date_format_override(
+    fixed_time_fn: Callable[[], float],
+    recording_storage_client: RecordingGCSClient,
+) -> None:
+    """WHAT: hive_partition_date_format overrides the run-date segment pattern.
+    WHY: Consumers not yet migrated must be able to keep the year=/month=/day= layout."""
+    config = {
+        "bucket_name": "test-bucket",
+        "hive_partitioned": True,
+        "hive_partition_date_format": "year=%Y/month=%m/day=%d",
+    }
+    subject = DatedPath(
+        stream_name="my_stream",
+        config=config,
+        time_fn=fixed_time_fn,
+        storage_client=recording_storage_client,
+        extraction_date=datetime(2024, 6, 15),
+    )
+    subject.process_record({"id": 1}, {})
+    subject.close()
+    assert recording_storage_client.get_written_paths() == [
+        ("test-bucket", "my_stream/year=2024/month=06/day=15/12345000.jsonl")
+    ]
 
 
 def test_filename_is_timestamp_jsonl(
@@ -83,10 +108,7 @@ def test_filename_is_timestamp_jsonl(
     subject.process_record({"id": 1}, {})
     subject.close()
     paths = recording_storage_client.get_written_paths()
-    assert len(paths) == 1
-    key = paths[0][1]
-    assert key.endswith("77777000.jsonl")
-    assert "-0" not in key and "-1" not in key
+    assert paths == [("test-bucket", "my_stream/date=2024-03-11/77777000.jsonl")]
 
 
 # --- One handle per run ---
@@ -114,7 +136,7 @@ def test_dated_path_one_handle_per_run_when_no_chunking_uses_single_key(
     assert len(paths) == 1
     keys = [p[1] for p in paths]
     assert len(set(keys)) == 1
-    assert "year=2024/month=01/day=01" in keys[0]
+    assert "date=2024-01-01" in keys[0]
 
 
 # --- Rotation at limit ---

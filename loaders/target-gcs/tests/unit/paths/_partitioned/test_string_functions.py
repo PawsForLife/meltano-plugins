@@ -32,7 +32,7 @@ def test_date_as_partition_returns_formatted_string_for_datetime() -> None:
     """WHAT: date_as_partition returns non-empty string in Hive date format for datetime input.
     WHY: Partition path construction depends on correct formatted date; datetime is a common input."""
     result = date_as_partition("dt", datetime(2024, 3, 15))
-    assert result == "year=2024/month=03/day=15"
+    assert result == "date=2024-03-15"
     assert len(result) > 0
 
 
@@ -40,7 +40,7 @@ def test_date_as_partition_returns_formatted_string_for_date() -> None:
     """WHAT: date_as_partition returns non-empty string in Hive date format for date input.
     WHY: Partition path construction supports native date objects."""
     result = date_as_partition("dt", date(2024, 3, 15))
-    assert result == "year=2024/month=03/day=15"
+    assert result == "date=2024-03-15"
     assert len(result) > 0
 
 
@@ -48,8 +48,17 @@ def test_date_as_partition_returns_formatted_string_for_parseable_string() -> No
     """WHAT: date_as_partition returns non-empty string in Hive date format for parseable date string.
     WHY: Records often contain date strings; dateutil parses them for partition path."""
     result = date_as_partition("dt", "2024-03-15")
-    assert result == "year=2024/month=03/day=15"
+    assert result == "date=2024-03-15"
     assert len(result) > 0
+
+
+def test_date_as_partition_uses_date_format_override() -> None:
+    """WHAT: date_as_partition formats with the given date_format instead of the default.
+    WHY: hive_partition_date_format lets consumers keep the year=/month=/day= layout."""
+    result = date_as_partition(
+        "dt", "2024-03-15", date_format="year=%Y/month=%m/day=%d"
+    )
+    assert result == "year=2024/month=03/day=15"
 
 
 def test_date_as_partition_invalid_type_raises() -> None:

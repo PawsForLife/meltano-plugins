@@ -44,6 +44,7 @@ The target is configured via [Meltano](https://meltano.com/): settings and `conf
 | key_prefix           | TARGET_GCS_KEY_PREFIX           | string  | no       | None      | Static prefix prepended to generated object keys. Normalized (no leading `//`, leading `/` stripped).                                                                                                       |
 | max_records_per_file | TARGET_GCS_MAX_RECORDS_PER_FILE | integer | no       | 0         | When set and greater than 0, the target rotates to a new GCS object after that many records per stream; when 0 or omitted, one file per stream per run.                                                     |
 | hive_partitioned     | TARGET_GCS_HIVE_PARTITIONED     | boolean | no       | false     | When true, Hive-style partitioning from stream schema (`x-partition-fields`) or extraction date; path built per record. Key format is fixed (see Key format table below).                                      |
+| hive_partition_date_format | TARGET_GCS_HIVE_PARTITION_DATE_FORMAT | string | no | date=%Y-%m-%d | [strftime](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes) pattern for Hive date segments (run-date fallback and date-parseable `x-partition-fields`). Set `year=%Y/month=%m/day=%d` for the pre-4.0 layout. |
 
 **File chunking (optional):** When `max_records_per_file` is set and greater than 0, the target writes multiple files per stream; each file contains at most that many records, and the last file for a stream may have fewer. When 0 or omitted, one file per stream per run is written (no chunking). Chunking uses timestamp-only filenames: each new chunk gets a fresh `{timestamp}`, so keys differ unless consecutive chunks start within the same second.
 
@@ -51,19 +52,19 @@ See `meltano.yml` in this directory for an example `config` block; it may includ
 
 ### Key format (fixed)
 
-Object keys follow a fixed format per extraction pattern. The path and filename are built from internal constants; there is no user-configurable key template.
+Object keys follow a fixed format per extraction pattern. The path and filename are built from internal constants; there is no user-configurable key template. Only the Hive date segment pattern is configurable, via `hive_partition_date_format`.
 
 | Pattern       | Path format                                      | Description                                                                 |
 | ------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
 | SimplePath    | `{stream}/{date}/{timestamp}.jsonl`              | Single path per stream; no partition.                                       |
-| DatedPath     | `{stream}/{hive_path}/{timestamp}.jsonl`         | Hive-style by extraction date only; `hive_path` = run date (e.g. `year=2024/month=03/day=13`). |
+| DatedPath     | `{stream}/{hive_path}/{timestamp}.jsonl`         | Hive-style by extraction date only; `hive_path` = run date (e.g. `date=2024-03-13`). |
 | PartitionedPath | `{stream}/{hive_path}/{timestamp}.jsonl`       | Hive-style from record; `hive_path` from stream schema `x-partition-fields`. |
 
 ### Hive partitioning (schema-driven)
 
-When `hive_partitioned` is **true**, the target uses DatedPath or PartitionedPath. Object keys follow the fixed format `{stream}/{hive_path}/{timestamp}.jsonl` (see Key format table above). The path format is not user-configurable.
+When `hive_partitioned` is **true**, the target uses DatedPath or PartitionedPath. Object keys follow the fixed format `{stream}/{hive_path}/{timestamp}.jsonl` (see Key format table above). Date segments in `hive_path` use `hive_partition_date_format` (default `date=%Y-%m-%d`, e.g. `date=2024-03-13`); set it to `year=%Y/month=%m/day=%d` to keep the pre-4.0 `year=2024/month=03/day=13` layout. The rest of the path format is not user-configurable.
 
-**Path from stream schema:** If the stream schema defines `x-partition-fields` (array of property names at the top level), the path is built from those fields in **array order**. Each field must be in `properties`, in `required`, and non-nullable; the target validates this at sink init and raises `ValueError` if invalid. Every partition segment is `key=value`: literal segments are always emitted as `field_name=value` (e.g. `region=eu`); date segments are `year=YYYY/month=MM/day=DD` (Hive-style). For each field: **Date-parseable** values (e.g. ISO date/datetime strings) → one segment `year=.../month=.../day=...`. **Other values** → literal segment `field_name=value`; path-unsafe characters (e.g. `/`) are replaced (e.g. with `_`). **Fallback when no x-partition-fields:** If the stream has no `x-partition-fields` or it is empty, the target uses the **current date** (run date) for the partition path. **Removal of old settings:** `partition_date_field` and `partition_date_format` are no longer supported; use `hive_partitioned: true` and define partition fields on the stream schema via `x-partition-fields`.
+**Path from stream schema:** If the stream schema defines `x-partition-fields` (array of property names at the top level), the path is built from those fields in **array order**. Each field must be in `properties`, in `required`, and non-nullable; the target validates this at sink init and raises `ValueError` if invalid. Every partition segment is `key=value`: literal segments are always emitted as `field_name=value` (e.g. `region=eu`); date segments are formatted with `hive_partition_date_format` (default `date=YYYY-MM-DD`). For each field: **Date-parseable** values (e.g. ISO date/datetime strings) → one date segment (e.g. `date=2024-03-13`). **Other values** → literal segment `field_name=value`; path-unsafe characters (e.g. `/`) are replaced (e.g. with `_`). **Fallback when no x-partition-fields:** If the stream has no `x-partition-fields` or it is empty, the target uses the **current date** (run date) for the partition path. **Removal of old settings:** `partition_date_field` and `partition_date_format` are no longer supported; use `hive_partitioned: true` and define partition fields on the stream schema via `x-partition-fields`.
 
 **Example:** Stream schema with `x-partition-fields` (e.g. `["region", "created_at"]`); set the loader `config` in `meltano.yml`:
 
@@ -76,9 +77,11 @@ plugins:
       config:
         bucket_name: my-bucket
         hive_partitioned: true
+        # Optional: keep the pre-4.0 layout instead of the date=YYYY-MM-DD default.
+        # hive_partition_date_format: "year=%Y/month=%m/day=%d"
 ```
 
-Resulting path order: first segment from `region` (literal, e.g. `region=eu`), then `year=.../month=.../day=...` from `created_at`. For `x-partition-fields: ["country", "event_date"]`, paths look like `country=UK/year=2024/month=03/day=13/` (literal then date).
+Resulting path order: first segment from `region` (literal, e.g. `region=eu`), then the date segment from `created_at` (e.g. `date=2024-03-13`). For `x-partition-fields: ["country", "event_date"]`, paths look like `country=UK/date=2024-03-13/` by default, or `country=UK/year=2024/month=03/day=13/` with the override above.
 
 **Chunking:** When both `max_records_per_file` and `hive_partitioned` are set, the target rotates to a new file after that many records **within the current partition**. The partition path stays the same; the new file uses a new timestamp in the key.
 
