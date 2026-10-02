@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-02
+
+### Changed
+
+- CI `commitlint.yaml` mirrors puggle's advisory `commitlint-variant.yaml` inline (`continue-on-error`); added `.no-mistakes.yaml` so pipeline commits use `chore(no-mistakes):`.
+
 ## 2026-09-29
 
 ### Added

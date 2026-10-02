@@ -107,7 +107,7 @@ To bootstrap all plugins and git hooks from the repository root:
 
 This repo enforces [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`<type>(<scope>): <description>`, e.g. `feat(tap-talon-one): add campaigns stream (DNA-9537)`):
 
-- **CI:** the `Lint Commit Messages` workflow lints every non-merge commit on PRs into `main` (relaxed mode; merge commits are ignored). Promotion PRs into `release` are deliberately not linted.
+- **CI:** the `Lint Commit Messages` workflow checks commits on PRs into `main` with rules mirroring puggle's shared variant (advisory for now; merge commits are ignored). Promotion PRs into `release` are deliberately not linted.
 - **Local:** a `commit-msg` gitlint hook rejects non-conventional messages (installed by `./install.sh`; config in `.gitlint`).
 - **PR titles:** merges use `PR_TITLE`, so the PR title lands in history — write it in Conventional Commits form with a trailing key, e.g. `feat: add campaigns stream (DNA-9537)`.
 

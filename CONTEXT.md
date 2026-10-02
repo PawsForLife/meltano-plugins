@@ -4,19 +4,17 @@ Public Python monorepo of Meltano/Singer plugins. Default branch `main`, promote
 
 ## CI/CD — commit-message linting
 
-Conventional Commits ([spec](https://www.conventionalcommits.org/en/v1.0.0/)) are enforced.
-Reference: [Pet Circle commit-message linting](https://petcircle.atlassian.net/wiki/spaces/TEC/pages/2786427719).
+Conventional Commits ([spec](https://www.conventionalcommits.org/en/v1.0.0/)) are checked,
+advisory for now. Reference: [Pet Circle commit-message linting](https://petcircle.atlassian.net/wiki/spaces/TEC/pages/2786427719).
 
 - **CI** — `.github/workflows/commitlint.yaml` runs `wagoid/commitlint-github-action@v6`
-  inline on `ubuntu-latest` for every PR (`if: github.base_ref == 'main'`), in relaxed
-  mode (a generated `commitlint.config.mjs` extending `@commitlint/config-conventional`,
-  `subject-case` downgraded to a warning; `strict` is not set). It is inlined rather than
-  calling the org reusable workflow because this repo is **public**: it cannot read the
-  private `pc-central-services`, and self-hosted runners on a public repo would expose
-  internal infra to fork PRs — so it keeps `ubuntu-latest`.
+  inline on `ubuntu-latest` for PRs into `main`, with the same relaxed rules as the data
+  team's `PawsForLife/puggle` `commitlint-variant.yaml`. It mirrors that workflow inline
+  because this repo is **public** and cannot call the private puggle workflow. The step is
+  `continue-on-error: true`, so lint errors do not fail the check yet.
   - Merge commits are ignored (config-conventional `defaultIgnores`), so
     `Merge branch 'main' into ...` commits pass.
-  - `release` promotion PRs (`M2R`) are skipped by `github.base_ref == 'main'` and are
+  - `release` promotion PRs (`M2R`) are skipped by the `branches: [main]` trigger and are
     deliberately not linted.
   - Not a required status check — branch protection is unchanged (out of scope).
 
