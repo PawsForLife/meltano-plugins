@@ -75,7 +75,7 @@ def test_key_shape_matches_constants(
         "SimplePath key must match stream/date/timestamp.jsonl"
     )
 
-    # DatedPath: stream/year=X/month=Y/day=Z/timestamp.jsonl
+    # DatedPath: stream/date=YYYY-MM-DD/timestamp.jsonl
     config = {"bucket_name": "test-bucket", "hive_partitioned": True}
     target = GCSTarget(config=config, storage_client=recording_storage_client)
     sink = GCSSink(
@@ -89,7 +89,7 @@ def test_key_shape_matches_constants(
     )
     sink.process_record({"id": 1}, {})
     assert re.match(
-        r"my_stream/year=\d+/month=\d+/day=\d+/99999000\.jsonl", sink.key_name
+        r"my_stream/date=\d{4}-\d{2}-\d{2}/99999000\.jsonl", sink.key_name
     ), "DatedPath key must match stream/hive_path/timestamp.jsonl"
 
     # PartitionedPath: stream/field=value/.../timestamp.jsonl

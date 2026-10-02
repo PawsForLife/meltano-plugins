@@ -5,6 +5,7 @@
 ### Changed
 
 - CI `commitlint.yaml` mirrors puggle's advisory `commitlint-variant.yaml` inline (`continue-on-error`); added `.no-mistakes.yaml` so pipeline commits use `chore(no-mistakes):`.
+- **AI context (target-gcs)** — Document the `hive_partition_date_format` setting and the `date=YYYY-MM-DD` default Hive date segment in target-gcs 4.0.0.
 
 ## 2026-09-29
 

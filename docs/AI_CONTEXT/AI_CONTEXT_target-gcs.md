@@ -21,10 +21,10 @@
 | `target_gcs/sinks.py` | `GCSSink`: selects one of SimplePath, DatedPath, or PartitionedPath from config and schema; delegates `process_record` and lifecycle to `_extraction_pattern`. |
 | `target_gcs/paths/base.py` | `BasePathPattern`: shared key prefix, effective template, JSONL write, rotation at limit, flush/close; subclasses implement key building and handle lifecycle. |
 | `target_gcs/paths/simple.py` | `SimplePath`: single path per stream, one handle; `{date}` from config `date_format` and injection `extraction_date`; rotation at `max_records_per_file`. |
-| `target_gcs/paths/dated.py` | `DatedPath`: Hive-style by extraction date only; partition path from `extraction_date` via `DEFAULT_PARTITION_DATE_FORMAT`; rotation at limit. |
+| `target_gcs/paths/dated.py` | `DatedPath`: Hive-style by extraction date only; partition path from `extraction_date` via `hive_partition_date_format`; rotation at limit. |
 | `target_gcs/paths/partitioned.py` | `PartitionedPath`: schema-driven Hive from `x-partition-fields`; partition path per record via `hive_path(record)`; on partition change closes handle and resets state; rotation at limit within partition. |
-| `target_gcs/paths/_partitioned/hive.py` | `get_hive_path_generator(partition_fields, schema)`: returns list of `(field_name, fn)`; fn is `date_as_partition` or `string_as_partition` per field schema. |
-| `target_gcs/paths/_partitioned/string_functions.py` | `date_as_partition`, `string_as_partition`: format partition path segments; date uses `DEFAULT_PARTITION_DATE_FORMAT`; date parsing via `dateutil.parser.parse` (raises `dateutil.parser.ParserError` when unparseable). |
+| `target_gcs/paths/_partitioned/hive.py` | `get_hive_path_generator(partition_fields, schema, date_format)`: returns list of `(field_name, fn)`; fn is `date_as_partition` (bound to `date_format`) or `string_as_partition` per field schema. |
+| `target_gcs/paths/_partitioned/string_functions.py` | `date_as_partition`, `string_as_partition`: format partition path segments; date uses the `date_format` passed by `get_hive_path_generator` (from `hive_partition_date_format`); date parsing via `dateutil.parser.parse` (raises `dateutil.parser.ParserError` when unparseable). |
 | `target_gcs/paths/_partitioned/validators.py` | `is_date_field(field_definition)`: true when schema type/format is date or date-time (used to choose date vs string segment). |
 | `target_gcs/paths/_types.py` | `PathType` enum: SIMPLE, DATED, PARTITIONED (for typing; not used in runtime selection). |
 | `target_gcs/helpers/partition_schema.py` | `validate_partition_fields_schema`, `validate_partition_date_field_schema`, `_assert_field_required_and_non_null_type`: schema validation for partition fields. |
@@ -41,7 +41,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
 
 - **`PATH_SIMPLE`**, **`PATH_DATED`**, **`PATH_PARTITIONED`**: Path templates for SimplePath, DatedPath, PartitionedPath. Tokens: `{stream}`, `{date}`, `{hive_path}`.
 - **`FILENAME_TEMPLATE`**: `"{timestamp}.jsonl"` — filename segment; timestamp-only chunking (no `{chunk_index}`).
-- **`DEFAULT_PARTITION_DATE_FORMAT`**: `"year=%Y/month=%m/day=%d"` (Hive-style). Single source of truth for partition date formatting. Used by `DatedPath` and `_partitioned.string_functions` for date segments in partition paths.
+- **`DEFAULT_PARTITION_DATE_FORMAT`**: `"date=%Y-%m-%d"` (Hive-style). Default for the `hive_partition_date_format` config; `BasePathPattern.hive_partition_date_format` resolves the config value or this default for `DatedPath` and `PartitionedPath` date segments.
 
 ### GCSTarget (`target_gcs.target`)
 
@@ -52,6 +52,7 @@ Package root: `loaders/target-gcs/`. Source package: `target_gcs/`. No shared co
   - `key_prefix` (string, optional): Prepended to the generated object key; normalized (no leading `//`, leading `/` stripped).
   - `max_records_per_file` (integer, optional): When set and > 0, the sink rotates to a new file after that many records per stream; when 0 or omitted, one file per stream per run. Chunking uses timestamp-only filenames; `{timestamp}` is refreshed per chunk.
   - `hive_partitioned` (boolean, optional, default false): When true, Hive-style partitioning from stream schema `x-partition-fields` or extraction date; path built per record via `hive_path(record)` in PartitionedPath or extraction date in DatedPath.
+  - `hive_partition_date_format` (string, optional, default `date=%Y-%m-%d`): strftime pattern for Hive date segments in DatedPath and PartitionedPath; `year=%Y/month=%m/day=%d` reproduces the pre-4.0 layout.
 - **Sink**: `default_sink_class = GCSSink`.
 - **Sink creation**: Overrides `get_sink()` and `_add_sink_with_client()` so each sink receives `storage_client=self._storage_client`. `_storage_client` is set in `__init__`: from `kwargs["storage_client"]` if provided, else `Client()`. Tests use a subclass that injects a recording client (e.g. `GCSTargetWithRecordingStorage` with `RecordingGCSClient`).
 
@@ -88,8 +89,8 @@ The path patterns read `date_format` from config for the `{date}` token (e.g. Si
 
 **Selection rule**: `hive_partitioned` false or unset → **SimplePath** (single path per stream, no partition). `hive_partitioned` true + non-empty `x-partition-fields` → **PartitionedPath** (partition path per record from schema). `hive_partitioned` true + no/empty `x-partition-fields` → **DatedPath** (extraction date only).
 
-- **DatedPath**: Partition path is the run/extraction date via `DEFAULT_PARTITION_DATE_FORMAT` (e.g. `year=2024/month=03/day=11`). One logical partition per run; chunking rotates within it. Uses injected `extraction_date` (or `datetime.today()` when not injected).
-- **PartitionedPath**: Partition path per record via `hive_path(record)` from stream schema `x-partition-fields` and the record. Path order = array order. Every segment is `key=value`: literal segments `field_name=value` (path-safe); date segments `year=.../month=.../day=...`. **Date-parseable** is determined by `is_date_field()` (schema type/format date or date-time); native `datetime`/`date` are date segments. Unparseable date strings raise `dateutil.parser.ParserError`. On partition change the pattern closes the handle and resets state; when the same partition returns, the next write gets a new key (new file). Chunking rotates within the current partition.
+- **DatedPath**: Partition path is the run/extraction date via `hive_partition_date_format` (default e.g. `date=2024-03-11`). One logical partition per run; chunking rotates within it. Uses injected `extraction_date` (or `datetime.today()` when not injected).
+- **PartitionedPath**: Partition path per record via `hive_path(record)` from stream schema `x-partition-fields` and the record. Path order = array order. Every segment is `key=value`: literal segments `field_name=value` (path-safe); date segments formatted with `hive_partition_date_format` (default `date=YYYY-MM-DD`). **Date-parseable** is determined by `is_date_field()` (schema type/format date or date-time); native `datetime`/`date` are date segments. Unparseable date strings raise `dateutil.parser.ParserError`. On partition change the pattern closes the handle and resets state; when the same partition returns, the next write gets a new key (new file). Chunking rotates within the current partition.
 
 ### Partition fields validation (sink init)
 

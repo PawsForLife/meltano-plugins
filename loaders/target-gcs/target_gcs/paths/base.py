@@ -16,7 +16,7 @@ from typing import Any
 import orjson
 from google.cloud.storage import Client
 
-from target_gcs.constants import FILENAME_TEMPLATE
+from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT, FILENAME_TEMPLATE
 from target_gcs.helpers import _json_default
 
 
@@ -49,6 +49,14 @@ class BasePathPattern(abc.ABC):
         self._key_name: str = ""
         self._records_written_in_current_file: int = 0
         self.bucket_name: str = config.get("bucket_name", "") or ""
+
+    @property
+    def hive_partition_date_format(self) -> str:
+        """strftime pattern for Hive date segments; config override or DEFAULT_PARTITION_DATE_FORMAT."""
+        return (
+            self.config.get("hive_partition_date_format")
+            or DEFAULT_PARTITION_DATE_FORMAT
+        )
 
     @property
     def storage_client(self) -> Client:

@@ -5,7 +5,9 @@ from dateutil import parser as dateutil_parser
 from target_gcs.constants import DEFAULT_PARTITION_DATE_FORMAT
 
 
-def date_as_partition(field_name: str, field_value: str) -> str:
+def date_as_partition(
+    field_name: str, field_value: str, date_format: str = DEFAULT_PARTITION_DATE_FORMAT
+) -> str:
 
     if isinstance(field_value, (datetime, date)):
         date_value = field_value
@@ -13,7 +15,7 @@ def date_as_partition(field_name: str, field_value: str) -> str:
         date_value = dateutil_parser.parse(field_value)
     else:
         raise TypeError("unsupported field_value type")
-    return date_value.strftime(DEFAULT_PARTITION_DATE_FORMAT)
+    return date_value.strftime(date_format)
 
 
 def string_as_partition(field_name: str, field_value: str) -> str:

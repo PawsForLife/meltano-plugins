@@ -46,10 +46,6 @@ class PartitionedPath(BasePathPattern):
             stream_name=stream_name, schema=schema, partition_fields=partition_fields
         )
 
-        self.hive_path_generator = get_hive_path_generator(
-            partition_fields=partition_fields, schema=schema
-        )
-
         self.schema = schema
         self.partition_fields = partition_fields
         self._current_partition_path: str | None = None
@@ -59,6 +55,11 @@ class PartitionedPath(BasePathPattern):
             time_fn=time_fn,
             storage_client=storage_client,
             extraction_date=extraction_date,
+        )
+        self.hive_path_generator = get_hive_path_generator(
+            partition_fields=partition_fields,
+            schema=schema,
+            date_format=self.hive_partition_date_format,
         )
 
     def hive_path(self, record: dict[str, Any]) -> str:
